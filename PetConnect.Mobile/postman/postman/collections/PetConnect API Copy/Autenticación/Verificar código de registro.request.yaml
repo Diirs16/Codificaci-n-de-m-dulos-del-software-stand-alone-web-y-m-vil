@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{base_url}}/auth/verify"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "dtest@example.com",
+      "code": "123456"
+    }
+order: 2000

@@ -1,0 +1,5 @@
+$kind: collection
+description: "Colección de pruebas de la API REST de PetConnect (módulo web). Framework: Flask + MySQL. Autenticación: JWT Bearer Token."
+variables:
+  base_url: http://localhost:5000/api
+  token: ""

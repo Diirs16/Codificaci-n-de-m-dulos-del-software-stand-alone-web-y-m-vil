@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/mascotas/3"
+method: GET
+order: 2000
