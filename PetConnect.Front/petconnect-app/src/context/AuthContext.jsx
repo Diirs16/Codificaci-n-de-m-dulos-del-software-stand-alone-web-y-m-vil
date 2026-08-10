@@ -1,5 +1,10 @@
 import { createContext, useContext, useState } from "react";
-import { loginUser, registerUser, verifyCode as apiVerifyCode } from "../services/api";
+import {
+  loginUser,
+  registerUser,
+  verifyCode as apiVerifyCode,
+  verifyLoginCode as apiVerifyLoginCode,
+} from "../services/api";
 
 const AuthContext = createContext();
 const SESSION_KEY = "petconnect_session";
@@ -30,6 +35,7 @@ export function AuthProvider({ children }) {
   const [showRegister, setShowRegister] = useState(false);
   const [authError, setAuthError]     = useState(null);
   const [pendingEmail, setPendingEmail] = useState(null);
+  const [pendingLoginEmail, setPendingLoginEmail] = useState(null);
 
   const _setUser = (userData, token) => {
     setUser(userData);
@@ -39,8 +45,15 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     setAuthError(null);
-    const { token, ...userData } = await loginUser(email, password);
+    await loginUser(email, password);
+    setPendingLoginEmail(email);
+  };
+
+  const verifyLoginCode = async (email, code) => {
+    setAuthError(null);
+    const { token, ...userData } = await apiVerifyLoginCode(email, code);
     _setUser(userData, token);
+    setPendingLoginEmail(null);
     setShowLogin(false);
   };
 
@@ -61,12 +74,14 @@ export function AuthProvider({ children }) {
   const logout = () => {
     _setUser(null);
     setPendingEmail(null);
+    setPendingLoginEmail(null);
   };
 
   const openLogin = () => {
     setShowRegister(false);
     setShowLogin(true);
     setAuthError(null);
+    setPendingLoginEmail(null);
   };
 
   const openRegister = () => {
@@ -88,7 +103,10 @@ export function AuthProvider({ children }) {
         setShowRegister,
         pendingEmail,
         setPendingEmail,
+        pendingLoginEmail,
+        setPendingLoginEmail,
         login,
+        verifyLoginCode,
         register,
         verifyCode,
         logout,

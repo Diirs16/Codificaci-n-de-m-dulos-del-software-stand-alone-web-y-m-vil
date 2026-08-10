@@ -19,11 +19,19 @@ DB_NAME=petconnect
 DB_USER=root
 DB_PASSWORD=
 
-# Mailtrap (opcional: si se deja vacio o falla el envio, el codigo de
+# Envio de correo (opcional: si falla o no esta configurado, el codigo de
 # verificacion se imprime en la consola del servidor igualmente)
+# EMAIL_MODE=sdk | smtp | gmail  (ver comentarios en .env.example)
+EMAIL_MODE=gmail
+
 MAILTRAP_API_TOKEN=
 MAILTRAP_SENDER=noreply@tudominio.com
-EMAIL_MODE=sdk
+
+# Gmail SMTP: GMAIL_APP_PASSWORD es una "contrasena de aplicacion" de 16
+# caracteres (no la contrasena normal), generada en
+# https://myaccount.google.com/apppasswords
+GMAIL_USER=
+GMAIL_APP_PASSWORD=
 
 # Claves de seguridad (generadas automaticamente - NUNCA compartir)
 JWT_SECRET={jwt_secret}

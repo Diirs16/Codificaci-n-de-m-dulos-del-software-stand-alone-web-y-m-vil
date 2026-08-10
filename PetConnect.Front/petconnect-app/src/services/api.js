@@ -43,6 +43,20 @@ export function verifyCode(email, code) {
   });
 }
 
+export function verifyLoginCode(email, code) {
+  return apiFetch("/auth/login/verify", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export function validarCorreo(email) {
+  return apiFetch("/utils/validar-correo", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
 // --- Productos ---
 export function getProductos() { return apiFetch("/productos"); }
 export function getProducto(id) { return apiFetch(`/productos/${id}`); }

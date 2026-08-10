@@ -8,7 +8,7 @@ import jwt
 
 _SECRET    = os.environ.get("JWT_SECRET", "dev-secret-inseguro")
 _ALGORITHM = "HS256"
-_EXPIRE    = 7 * 24 * 3600  # 7 dias en segundos
+_EXPIRE    = 24 * 3600  # 24 horas en segundos
 
 
 def generate_token(user_id: int, email: str) -> str:

@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
-import { X, Check, AlertCircle } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { X, Check, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { esFormatoCorreoValido } from "../utils/validarCorreo";
+import { validarCorreo } from "../services/api";
 
 const RULES = [
   { id: "len",     label: "Mínimo 8 caracteres",               test: (p) => p.length >= 8 },
@@ -38,6 +40,38 @@ export default function RegisterModal() {
   );
   const allRulesOk = ruleResults.every((r) => r.ok);
 
+  // Estado del correo: "vacio" | "formato_invalido" | "verificando" | "valido" | "invalido" | "sin_verificar"
+  const [emailStatus, setEmailStatus] = useState({ estado: "vacio", mensaje: "" });
+
+  useEffect(() => {
+    const email = form.email.trim();
+
+    if (!email) {
+      setEmailStatus({ estado: "vacio", mensaje: "" });
+      return;
+    }
+    // 1. Formato: instantáneo, 100% en el navegador.
+    if (!esFormatoCorreoValido(email)) {
+      setEmailStatus({ estado: "formato_invalido", mensaje: "El formato del correo no es válido" });
+      return;
+    }
+    // 2. Dominio: se confirma con el backend (consulta registros MX),
+    //    con un pequeño retraso para no llamar la API en cada tecla.
+    setEmailStatus({ estado: "verificando", mensaje: "Verificando dominio..." });
+    const timeoutId = setTimeout(async () => {
+      try {
+        const res = await validarCorreo(email);
+        setEmailStatus({ estado: res.valido ? "valido" : "invalido", mensaje: res.mensaje });
+      } catch {
+        setEmailStatus({ estado: "sin_verificar", mensaje: "No se pudo verificar el dominio ahora mismo" });
+      }
+    }, 600);
+
+    return () => clearTimeout(timeoutId);
+  }, [form.email]);
+
+  const emailBloqueaEnvio = emailStatus.estado === "formato_invalido" || emailStatus.estado === "invalido";
+
   if (!showRegister) return null;
 
   const handleChange = (e) =>
@@ -45,6 +79,10 @@ export default function RegisterModal() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (emailBloqueaEnvio) {
+      setAuthError(emailStatus.mensaje || "El correo no es válido");
+      return;
+    }
     if (!allRulesOk) {
       setAuthError("La contraseña no cumple todos los requisitos");
       setShowRules(true);
@@ -136,9 +174,35 @@ export default function RegisterModal() {
                   value={form.email}
                   onChange={handleChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none ${
+                    emailBloqueaEnvio
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-gray-300 focus:border-black"
+                  }`}
                   placeholder="tu@correo.com"
                 />
+                {emailStatus.estado !== "vacio" && (
+                  <p
+                    className={`mt-1.5 flex items-center gap-1.5 text-xs ${
+                      emailStatus.estado === "valido"
+                        ? "text-green-600"
+                        : emailStatus.estado === "verificando"
+                        ? "text-gray-400"
+                        : emailStatus.estado === "sin_verificar"
+                        ? "text-amber-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {emailStatus.estado === "verificando" ? (
+                      <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                    ) : emailStatus.estado === "valido" ? (
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                    {emailStatus.mensaje}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -188,7 +252,7 @@ export default function RegisterModal() {
 
               <button
                 type="submit"
-                disabled={loading || !allRulesOk || form.password !== form.confirmPassword}
+                disabled={loading || emailBloqueaEnvio || !allRulesOk || form.password !== form.confirmPassword}
                 className="w-full bg-black text-white py-2.5 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {loading ? "Enviando código..." : "Registrarse"}

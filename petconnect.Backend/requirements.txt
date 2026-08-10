@@ -5,3 +5,4 @@ mailtrap
 python-dotenv
 PyJWT
 cryptography
+dnspython

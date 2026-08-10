@@ -79,7 +79,19 @@
           }
         },
         {
-          "name": "Iniciar sesión",
+          "name": "Iniciar sesión (paso 1: envía código por correo)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"dtest@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Verificar código de inicio de sesión (paso 2)",
           "event": [
             {
               "listen": "test",
@@ -98,9 +110,9 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"dtest@example.com\",\n  \"password\": \"Password123!\"\n}"
+              "raw": "{\n  \"email\": \"dtest@example.com\",\n  \"code\": \"123456\"\n}"
             },
-            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+            "url": { "raw": "{{base_url}}/auth/login/verify", "host": ["{{base_url}}"], "path": ["auth", "login", "verify"] }
           }
         },
         {

@@ -6,8 +6,6 @@ Ejecutar con: python api.py
 import sys
 import os
 import hashlib
-import random
-import time
 import re
 from datetime import datetime, date
 from functools import wraps
@@ -18,10 +16,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import mailtrap as mt
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import dns.resolver
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from mysql.connector import Error
@@ -29,7 +24,8 @@ from mysql.connector import Error
 from conexion.conexion_bd import ConexionBD
 from dao.usuario_dao import UsuarioDAO
 from modelo.usuario import Usuario
-from config.email_config import EMAIL_CONFIG
+from correo import enviar_codigo, enviar_bienvenida
+from otp import AlmacenOTP
 from security.jwt_helper import generate_token, verify_token
 from security.crypto import encrypt, decrypt
 
@@ -45,7 +41,8 @@ def handle_exception(e):
     return jsonify({"error": str(e)}), 500
 
 _conexion_bd = ConexionBD()
-_pending = {}
+_otp_registro = AlmacenOTP()
+_otp_login = AlmacenOTP()
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +79,48 @@ def _validate_password(password: str) -> str | None:
     return None
 
 
+_EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+_mx_cache: dict[str, bool] = {}
+
+
+def _validar_correo(email: str) -> tuple[bool, str]:
+    """
+    Valida el correo en dos niveles:
+      1. Formato (regex) - rapido, sin red.
+      2. Dominio (registros MX) - confirma que el dominio tiene
+         servidores de correo configurados (detecta typos como
+         "gmial.com" o dominios inventados). No confirma que la
+         casilla especifica exista: eso solo lo confirma el codigo
+         de verificacion que se envia al correo.
+    """
+    email = (email or "").strip()
+
+    if not email:
+        return False, "El correo es requerido"
+    if not _EMAIL_REGEX.match(email):
+        return False, "El formato del correo no es valido"
+
+    dominio = email.rsplit("@", 1)[-1].lower()
+
+    if dominio in _mx_cache:
+        tiene_mx = _mx_cache[dominio]
+    else:
+        try:
+            respuestas = dns.resolver.resolve(dominio, "MX", lifetime=4)
+            tiene_mx = len(respuestas) > 0
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+            tiene_mx = False
+        except Exception:
+            # Fallo de red/DNS temporal: no bloqueamos el registro por esto.
+            return True, "No se pudo verificar el dominio en este momento, pero el formato es valido"
+        _mx_cache[dominio] = tiene_mx
+
+    if not tiene_mx:
+        return False, f'El dominio "{dominio}" no tiene servidores de correo configurados'
+
+    return True, "El correo y el dominio son validos"
+
+
 # ---------------------------------------------------------------------------
 # Decorador de autenticacion JWT
 # ---------------------------------------------------------------------------
@@ -100,50 +139,6 @@ def require_auth(f):
         request.current_user_email = payload["email"]
         return f(*args, **kwargs)
     return decorated
-
-
-# ---------------------------------------------------------------------------
-# Email
-# ---------------------------------------------------------------------------
-
-_HTML_CODE = """
-<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;
-            border:1px solid #e5e5e5;border-radius:12px;">
-  <h2 style="color:#111;margin-bottom:8px;">PetConnect</h2>
-  <p style="color:#555;">Hola <strong>{name}</strong>,</p>
-  <p style="color:#555;">Tu codigo de verificacion es:</p>
-  <div style="font-size:40px;font-weight:bold;letter-spacing:10px;text-align:center;
-              padding:24px;background:#f5f5f5;border-radius:8px;margin:16px 0;">{code}</div>
-  <p style="color:#999;font-size:13px;">Expira en <strong>10 minutos</strong>.<br>
-  Si no solicitaste esto, ignora este mensaje.</p>
-</div>"""
-
-
-def _send_code(to_email: str, name: str, code: str):
-    html = _HTML_CODE.format(name=name, code=code)
-    texto = f"Hola {name},\n\nTu codigo: {code}\n\nExpira en 10 minutos.\n\nEquipo PetConnect"
-
-    if EMAIL_CONFIG["mode"] == "smtp":
-        msg = MIMEMultipart("alternative")
-        msg["From"]    = f"PetConnect <{EMAIL_CONFIG['smtp_user']}>"
-        msg["To"]      = to_email
-        msg["Subject"] = "PetConnect - Codigo de verificacion"
-        msg.attach(MIMEText(texto, "plain"))
-        msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP(EMAIL_CONFIG["smtp_host"], EMAIL_CONFIG["smtp_port"]) as s:
-            s.ehlo()
-            s.starttls()
-            s.login(EMAIL_CONFIG["smtp_user"], EMAIL_CONFIG["smtp_pass"])
-            s.sendmail(EMAIL_CONFIG["smtp_user"], to_email, msg.as_string())
-    else:
-        mail = mt.Mail(
-            sender=mt.Address(email=EMAIL_CONFIG["sender"], name=EMAIL_CONFIG["sender_name"]),
-            to=[mt.Address(email=to_email)],
-            subject="PetConnect - Codigo de verificacion",
-            text=texto,
-            html=html,
-        )
-        mt.MailtrapClient(token=EMAIL_CONFIG["api_token"]).send(mail)
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +244,24 @@ def get_mascota(id_mascota):
 
 
 # ---------------------------------------------------------------------------
+# Utilidades publicas
+# ---------------------------------------------------------------------------
+
+@app.route("/api/utils/validar-correo", methods=["POST"])
+def validar_correo():
+    """
+    Valida formato + dominio (registros MX) de un correo, sin crear nada.
+    Pensado para llamarse en vivo mientras el usuario escribe en el
+    formulario de registro (con debounce en el frontend).
+    """
+    data = request.get_json(silent=True) or {}
+    email = data.get("email", "")
+
+    valido, mensaje = _validar_correo(email)
+    return jsonify({"valido": valido, "mensaje": mensaje})
+
+
+# ---------------------------------------------------------------------------
 # Autenticacion
 # ---------------------------------------------------------------------------
 
@@ -270,6 +283,43 @@ def login():
     if usuario.estado != "activo":
         return jsonify({"error": "Cuenta inactiva o bloqueada"}), 403
 
+    # Segundo factor: se manda un codigo de un solo uso al correo antes de
+    # entregar el token. La sesion solo se completa en /api/auth/login/verify.
+    code = _otp_login.crear(email, {"id_usuario": usuario.id_usuario})
+
+    try:
+        enviar_codigo(
+            email, usuario.nombres, code,
+            asunto="PetConnect - Codigo de inicio de sesion",
+            proposito="Usa este codigo para confirmar que eres tu e iniciar sesion:",
+        )
+    except Exception as e:
+        print(f"[DEV] No se pudo enviar el correo ({e}). Codigo de inicio de sesion para {email}: {code}")
+
+    return jsonify({"message": "Codigo enviado", "email": email})
+
+
+@app.route("/api/auth/login/verify", methods=["POST"])
+def login_verify():
+    data  = request.get_json(silent=True) or {}
+    email = data.get("email", "").strip()
+    code  = data.get("code", "").strip()
+
+    pending, error = _otp_login.verificar(email, code)
+    if error == "no_pendiente":
+        return jsonify({"error": "No hay inicio de sesion pendiente para este correo"}), 400
+    if error == "expirado":
+        return jsonify({"error": "El codigo expiro. Vuelve a iniciar sesion"}), 400
+    if error == "incorrecto":
+        return jsonify({"error": "Codigo incorrecto"}), 400
+
+    _otp_login.descartar(email)
+
+    dao = UsuarioDAO()
+    usuario = dao.consultar_por_correo(email)
+    if usuario is None:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
     token = generate_token(usuario.id_usuario, usuario.correo)
     return jsonify({
         "token": token,
@@ -289,6 +339,10 @@ def register():
     if not name or not email or not password:
         return jsonify({"error": "Nombre, correo y contrasena son requeridos"}), 400
 
+    correo_valido, mensaje_correo = _validar_correo(email)
+    if not correo_valido:
+        return jsonify({"error": mensaje_correo}), 400
+
     error_pw = _validate_password(password)
     if error_pw:
         return jsonify({"error": error_pw}), 400
@@ -297,16 +351,17 @@ def register():
     if dao.consultar_por_correo(email) is not None:
         return jsonify({"error": "El correo ya esta registrado"}), 409
 
-    code = str(random.randint(100000, 999999))
-    _pending[email] = {
-        "code":          code,
+    code = _otp_registro.crear(email, {
         "name":          name,
         "password_hash": _hash_password(password),
-        "expires":       time.time() + 600,
-    }
+    })
 
     try:
-        _send_code(email, name.split()[0], code)
+        enviar_codigo(
+            email, name.split()[0], code,
+            asunto="PetConnect - Codigo de verificacion",
+            proposito="Usa este codigo para verificar tu correo y completar tu registro:",
+        )
     except Exception as e:
         # Si el envio de correo falla (Mailtrap no configurado/no disponible),
         # el registro continua igual y el codigo queda visible en la consola
@@ -322,15 +377,12 @@ def verify():
     email = data.get("email", "").strip()
     code  = data.get("code", "").strip()
 
-    pending = _pending.get(email)
-    if not pending:
+    pending, error = _otp_registro.verificar(email, code)
+    if error == "no_pendiente":
         return jsonify({"error": "No hay verificacion pendiente para este correo"}), 400
-
-    if time.time() > pending["expires"]:
-        del _pending[email]
+    if error == "expirado":
         return jsonify({"error": "El codigo expiro. Vuelve a registrarte"}), 400
-
-    if pending["code"] != code:
+    if error == "incorrecto":
         return jsonify({"error": "Codigo incorrecto"}), 400
 
     parts    = pending["name"].split(" ", 1)
@@ -353,7 +405,12 @@ def verify():
     if not dao.insertar(usuario):
         return jsonify({"error": "Error al crear el usuario"}), 500
 
-    del _pending[email]
+    _otp_registro.descartar(email)
+
+    try:
+        enviar_bienvenida(email, nombres)
+    except Exception as e:
+        print(f"[DEV] No se pudo enviar el correo de bienvenida ({e}) a {email}")
 
     token = generate_token(usuario.id_usuario, email)
     return jsonify({
