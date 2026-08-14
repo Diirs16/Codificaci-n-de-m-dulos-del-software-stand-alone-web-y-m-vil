@@ -1,0 +1,52 @@
+# ================================================================
+# PETCONNECT — .gitignore raíz
+# Cubre todo el repositorio como respaldo, además de los .gitignore
+# propios de cada módulo (petconnect.Backend/, PetConnect.Front/,
+# PetConnect.Mobile/).
+# ================================================================
+
+# Entornos virtuales de Python (NUNCA subir: son locales y pesados)
+.venv/
+.venv-1/
+venv/
+env/
+
+# Variables de entorno y credenciales (NUNCA subir: contraseñas, claves, tokens)
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Cache y artefactos de Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Dependencias de Node (cualquier proyecto: Front, Mobile, etc.)
+node_modules/
+dist/
+dist-ssr/
+.expo/
+web-build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Bases de datos locales / temporales
+*.sqlite3
+*.db
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claves y certificados sueltos
+*.pem
+*.key
+*.p12
+*.jks

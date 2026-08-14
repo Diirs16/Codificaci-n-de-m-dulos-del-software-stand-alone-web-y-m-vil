@@ -11,7 +11,7 @@ import { registerUser, verifyCode, loginUser } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function RegisterScreen({ navigation }) {
-  const { login } = useAuth();
+  const { establecerSesion } = useAuth();
   const [step, setStep] = useState("form"); // form | code
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -38,7 +38,7 @@ export default function RegisterScreen({ navigation }) {
     setLoading(true);
     try {
       const data = await verifyCode(email.trim(), code.trim());
-      await login(data.token, data);
+      await establecerSesion(data.token, data);
     } catch (e) {
       setError(e.message);
     } finally {

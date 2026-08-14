@@ -72,6 +72,13 @@ export function verifyCode(email, code) {
   });
 }
 
+export function verifyLoginCode(email, code) {
+  return apiFetch("/auth/login/verify", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
 export function getPerfil() {
   return apiFetch("/auth/me");
 }
