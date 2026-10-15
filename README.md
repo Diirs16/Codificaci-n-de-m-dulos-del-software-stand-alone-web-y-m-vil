@@ -45,9 +45,11 @@ Comparación con JDBC (Java):
 
 | Librería | Módulo | Uso en el proyecto |
 |---|---|---|
-| hashlib | `hashlib.sha256()` | Hash SHA-256 para contraseñas de usuarios |
+| hashlib | `hashlib.sha256()` | Solo para reconocer y migrar los hashes SHA-256 antiguos de contraseñas |
 | sys | `sys.path`, `sys.exit()` | Configuración de rutas y salida del programa |
 | os | `os.path.dirname()` | Obtener ruta absoluta del proyecto |
+
+Las contraseñas se guardan con la librería externa **bcrypt** (sal aleatoria y factor de costo 12), en `security/passwords.py`. Las cuentas creadas antes con SHA-256 se migran a bcrypt automáticamente en su siguiente inicio de sesión.
 
 ## 4. Arquitectura del proyecto
 
@@ -160,7 +162,7 @@ Las clases del modelo representan las tablas de la base de datos. Cada atributo 
 | apellidos | str | Apellidos del usuario |
 | correo | str | Correo electrónico (único) |
 | telefono | str | Número de teléfono |
-| password_hash | str | Hash SHA-256 de la contraseña |
+| password_hash | str | Hash bcrypt de la contraseña (60 caracteres, costo 12) |
 | estado | str | activo / inactivo / bloqueado |
 | verificado | bool | Si el correo fue verificado |
 

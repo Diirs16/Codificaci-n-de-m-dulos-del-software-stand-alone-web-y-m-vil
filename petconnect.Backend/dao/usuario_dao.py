@@ -46,6 +46,10 @@ class UsuarioDAO:
         WHERE id_usuario = %s
     """
 
+    _ACTUALIZAR_PASSWORD = """
+        UPDATE usuarios SET password_hash = %s WHERE id_usuario = %s
+    """
+
     _ELIMINAR = """
         DELETE FROM usuarios WHERE id_usuario = %s
     """
@@ -166,6 +170,23 @@ class UsuarioDAO:
         except Error as e:
             self._conexion_bd.rollback()
             print(f"[ERROR] Al actualizar usuario: {e}")
+            return False
+
+    def actualizar_password(self, id_usuario, password_hash):
+        """Reemplaza el hash de la contrasena (migracion de SHA-256 a bcrypt)."""
+        conexion = self._conexion_bd.obtener_conexion()
+        if conexion is None:
+            return False
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(self._ACTUALIZAR_PASSWORD, (password_hash, id_usuario))
+            self._conexion_bd.commit()
+            filas_afectadas = cursor.rowcount
+            cursor.close()
+            return filas_afectadas > 0
+        except Error as e:
+            self._conexion_bd.rollback()
+            print(f"[ERROR] Al actualizar la contrasena: {e}")
             return False
 
     def eliminar(self, id_usuario):

@@ -1,0 +1,8 @@
+[15:09:23] ===== CONF-NC-008 (NC-008) – El token emitido por la API se acepta en las rutas protegidas =====
+[15:09:23] Fecha de ejecución: 15/10/2026 15:09:23
+[15:09:24] OK    | Registro y verificación OTP entregan un token | obtenido: HTTP 200 y 201
+[15:09:24] OK    | GET /api/auth/me con el token del registro responde 200 (antes: 401) | obtenido: HTTP 200 {'email': 'laura.gomez.qa@example.com', 'id': 14, 'name': 'Laura Gómez'}
+[15:09:24] OK    | Inicio de sesión en dos pasos entrega un token | obtenido: HTTP 200 y 200
+[15:09:24] OK    | GET /api/auth/me con el token del inicio de sesión responde 200 | obtenido: HTTP 200 {'email': 'laura.gomez.qa@example.com', 'id': 14, 'name': 'Laura Gómez'}
+[15:09:24] OK    | Un token con la firma alterada se rechaza con 401 | obtenido: HTTP 401
+[15:09:24] RESULTADO: Aprobado

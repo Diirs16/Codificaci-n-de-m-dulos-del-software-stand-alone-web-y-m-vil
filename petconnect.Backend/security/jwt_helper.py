@@ -12,8 +12,10 @@ _EXPIRE    = 24 * 3600  # 24 horas en segundos
 
 
 def generate_token(user_id: int, email: str) -> str:
+    # El estandar JWT (RFC 7519) exige que "sub" sea texto; PyJWT >= 2.10 rechaza
+    # un entero (NC-008). Quien lo lea debe convertirlo de nuevo con int().
     payload = {
-        "sub":   user_id,
+        "sub":   str(user_id),
         "email": email,
         "iat":   int(time.time()),
         "exp":   int(time.time()) + _EXPIRE,

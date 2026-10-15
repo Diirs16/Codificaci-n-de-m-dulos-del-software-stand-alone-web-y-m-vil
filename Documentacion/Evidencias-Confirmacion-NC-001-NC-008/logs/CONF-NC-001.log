@@ -1,0 +1,6 @@
+[15:09:24] ===== CONF-NC-001 (NC-001) – Las contraseñas se guardan con bcrypt, costo 12 y sal aleatoria =====
+[15:09:24] Fecha de ejecución: 15/10/2026 15:09:24
+[15:09:24] OK    | El hash tiene formato bcrypt: prefijo $2b$12$ y 60 caracteres (antes: 64 de SHA-256) | obtenido: prefijo '$2b$12$', longitud 60
+[15:09:24] OK    | El valor no coincide con el SHA-256 sin sal de la contraseña | obtenido: no coincide
+[15:09:24] OK    | Tres usuarios con la misma contraseña tienen hashes distintos (sal aleatoria) | obtenido: 3 hashes distintos de 3
+[15:09:24] RESULTADO: Aprobado

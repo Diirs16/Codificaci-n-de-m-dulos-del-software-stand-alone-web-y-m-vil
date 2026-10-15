@@ -5,7 +5,6 @@ Ejecutar con: python api.py
 
 import sys
 import os
-import hashlib
 import re
 from datetime import datetime, date
 from functools import wraps
@@ -28,6 +27,7 @@ from correo import enviar_codigo, enviar_bienvenida
 from otp import AlmacenOTP
 from security.jwt_helper import generate_token, verify_token
 from security.crypto import encrypt, decrypt
+from security.passwords import hash_password, verificar_password, es_hash_heredado, MAX_BYTES_BCRYPT
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -63,13 +63,11 @@ def _row_to_dict(row):
     return {k: _serialize(v) for k, v in row.items()}
 
 
-def _hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
-
-
 def _validate_password(password: str) -> str | None:
     if len(password) < 8:
         return "La contrasena debe tener al menos 8 caracteres"
+    if len(password) > 64 or len(password.encode("utf-8")) > MAX_BYTES_BCRYPT:
+        return "La contrasena debe tener maximo 64 caracteres"
     if not re.search(r'[A-Z]', password):
         return "La contrasena debe tener al menos una mayuscula"
     if not re.search(r'[0-9]', password):
@@ -133,9 +131,14 @@ def require_auth(f):
         if not token:
             return jsonify({"error": "Autenticacion requerida"}), 401
         payload = verify_token(token)
-        if not payload:
+        try:
+            # "sub" viaja como texto (RFC 7519); el resto de la API usa el id entero
+            user_id = int(payload["sub"]) if payload else None
+        except (KeyError, TypeError, ValueError):
+            user_id = None
+        if user_id is None:
             return jsonify({"error": "Token invalido o sesion expirada. Inicia sesion de nuevo"}), 401
-        request.current_user_id = payload["sub"]
+        request.current_user_id = user_id
         request.current_user_email = payload["email"]
         return f(*args, **kwargs)
     return decorated
@@ -277,8 +280,13 @@ def login():
     dao = UsuarioDAO()
     usuario = dao.consultar_por_correo(email)
 
-    if usuario is None or usuario.password_hash != _hash_password(password):
+    if usuario is None or not verificar_password(password, usuario.password_hash):
         return jsonify({"error": "Correo o contrasena incorrectos"}), 401
+
+    # NC-001: los hashes SHA-256 del sistema anterior se reemplazan por bcrypt
+    # en el primer inicio de sesion exitoso, cuando se conoce la contrasena.
+    if es_hash_heredado(usuario.password_hash):
+        dao.actualizar_password(usuario.id_usuario, hash_password(password))
 
     if usuario.estado != "activo":
         return jsonify({"error": "Cuenta inactiva o bloqueada"}), 403
@@ -353,7 +361,7 @@ def register():
 
     code = _otp_registro.crear(email, {
         "name":          name,
-        "password_hash": _hash_password(password),
+        "password_hash": hash_password(password),
     })
 
     try:

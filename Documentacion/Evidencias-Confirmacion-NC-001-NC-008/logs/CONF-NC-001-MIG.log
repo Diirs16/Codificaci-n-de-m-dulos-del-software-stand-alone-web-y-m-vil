@@ -1,0 +1,8 @@
+[15:09:24] ===== CONF-NC-001-MIG (NC-001) – Las cuentas antiguas con SHA-256 migran a bcrypt al iniciar sesión =====
+[15:09:24] Fecha de ejecución: 15/10/2026 15:09:24
+[15:09:24] Se crearon dos cuentas con el hash SHA-256 que guardaba el sistema anterior.
+[15:09:24] OK    | Con la contraseña equivocada: 401 y el hash no se modifica | obtenido: HTTP 401; hash sin cambios
+[15:09:24] OK    | Con la contraseña correcta, la cuenta antigua inicia sesión | obtenido: HTTP 200 y 200
+[15:09:24] OK    | El hash quedó migrado a bcrypt | obtenido: prefijo '$2b$12$', longitud 60
+[15:09:25] OK    | Después de migrar, el inicio de sesión sigue funcionando | obtenido: HTTP 200 y 200
+[15:09:25] RESULTADO: Aprobado

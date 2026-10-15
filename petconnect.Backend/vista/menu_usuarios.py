@@ -3,9 +3,9 @@ Vista del módulo de Usuarios.
 Interfaz de consola para gestionar las operaciones CRUD de usuarios.
 """
 
-import hashlib
 from dao.usuario_dao import UsuarioDAO
 from modelo.usuario import Usuario
+from security.passwords import hash_password
 
 
 class MenuUsuarios:
@@ -64,7 +64,7 @@ class MenuUsuarios:
             print("  [!] Nombres, correo y contrasena son obligatorios.")
             return
 
-        password_hash = hashlib.sha256(contrasena.encode()).hexdigest()
+        password_hash = hash_password(contrasena)
 
         usuario = Usuario(
             nombres=nombres,

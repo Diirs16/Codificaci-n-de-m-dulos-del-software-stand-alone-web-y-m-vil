@@ -1,0 +1,103 @@
+{
+  "inicio": "15/10/2026 15:09:23",
+  "fin": "15/10/2026 15:09:25",
+  "verificaciones": [
+    {
+      "id": "CONF-NC-008",
+      "nc": "NC-008",
+      "nombre": "El token emitido por la API se acepta en las rutas protegidas",
+      "resultado": "Aprobado",
+      "verificaciones": [
+        {
+          "descripcion": "Registro y verificación OTP entregan un token",
+          "ok": true,
+          "obtenido": "HTTP 200 y 201"
+        },
+        {
+          "descripcion": "GET /api/auth/me con el token del registro responde 200 (antes: 401)",
+          "ok": true,
+          "obtenido": "HTTP 200 {'email': 'laura.gomez.qa@example.com', 'id': 14, 'name': 'Laura Gómez'}"
+        },
+        {
+          "descripcion": "Inicio de sesión en dos pasos entrega un token",
+          "ok": true,
+          "obtenido": "HTTP 200 y 200"
+        },
+        {
+          "descripcion": "GET /api/auth/me con el token del inicio de sesión responde 200",
+          "ok": true,
+          "obtenido": "HTTP 200 {'email': 'laura.gomez.qa@example.com', 'id': 14, 'name': 'Laura Gómez'}"
+        },
+        {
+          "descripcion": "Un token con la firma alterada se rechaza con 401",
+          "ok": true,
+          "obtenido": "HTTP 401"
+        }
+      ]
+    },
+    {
+      "id": "CONF-NC-001",
+      "nc": "NC-001",
+      "nombre": "Las contraseñas se guardan con bcrypt, costo 12 y sal aleatoria",
+      "resultado": "Aprobado",
+      "verificaciones": [
+        {
+          "descripcion": "El hash tiene formato bcrypt: prefijo $2b$12$ y 60 caracteres (antes: 64 de SHA-256)",
+          "ok": true,
+          "obtenido": "prefijo '$2b$12$', longitud 60"
+        },
+        {
+          "descripcion": "El valor no coincide con el SHA-256 sin sal de la contraseña",
+          "ok": true,
+          "obtenido": "no coincide"
+        },
+        {
+          "descripcion": "Tres usuarios con la misma contraseña tienen hashes distintos (sal aleatoria)",
+          "ok": true,
+          "obtenido": "3 hashes distintos de 3"
+        }
+      ]
+    },
+    {
+      "id": "CONF-NC-001-MIG",
+      "nc": "NC-001",
+      "nombre": "Las cuentas antiguas con SHA-256 migran a bcrypt al iniciar sesión",
+      "resultado": "Aprobado",
+      "verificaciones": [
+        {
+          "descripcion": "Con la contraseña equivocada: 401 y el hash no se modifica",
+          "ok": true,
+          "obtenido": "HTTP 401; hash sin cambios"
+        },
+        {
+          "descripcion": "Con la contraseña correcta, la cuenta antigua inicia sesión",
+          "ok": true,
+          "obtenido": "HTTP 200 y 200"
+        },
+        {
+          "descripcion": "El hash quedó migrado a bcrypt",
+          "ok": true,
+          "obtenido": "prefijo '$2b$12$', longitud 60"
+        },
+        {
+          "descripcion": "Después de migrar, el inicio de sesión sigue funcionando",
+          "ok": true,
+          "obtenido": "HTTP 200 y 200"
+        }
+      ]
+    },
+    {
+      "id": "CONF-NC-001-CON",
+      "nc": "NC-001",
+      "nombre": "El módulo de consola también guarda las contraseñas con bcrypt",
+      "resultado": "Aprobado",
+      "verificaciones": [
+        {
+          "descripcion": "El usuario registrado desde la consola tiene hash bcrypt (antes: SHA-256)",
+          "ok": true,
+          "obtenido": "prefijo '$2b$12$', longitud 60"
+        }
+      ]
+    }
+  ]
+}
