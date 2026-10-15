@@ -1,0 +1,10 @@
+[18:40:55] ===== CP-003 – Registro de más de una mascota para el mismo usuario =====
+[18:40:55] Tipo de prueba: Funcional | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] OK    | Se registran Toby y Mía para el usuario A y Rocky para el usuario B | obtenido: ids = 10, 11, 12
+[18:40:55] OK    | El usuario A tiene exactamente sus 2 mascotas | obtenido: ['Mía', 'Toby']
+[18:40:55] OK    | Cada mascota tiene un identificador propio | obtenido: [11, 10]
+[18:40:55] OK    | Se conservan los campos de RIU02 (especie, raza, edad y foto) | obtenido: ('Perro', 'Criollo', 3, 'https://example.com/toby.jpg')
+[18:40:55] OK    | Las mascotas no se mezclan entre usuarios | obtenido: ['Rocky']
+[18:40:55] Observación: la API REST aún no expone el registro de mascotas (POST /api/mascotas → HTTP 500); la prueba se ejecutó sobre el módulo stand-alone (MascotaDAO).
+[18:40:55] RESULTADO: Aprobado | Seguimiento: N/A | Severidad: N/A
+[18:40:55] Salida obtenida: Se registraron 2 mascotas (Toby y Mía) para el mismo usuario con identificadores distintos; la consulta por usuario devolvió exactamente esas 2, con nombre, especie, raza, edad y foto, sin mezclar la mascota de otro usuario.

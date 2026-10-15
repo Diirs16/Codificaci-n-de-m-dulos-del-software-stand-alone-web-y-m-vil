@@ -1,0 +1,11 @@
+[18:40:55] ===== CP-011 – Validación de campos obligatorios vacíos en registro e inicio de sesión =====
+[18:40:55] Tipo de prueba: Unitaria | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] OK    | _validar_correo('') rechaza el correo vacío | obtenido: (False, 'El correo es requerido')
+[18:40:55] OK    | _validate_password('') exige la longitud mínima | obtenido: La contrasena debe tener al menos 8 caracteres
+[18:40:55] OK    | Registro con cuerpo vacío → HTTP 400 'requeridos' | obtenido: HTTP 400 {'error': 'Nombre, correo y contrasena son requeridos'}
+[18:40:55] OK    | Registro solo con nombre → HTTP 400 'requeridos' | obtenido: HTTP 400 {'error': 'Nombre, correo y contrasena son requeridos'}
+[18:40:55] OK    | Registro sin contraseña → HTTP 400 'requeridos' | obtenido: HTTP 400 {'error': 'Nombre, correo y contrasena son requeridos'}
+[18:40:55] OK    | Inicio de sesión vacío → HTTP 400 'requeridos' | obtenido: HTTP 400 {'error': 'Correo y contrasena son requeridos'}
+[18:40:55] OK    | Inicio de sesión sin contraseña → HTTP 400 'requeridos' | obtenido: HTTP 400 {'error': 'Correo y contrasena son requeridos'}
+[18:40:55] RESULTADO: Aprobado | Seguimiento: N/A | Severidad: N/A
+[18:40:55] Salida obtenida: Las 2 funciones de validación rechazaron los valores vacíos y los 5 envíos con campos vacíos respondieron HTTP 400 con el mensaje 'son requeridos'; no se creó ningún registro.

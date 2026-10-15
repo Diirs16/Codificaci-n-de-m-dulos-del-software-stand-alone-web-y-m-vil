@@ -1,0 +1,8 @@
+[18:40:55] ===== CP-005 – Búsqueda en el directorio de servicios veterinarios =====
+[18:40:55] Tipo de prueba: Funcional | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] OK    | Filtro por ciudad 'Armenia' devuelve solo los proveedores activos de Armenia | obtenido: ['Peluquería Canina Patitas', 'Veterinaria Huellitas']
+[18:40:55] OK    | Una cadena de inyección SQL no devuelve resultados (consulta parametrizada) | obtenido: 0
+[18:40:55] OK    | Un término inexistente devuelve una lista vacía | obtenido: 0
+[18:40:55] FALLA | Búsqueda 'Veterinaria' devuelve solo proveedores activos | obtenido: ['Clínica Veterinaria San Roque', 'Veterinaria El Refugio (inactiva)', 'Veterinaria Huellitas']
+[18:40:55] RESULTADO: En seguimiento | Seguimiento: NC-011 | Severidad: Baja
+[18:40:55] Salida obtenida: El filtro por ciudad devolvió solo los 2 proveedores activos de Armenia, y la inyección SQL y el término inexistente devolvieron 0 resultados. Pero la búsqueda por nombre 'Veterinaria' incluyó 'Veterinaria El Refugio (inactiva)': buscar_por_nombre() no filtra por activo.

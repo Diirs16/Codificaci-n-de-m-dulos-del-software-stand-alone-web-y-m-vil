@@ -1,0 +1,7 @@
+[18:40:55] ===== CP-007 – Validación del almacenamiento de contraseñas con bcrypt en la BD (RS03) =====
+[18:40:55] Tipo de prueba: Seguridad | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] FALLA | El hash tiene formato bcrypt: prefijo $2b$12$ y 60 caracteres | obtenido: prefijo '795fa8b', longitud 64
+[18:40:55] FALLA | El valor no es un SHA-256 sin sal de la contraseña | obtenido: coincide con sha256('Firulais2026!')
+[18:40:55] FALLA | Tres usuarios con la misma contraseña tienen hashes distintos (sal aleatoria) | obtenido: los 3 hashes son idénticos
+[18:40:55] RESULTADO: Rechazado | Seguimiento: NC-001 | Severidad: Alta
+[18:40:55] Salida obtenida: El password_hash tiene 64 caracteres hexadecimales (prefijo '795fa8b') y coincide con el SHA-256 sin sal de la contraseña; los 3 usuarios con la misma contraseña tienen exactamente el mismo hash. No se usa bcrypt.

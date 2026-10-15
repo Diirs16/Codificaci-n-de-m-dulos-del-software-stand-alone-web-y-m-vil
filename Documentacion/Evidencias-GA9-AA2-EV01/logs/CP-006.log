@@ -1,0 +1,6 @@
+[18:40:55] ===== CP-006 – Acceso no autorizado a la información de la mascota de otro usuario (RS02) =====
+[18:40:55] Tipo de prueba: Seguridad | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] FALLA | Sin token: GET /api/mascotas/{id} de una mascota privada responde 401, 403 o 404 | obtenido: HTTP 200 {'age': 3, 'breed': 'Criollo', 'description': 'Alergia a la penicilina', 'estado': 'activa', 'gender': 'macho', 'id': 10, 'image': 'https://example.com/toby.jpg', 'name': 'Toby', 'size': 'Mediano', 'species': 'Perro', 'sterilized': False, 'vaccinated': False}
+[18:40:55] FALLA | Con el token del usuario B (no dueño): responde 403 o 404 | obtenido: HTTP 200
+[18:40:55] RESULTADO: Rechazado | Seguimiento: NC-002 | Severidad: Alta
+[18:40:55] Salida obtenida: La API respondió HTTP 200 sin token y HTTP 200 con el token de otro usuario, y entregó los datos de 'Toby' (mascota privada, estado 'activa'), incluidas sus observaciones de salud ('Alergia a la penicilina'). El endpoint no exige autenticación ni verifica el dueño.

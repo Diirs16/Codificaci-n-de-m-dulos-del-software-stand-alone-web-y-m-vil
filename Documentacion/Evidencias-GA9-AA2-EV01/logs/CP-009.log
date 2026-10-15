@@ -1,0 +1,9 @@
+[18:42:07] ===== CP-009 – Rendimiento en el registro masivo de usuarios =====
+[18:42:07] Tipo de prueba: Rendimiento | Fecha de ejecución: 05/10/2026 18:42:07
+[18:42:07] Escenario: 100 registros completos (registro + verificación OTP) con rampa de 5 s.
+[18:42:12] Métricas: {"solicitudes": 200, "exitosas": 200, "tasa_error_pct": 0.0, "p50_s": 0.005, "p95_s": 0.02, "p99_s": 0.027, "max_s": 0.029, "promedio_s": 0.006, "duracion_s": 5.0, "rendimiento_rps": 40.1, "errores": {}, "errores_500": {}, "usuarios_creados": 100}
+[18:42:12] OK    | p95 ≤ 2.0 s por acción (RNF04) | obtenido: p95 = 0.02 s
+[18:42:12] OK    | Tasa de error < 1 % | obtenido: 0.0 % ({})
+[18:42:12] OK    | Se crean los 100 usuarios en la BD | obtenido: 100
+[18:42:12] RESULTADO: Aprobado | Seguimiento: N/A | Severidad: N/A
+[18:42:12] Salida obtenida: 200 solicitudes (100 registros + 100 verificaciones) en 5.0 s: p50 0.005 s, p95 0.02 s, máximo 0.029 s; tasa de error 0.0 %. Usuarios creados en la BD: 100 de 100.

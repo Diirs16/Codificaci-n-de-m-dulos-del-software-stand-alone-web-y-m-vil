@@ -34,6 +34,8 @@ web-build/
 # Logs
 *.log
 npm-debug.log*
+# Excepción: los logs de las evidencias de pruebas son soporte de los resultados
+!Documentacion/Evidencias-*/logs/*.log
 
 # Bases de datos locales / temporales
 *.sqlite3

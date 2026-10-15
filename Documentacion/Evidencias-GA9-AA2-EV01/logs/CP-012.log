@@ -1,0 +1,9 @@
+[18:40:55] ===== CP-012 – Flujo completo de adopción de una mascota =====
+[18:40:55] Tipo de prueba: Aceptación | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] FALLA | Paso 1: la mascota publicada queda con estado 'en_adopcion' | obtenido: estado guardado = ''; advertencia de la BD: [('Warning', 1265, "Data truncated for column 'estado' at row 1")]
+[18:40:55] FALLA | Paso 2: GET /api/mascotas/adopcion muestra a Luna en el catálogo | obtenido: HTTP 200, 0 mascotas
+[18:40:55] FALLA | Paso 3: POST /api/adopciones registra la solicitud de adopción | obtenido: HTTP 500
+[18:40:55] Contraste en la BD de desarrollo (solo lectura): mascotas por estado = [('', 6)]
+[18:40:55] Contraste en la web: Adoption.jsx solo reemplaza las mascotas fijas de src/data/pets.js si la API devuelve datos (if (data.length > 0)); con la lista vacía muestra las mascotas de ejemplo y oculta el defecto.
+[18:40:55] RESULTADO: Rechazado | Seguimiento: NC-009 | Severidad: Alta
+[18:40:55] Salida obtenida: El flujo se detuvo en el paso 1. El estado 'en_adopcion' que usan seed.py y la API no existe en el enum de mascotas.estado; MariaDB (modo no estricto) lo guardó como '' con la advertencia 1265. Por eso GET /api/mascotas/adopcion devolvió 0 mascotas, y POST /api/adopciones respondió HTTP 500 (no existe). En la BD de desarrollo, las 6 mascotas tienen estado vacío. La web oculta el defecto mostrando mascotas fijas.

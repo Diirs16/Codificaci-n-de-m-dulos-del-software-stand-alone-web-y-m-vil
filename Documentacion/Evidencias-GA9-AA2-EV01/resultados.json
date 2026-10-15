@@ -1,0 +1,495 @@
+{
+  "ambiente": {
+    "inicio": "05/10/2026 18:40:55",
+    "fin": "05/10/2026 18:42:13",
+    "python": "3.14.0",
+    "bd_version": "10.4.32-MariaDB",
+    "node": "v24.14.0"
+  },
+  "casos": [
+    {
+      "id": "CP-001",
+      "nombre": "Registro de usuario con datos válidos y verificación por código OTP",
+      "tipo": "Funcional",
+      "resultado": "Aprobado",
+      "salida_obtenida": "Registro respondió HTTP 200 (0.03 s) y envió el código OTP de 6 dígitos; la verificación respondió HTTP 201 con token JWT (0.00 s). El usuario quedó en la BD como activo y verificado, sin la contraseña en texto plano.",
+      "seguimiento": "N/A",
+      "severidad": "N/A",
+      "verificaciones": [
+        {
+          "descripcion": "Paso 1: POST /api/auth/register responde 200 'Codigo enviado'",
+          "ok": true,
+          "obtenido": "HTTP 200 {'email': 'laura.gomez.qa@example.com', 'message': 'Codigo enviado'} en 0.031 s"
+        },
+        {
+          "descripcion": "Se genera un código OTP de 6 dígitos",
+          "ok": true,
+          "obtenido": "961692"
+        },
+        {
+          "descripcion": "Paso 2: POST /api/auth/verify responde 201 con token JWT",
+          "ok": true,
+          "obtenido": "HTTP 201 campos=['email', 'id', 'name', 'token'] en 0.004 s"
+        },
+        {
+          "descripcion": "El usuario queda en la BD con estado 'activo' y verificado = 1",
+          "ok": true,
+          "obtenido": "('activo', 1)"
+        },
+        {
+          "descripcion": "La contraseña no se guarda en texto plano",
+          "ok": true,
+          "obtenido": "password_hash de 64 caracteres"
+        }
+      ],
+      "datos": {
+        "tiempo_registro_s": 0.031,
+        "tiempo_verificacion_s": 0.004
+      },
+      "log": "logs/CP-001.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-002",
+      "nombre": "Registro de usuario con datos inválidos (partición de equivalencia y valores límite)",
+      "tipo": "Funcional",
+      "resultado": "En seguimiento",
+      "salida_obtenida": "6 de 7 entradas se rechazaron correctamente (formato y dominio del correo, longitud 7, sin mayúscula, sin número y correo duplicado con 409). La contraseña 'PETCONNECT1!', sin minúscula, fue aceptada (HTTP 200 'Codigo enviado') e incumple la política de RS03.",
+      "seguimiento": "NC-004",
+      "severidad": "Media",
+      "verificaciones": [
+        {
+          "descripcion": "Correo con formato inválido → HTTP 400",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'El formato del correo no es valido'}"
+        },
+        {
+          "descripcion": "Dominio de correo inexistente → HTTP 400",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'El dominio \"dominio-inexistente-petconnect-qa.com\" no tiene servidores de correo configurados'}"
+        },
+        {
+          "descripcion": "Contraseña de 7 caracteres (valor límite inferior) → HTTP 400",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'La contrasena debe tener al menos 8 caracteres'}"
+        },
+        {
+          "descripcion": "Contraseña sin mayúscula → HTTP 400",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'La contrasena debe tener al menos una mayuscula'}"
+        },
+        {
+          "descripcion": "Contraseña sin número → HTTP 400",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'La contrasena debe tener al menos un numero'}"
+        },
+        {
+          "descripcion": "Contraseña sin minúscula (política RS03) → HTTP 400",
+          "ok": false,
+          "obtenido": "HTTP 200 {'email': 'qa.cp002.d@example.com', 'message': 'Codigo enviado'}"
+        },
+        {
+          "descripcion": "Correo ya registrado → HTTP 409",
+          "ok": true,
+          "obtenido": "HTTP 409 {'error': 'El correo ya esta registrado'}"
+        }
+      ],
+      "datos": {
+        "entradas": 7,
+        "rechazadas_correctamente": 6
+      },
+      "log": "logs/CP-002.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-003",
+      "nombre": "Registro de más de una mascota para el mismo usuario",
+      "tipo": "Funcional",
+      "resultado": "Aprobado",
+      "salida_obtenida": "Se registraron 2 mascotas (Toby y Mía) para el mismo usuario con identificadores distintos; la consulta por usuario devolvió exactamente esas 2, con nombre, especie, raza, edad y foto, sin mezclar la mascota de otro usuario.",
+      "seguimiento": "N/A",
+      "severidad": "N/A",
+      "verificaciones": [
+        {
+          "descripcion": "Se registran Toby y Mía para el usuario A y Rocky para el usuario B",
+          "ok": true,
+          "obtenido": "ids = 10, 11, 12"
+        },
+        {
+          "descripcion": "El usuario A tiene exactamente sus 2 mascotas",
+          "ok": true,
+          "obtenido": "['Mía', 'Toby']"
+        },
+        {
+          "descripcion": "Cada mascota tiene un identificador propio",
+          "ok": true,
+          "obtenido": "[11, 10]"
+        },
+        {
+          "descripcion": "Se conservan los campos de RIU02 (especie, raza, edad y foto)",
+          "ok": true,
+          "obtenido": "('Perro', 'Criollo', 3, 'https://example.com/toby.jpg')"
+        },
+        {
+          "descripcion": "Las mascotas no se mezclan entre usuarios",
+          "ok": true,
+          "obtenido": "['Rocky']"
+        }
+      ],
+      "datos": {
+        "ids": [
+          10,
+          11,
+          12
+        ],
+        "api_post_mascotas": 500
+      },
+      "log": "logs/CP-003.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-004",
+      "nombre": "Almacenamiento y consulta del carné de vacunación",
+      "tipo": "Integración",
+      "resultado": "En seguimiento",
+      "salida_obtenida": "La BD guardó y devolvió la vacuna Antirrábica de Toby (aplicación 2025-11-03, próxima 2026-11-03) y rechazó la vacuna para una mascota inexistente (rechazada (error 1452)). Pero aceptó una próxima dosis (2025-01-01) anterior a la aplicación: no hay validación de fechas. El módulo del carné en la API/app aún no existe.",
+      "seguimiento": "NC-010",
+      "severidad": "Media",
+      "verificaciones": [
+        {
+          "descripcion": "Se guarda y se consulta la vacuna del carné de Toby",
+          "ok": true,
+          "obtenido": "[('Antirrábica', '2025-11-03', '2026-11-03', 'Clínica Veterinaria QA')]"
+        },
+        {
+          "descripcion": "Se rechaza una vacuna para una mascota inexistente (integridad referencial)",
+          "ok": true,
+          "obtenido": "rechazada (error 1452)"
+        },
+        {
+          "descripcion": "Se rechaza una próxima dosis anterior a la fecha de aplicación (2025-01-01 < 2025-11-03)",
+          "ok": false,
+          "obtenido": "aceptada"
+        }
+      ],
+      "datos": {
+        "fk": "rechazada (error 1452)",
+        "fechas_inconsistentes": "aceptada",
+        "api_vacunas": 500
+      },
+      "log": "logs/CP-004.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-005",
+      "nombre": "Búsqueda en el directorio de servicios veterinarios",
+      "tipo": "Funcional",
+      "resultado": "En seguimiento",
+      "salida_obtenida": "El filtro por ciudad devolvió solo los 2 proveedores activos de Armenia, y la inyección SQL y el término inexistente devolvieron 0 resultados. Pero la búsqueda por nombre 'Veterinaria' incluyó 'Veterinaria El Refugio (inactiva)': buscar_por_nombre() no filtra por activo.",
+      "seguimiento": "NC-011",
+      "severidad": "Baja",
+      "verificaciones": [
+        {
+          "descripcion": "Filtro por ciudad 'Armenia' devuelve solo los proveedores activos de Armenia",
+          "ok": true,
+          "obtenido": "['Peluquería Canina Patitas', 'Veterinaria Huellitas']"
+        },
+        {
+          "descripcion": "Una cadena de inyección SQL no devuelve resultados (consulta parametrizada)",
+          "ok": true,
+          "obtenido": "0"
+        },
+        {
+          "descripcion": "Un término inexistente devuelve una lista vacía",
+          "ok": true,
+          "obtenido": "0"
+        },
+        {
+          "descripcion": "Búsqueda 'Veterinaria' devuelve solo proveedores activos",
+          "ok": false,
+          "obtenido": "['Clínica Veterinaria San Roque', 'Veterinaria El Refugio (inactiva)', 'Veterinaria Huellitas']"
+        }
+      ],
+      "datos": {
+        "por_nombre": [
+          "Clínica Veterinaria San Roque",
+          "Veterinaria El Refugio (inactiva)",
+          "Veterinaria Huellitas"
+        ],
+        "por_ciudad": [
+          "Peluquería Canina Patitas",
+          "Veterinaria Huellitas"
+        ]
+      },
+      "log": "logs/CP-005.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-006",
+      "nombre": "Acceso no autorizado a la información de la mascota de otro usuario (RS02)",
+      "tipo": "Seguridad",
+      "resultado": "Rechazado",
+      "salida_obtenida": "La API respondió HTTP 200 sin token y HTTP 200 con el token de otro usuario, y entregó los datos de 'Toby' (mascota privada, estado 'activa'), incluidas sus observaciones de salud ('Alergia a la penicilina'). El endpoint no exige autenticación ni verifica el dueño.",
+      "seguimiento": "NC-002",
+      "severidad": "Alta",
+      "verificaciones": [
+        {
+          "descripcion": "Sin token: GET /api/mascotas/{id} de una mascota privada responde 401, 403 o 404",
+          "ok": false,
+          "obtenido": "HTTP 200 {'age': 3, 'breed': 'Criollo', 'description': 'Alergia a la penicilina', 'estado': 'activa', 'gender': 'macho', 'id': 10, 'image': 'https://example.com/toby.jpg', 'name': 'Toby', 'size': 'Mediano', 'species': 'Perro', 'sterilized': False, 'vaccinated': False}"
+        },
+        {
+          "descripcion": "Con el token del usuario B (no dueño): responde 403 o 404",
+          "ok": false,
+          "obtenido": "HTTP 200"
+        }
+      ],
+      "datos": {
+        "sin_token": 200,
+        "token_ajeno": 200,
+        "campos_expuestos": [
+          "breed",
+          "description",
+          "image",
+          "name",
+          "species"
+        ]
+      },
+      "log": "logs/CP-006.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-007",
+      "nombre": "Validación del almacenamiento de contraseñas con bcrypt en la BD (RS03)",
+      "tipo": "Seguridad",
+      "resultado": "Rechazado",
+      "salida_obtenida": "El password_hash tiene 64 caracteres hexadecimales (prefijo '795fa8b') y coincide con el SHA-256 sin sal de la contraseña; los 3 usuarios con la misma contraseña tienen exactamente el mismo hash. No se usa bcrypt.",
+      "seguimiento": "NC-001",
+      "severidad": "Alta",
+      "verificaciones": [
+        {
+          "descripcion": "El hash tiene formato bcrypt: prefijo $2b$12$ y 60 caracteres",
+          "ok": false,
+          "obtenido": "prefijo '795fa8b', longitud 64"
+        },
+        {
+          "descripcion": "El valor no es un SHA-256 sin sal de la contraseña",
+          "ok": false,
+          "obtenido": "coincide con sha256('Firulais2026!')"
+        },
+        {
+          "descripcion": "Tres usuarios con la misma contraseña tienen hashes distintos (sal aleatoria)",
+          "ok": false,
+          "obtenido": "los 3 hashes son idénticos"
+        }
+      ],
+      "datos": {
+        "longitud": 64,
+        "prefijo": "795fa8b",
+        "sha256_sin_sal": true,
+        "hashes_identicos": true
+      },
+      "log": "logs/CP-007.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-008",
+      "nombre": "Carga de 500 usuarios concurrentes sobre la API",
+      "tipo": "Rendimiento",
+      "resultado": "Rechazado",
+      "salida_obtenida": "1000 solicitudes en 70.6 s (14.2 solicitudes/s): p50 0.103 s, p95 30.016 s, máximo 30.04 s; tasa de error 56.0 % (500: 161, 404: 3, TimeoutError: 396). Tras la prueba la API respondió HTTP 200.",
+      "seguimiento": "NC-003",
+      "severidad": "Alta",
+      "verificaciones": [
+        {
+          "descripcion": "p95 ≤ 2.0 s por acción (RNF04)",
+          "ok": false,
+          "obtenido": "p95 = 30.016 s"
+        },
+        {
+          "descripcion": "Tasa de error < 1 %",
+          "ok": false,
+          "obtenido": "56.0 % ({'500': 161, '404': 3, 'TimeoutError': 396})"
+        }
+      ],
+      "datos": {
+        "solicitudes": 1000,
+        "exitosas": 440,
+        "tasa_error_pct": 56.0,
+        "p50_s": 0.103,
+        "p95_s": 30.016,
+        "p99_s": 30.034,
+        "max_s": 30.04,
+        "promedio_s": 12.073,
+        "duracion_s": 70.6,
+        "rendimiento_rps": 14.2,
+        "errores": {
+          "500": 161,
+          "404": 3,
+          "TimeoutError": 396
+        },
+        "errores_500": {
+          "{\"error\":\"bytearray index out of range\"}\n": 85,
+          "{\"error\":\"MySQL Connection not available\"}\n": 27,
+          "{\"error\":\"Failed parsing column information\"}\n": 25
+        },
+        "recuperacion": 200
+      },
+      "log": "logs/CP-008.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-009",
+      "nombre": "Rendimiento en el registro masivo de usuarios",
+      "tipo": "Rendimiento",
+      "resultado": "Aprobado",
+      "salida_obtenida": "200 solicitudes (100 registros + 100 verificaciones) en 5.0 s: p50 0.005 s, p95 0.02 s, máximo 0.029 s; tasa de error 0.0 %. Usuarios creados en la BD: 100 de 100.",
+      "seguimiento": "N/A",
+      "severidad": "N/A",
+      "verificaciones": [
+        {
+          "descripcion": "p95 ≤ 2.0 s por acción (RNF04)",
+          "ok": true,
+          "obtenido": "p95 = 0.02 s"
+        },
+        {
+          "descripcion": "Tasa de error < 1 %",
+          "ok": true,
+          "obtenido": "0.0 % ({})"
+        },
+        {
+          "descripcion": "Se crean los 100 usuarios en la BD",
+          "ok": true,
+          "obtenido": "100"
+        }
+      ],
+      "datos": {
+        "solicitudes": 200,
+        "exitosas": 200,
+        "tasa_error_pct": 0.0,
+        "p50_s": 0.005,
+        "p95_s": 0.02,
+        "p99_s": 0.027,
+        "max_s": 0.029,
+        "promedio_s": 0.006,
+        "duracion_s": 5.0,
+        "rendimiento_rps": 40.1,
+        "errores": {},
+        "errores_500": {},
+        "usuarios_creados": 100
+      },
+      "log": "logs/CP-009.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-010",
+      "nombre": "Cálculo de la fecha de recordatorio de vacunación (3 días antes)",
+      "tipo": "Unitaria",
+      "resultado": "Aprobado",
+      "salida_obtenida": "6 de 6 pruebas pasaron: próxima dosis 2026-11-03 y aviso 2026-10-31; estados correctos en los días límite (30/10 programado, 31/10 y 03/11 aviso activo, 04/11 vencida); periodicidad 0 rechazada.",
+      "seguimiento": "N/A",
+      "severidad": "N/A",
+      "verificaciones": [
+        {
+          "descripcion": "Todas las pruebas unitarias pasan",
+          "ok": true,
+          "obtenido": "6/6"
+        }
+      ],
+      "datos": {
+        "tests": 6,
+        "pass": 6
+      },
+      "log": "logs/CP-010.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-011",
+      "nombre": "Validación de campos obligatorios vacíos en registro e inicio de sesión",
+      "tipo": "Unitaria",
+      "resultado": "Aprobado",
+      "salida_obtenida": "Las 2 funciones de validación rechazaron los valores vacíos y los 5 envíos con campos vacíos respondieron HTTP 400 con el mensaje 'son requeridos'; no se creó ningún registro.",
+      "seguimiento": "N/A",
+      "severidad": "N/A",
+      "verificaciones": [
+        {
+          "descripcion": "_validar_correo('') rechaza el correo vacío",
+          "ok": true,
+          "obtenido": "(False, 'El correo es requerido')"
+        },
+        {
+          "descripcion": "_validate_password('') exige la longitud mínima",
+          "ok": true,
+          "obtenido": "La contrasena debe tener al menos 8 caracteres"
+        },
+        {
+          "descripcion": "Registro con cuerpo vacío → HTTP 400 'requeridos'",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'Nombre, correo y contrasena son requeridos'}"
+        },
+        {
+          "descripcion": "Registro solo con nombre → HTTP 400 'requeridos'",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'Nombre, correo y contrasena son requeridos'}"
+        },
+        {
+          "descripcion": "Registro sin contraseña → HTTP 400 'requeridos'",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'Nombre, correo y contrasena son requeridos'}"
+        },
+        {
+          "descripcion": "Inicio de sesión vacío → HTTP 400 'requeridos'",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'Correo y contrasena son requeridos'}"
+        },
+        {
+          "descripcion": "Inicio de sesión sin contraseña → HTTP 400 'requeridos'",
+          "ok": true,
+          "obtenido": "HTTP 400 {'error': 'Correo y contrasena son requeridos'}"
+        }
+      ],
+      "datos": {},
+      "log": "logs/CP-011.log",
+      "fecha": "05/10/2026"
+    },
+    {
+      "id": "CP-012",
+      "nombre": "Flujo completo de adopción de una mascota",
+      "tipo": "Aceptación",
+      "resultado": "Rechazado",
+      "salida_obtenida": "El flujo se detuvo en el paso 1. El estado 'en_adopcion' que usan seed.py y la API no existe en el enum de mascotas.estado; MariaDB (modo no estricto) lo guardó como '' con la advertencia 1265. Por eso GET /api/mascotas/adopcion devolvió 0 mascotas, y POST /api/adopciones respondió HTTP 500 (no existe). En la BD de desarrollo, las 6 mascotas tienen estado vacío. La web oculta el defecto mostrando mascotas fijas.",
+      "seguimiento": "NC-009",
+      "severidad": "Alta",
+      "verificaciones": [
+        {
+          "descripcion": "Paso 1: la mascota publicada queda con estado 'en_adopcion'",
+          "ok": false,
+          "obtenido": "estado guardado = ''; advertencia de la BD: [('Warning', 1265, \"Data truncated for column 'estado' at row 1\")]"
+        },
+        {
+          "descripcion": "Paso 2: GET /api/mascotas/adopcion muestra a Luna en el catálogo",
+          "ok": false,
+          "obtenido": "HTTP 200, 0 mascotas"
+        },
+        {
+          "descripcion": "Paso 3: POST /api/adopciones registra la solicitud de adopción",
+          "ok": false,
+          "obtenido": "HTTP 500"
+        }
+      ],
+      "datos": {
+        "estado_guardado": "",
+        "catalogo": 0,
+        "post_adopciones": 500,
+        "bd_desarrollo": [
+          [
+            "",
+            6
+          ]
+        ]
+      },
+      "log": "logs/CP-012.log",
+      "fecha": "05/10/2026"
+    }
+  ]
+}

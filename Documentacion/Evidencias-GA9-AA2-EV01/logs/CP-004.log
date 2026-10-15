@@ -1,0 +1,8 @@
+[18:40:55] ===== CP-004 – Almacenamiento y consulta del carné de vacunación =====
+[18:40:55] Tipo de prueba: Integración | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] OK    | Se guarda y se consulta la vacuna del carné de Toby | obtenido: [('Antirrábica', '2025-11-03', '2026-11-03', 'Clínica Veterinaria QA')]
+[18:40:55] OK    | Se rechaza una vacuna para una mascota inexistente (integridad referencial) | obtenido: rechazada (error 1452)
+[18:40:55] FALLA | Se rechaza una próxima dosis anterior a la fecha de aplicación (2025-01-01 < 2025-11-03) | obtenido: aceptada
+[18:40:55] Observación: el módulo del carné en la API/app aún no existe (GET /api/mascotas/10/vacunas → HTTP 500); está programado para el Sprint 2 del plan.
+[18:40:55] RESULTADO: En seguimiento | Seguimiento: NC-010 | Severidad: Media
+[18:40:55] Salida obtenida: La BD guardó y devolvió la vacuna Antirrábica de Toby (aplicación 2025-11-03, próxima 2026-11-03) y rechazó la vacuna para una mascota inexistente (rechazada (error 1452)). Pero aceptó una próxima dosis (2025-01-01) anterior a la aplicación: no hay validación de fechas. El módulo del carné en la API/app aún no existe.

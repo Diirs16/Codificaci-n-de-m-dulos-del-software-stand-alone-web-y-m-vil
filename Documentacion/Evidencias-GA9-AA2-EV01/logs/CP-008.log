@@ -1,0 +1,9 @@
+[18:40:55] ===== CP-008 – Carga de 500 usuarios concurrentes sobre la API =====
+[18:40:55] Tipo de prueba: Rendimiento | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] Escenario: 500 usuarios virtuales, rampa de 10 s; cada uno consulta el catálogo de productos, espera 1 s y consulta el detalle de una mascota. Servidor: Werkzeug (el mismo de `python api.py`).
+[18:42:06] Recuperación: una solicitud posterior a la prueba respondió HTTP 200 en 0.003 s
+[18:42:07] Métricas: {"solicitudes": 1000, "exitosas": 440, "tasa_error_pct": 56.0, "p50_s": 0.103, "p95_s": 30.016, "p99_s": 30.034, "max_s": 30.04, "promedio_s": 12.073, "duracion_s": 70.6, "rendimiento_rps": 14.2, "errores": {"500": 161, "404": 3, "TimeoutError": 396}, "errores_500": {"{\"error\":\"bytearray index out of range\"}\n": 85, "{\"error\":\"MySQL Connection not available\"}\n": 27, "{\"error\":\"Failed parsing column information\"}\n": 25}, "recuperacion": 200}
+[18:42:07] FALLA | p95 ≤ 2.0 s por acción (RNF04) | obtenido: p95 = 30.016 s
+[18:42:07] FALLA | Tasa de error < 1 % | obtenido: 56.0 % ({'500': 161, '404': 3, 'TimeoutError': 396})
+[18:42:07] RESULTADO: Rechazado | Seguimiento: NC-003 | Severidad: Alta
+[18:42:07] Salida obtenida: 1000 solicitudes en 70.6 s (14.2 solicitudes/s): p50 0.103 s, p95 30.016 s, máximo 30.04 s; tasa de error 56.0 % (500: 161, 404: 3, TimeoutError: 396). Tras la prueba la API respondió HTTP 200.

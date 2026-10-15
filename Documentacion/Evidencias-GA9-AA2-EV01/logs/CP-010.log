@@ -1,0 +1,58 @@
+[18:40:55] ===== CP-010 – Cálculo de la fecha de recordatorio de vacunación (3 días antes) =====
+[18:40:55] Tipo de prueba: Unitaria | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] node:test | TAP version 13
+[18:40:55] node:test | # Subtest: Vacunacion.generarRecordatorio()
+[18:40:55] node:test |     # Subtest: calcula la próxima dosis y el aviso tres días antes
+[18:40:55] node:test |     ok 1 - calcula la próxima dosis y el aviso tres días antes
+[18:40:55] node:test |       ---
+[18:40:55] node:test |       duration_ms: 1.0602
+[18:40:55] node:test |       type: 'test'
+[18:40:55] node:test |       ...
+[18:40:55] node:test |     # Subtest: el 2026-10-30 el estado es PROGRAMADO
+[18:40:55] node:test |     ok 2 - el 2026-10-30 el estado es PROGRAMADO
+[18:40:55] node:test |       ---
+[18:40:55] node:test |       duration_ms: 0.1242
+[18:40:55] node:test |       type: 'test'
+[18:40:55] node:test |       ...
+[18:40:55] node:test |     # Subtest: el 2026-10-31 el estado es AVISO_ACTIVO
+[18:40:55] node:test |     ok 3 - el 2026-10-31 el estado es AVISO_ACTIVO
+[18:40:55] node:test |       ---
+[18:40:55] node:test |       duration_ms: 0.1153
+[18:40:55] node:test |       type: 'test'
+[18:40:55] node:test |       ...
+[18:40:55] node:test |     # Subtest: el 2026-11-03 el estado es AVISO_ACTIVO
+[18:40:55] node:test |     ok 4 - el 2026-11-03 el estado es AVISO_ACTIVO
+[18:40:55] node:test |       ---
+[18:40:55] node:test |       duration_ms: 0.1147
+[18:40:55] node:test |       type: 'test'
+[18:40:55] node:test |       ...
+[18:40:55] node:test |     # Subtest: el 2026-11-04 el estado es VENCIDA
+[18:40:55] node:test |     ok 5 - el 2026-11-04 el estado es VENCIDA
+[18:40:55] node:test |       ---
+[18:40:55] node:test |       duration_ms: 0.1108
+[18:40:55] node:test |       type: 'test'
+[18:40:55] node:test |       ...
+[18:40:55] node:test |     # Subtest: rechaza una periodicidad no positiva (valor límite 0)
+[18:40:55] node:test |     ok 6 - rechaza una periodicidad no positiva (valor límite 0)
+[18:40:55] node:test |       ---
+[18:40:55] node:test |       duration_ms: 0.4026
+[18:40:55] node:test |       type: 'test'
+[18:40:55] node:test |       ...
+[18:40:55] node:test |     1..6
+[18:40:55] node:test | ok 1 - Vacunacion.generarRecordatorio()
+[18:40:55] node:test |   ---
+[18:40:55] node:test |   duration_ms: 3.5287
+[18:40:55] node:test |   type: 'suite'
+[18:40:55] node:test |   ...
+[18:40:55] node:test | 1..1
+[18:40:55] node:test | # tests 6
+[18:40:55] node:test | # suites 1
+[18:40:55] node:test | # pass 6
+[18:40:55] node:test | # fail 0
+[18:40:55] node:test | # cancelled 0
+[18:40:55] node:test | # skipped 0
+[18:40:55] node:test | # todo 0
+[18:40:55] node:test | # duration_ms 82.9744
+[18:40:55] OK    | Todas las pruebas unitarias pasan | obtenido: 6/6
+[18:40:55] RESULTADO: Aprobado | Seguimiento: N/A | Severidad: N/A
+[18:40:55] Salida obtenida: 6 de 6 pruebas pasaron: próxima dosis 2026-11-03 y aviso 2026-10-31; estados correctos en los días límite (30/10 programado, 31/10 y 03/11 aviso activo, 04/11 vencida); periodicidad 0 rechazada.

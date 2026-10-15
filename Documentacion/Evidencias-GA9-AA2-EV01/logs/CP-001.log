@@ -1,0 +1,9 @@
+[18:40:55] ===== CP-001 – Registro de usuario con datos válidos y verificación por código OTP =====
+[18:40:55] Tipo de prueba: Funcional | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] OK    | Paso 1: POST /api/auth/register responde 200 'Codigo enviado' | obtenido: HTTP 200 {'email': 'laura.gomez.qa@example.com', 'message': 'Codigo enviado'} en 0.031 s
+[18:40:55] OK    | Se genera un código OTP de 6 dígitos | obtenido: 961692
+[18:40:55] OK    | Paso 2: POST /api/auth/verify responde 201 con token JWT | obtenido: HTTP 201 campos=['email', 'id', 'name', 'token'] en 0.004 s
+[18:40:55] OK    | El usuario queda en la BD con estado 'activo' y verificado = 1 | obtenido: ('activo', 1)
+[18:40:55] OK    | La contraseña no se guarda en texto plano | obtenido: password_hash de 64 caracteres
+[18:40:55] RESULTADO: Aprobado | Seguimiento: N/A | Severidad: N/A
+[18:40:55] Salida obtenida: Registro respondió HTTP 200 (0.03 s) y envió el código OTP de 6 dígitos; la verificación respondió HTTP 201 con token JWT (0.00 s). El usuario quedó en la BD como activo y verificado, sin la contraseña en texto plano.

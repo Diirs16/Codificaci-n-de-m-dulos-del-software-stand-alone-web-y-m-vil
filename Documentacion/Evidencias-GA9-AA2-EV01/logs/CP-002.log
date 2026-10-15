@@ -1,0 +1,11 @@
+[18:40:55] ===== CP-002 – Registro de usuario con datos inválidos (partición de equivalencia y valores límite) =====
+[18:40:55] Tipo de prueba: Funcional | Fecha de ejecución: 05/10/2026 18:40:55
+[18:40:55] OK    | Correo con formato inválido → HTTP 400 | obtenido: HTTP 400 {'error': 'El formato del correo no es valido'}
+[18:40:55] OK    | Dominio de correo inexistente → HTTP 400 | obtenido: HTTP 400 {'error': 'El dominio "dominio-inexistente-petconnect-qa.com" no tiene servidores de correo configurados'}
+[18:40:55] OK    | Contraseña de 7 caracteres (valor límite inferior) → HTTP 400 | obtenido: HTTP 400 {'error': 'La contrasena debe tener al menos 8 caracteres'}
+[18:40:55] OK    | Contraseña sin mayúscula → HTTP 400 | obtenido: HTTP 400 {'error': 'La contrasena debe tener al menos una mayuscula'}
+[18:40:55] OK    | Contraseña sin número → HTTP 400 | obtenido: HTTP 400 {'error': 'La contrasena debe tener al menos un numero'}
+[18:40:55] FALLA | Contraseña sin minúscula (política RS03) → HTTP 400 | obtenido: HTTP 200 {'email': 'qa.cp002.d@example.com', 'message': 'Codigo enviado'}
+[18:40:55] OK    | Correo ya registrado → HTTP 409 | obtenido: HTTP 409 {'error': 'El correo ya esta registrado'}
+[18:40:55] RESULTADO: En seguimiento | Seguimiento: NC-004 | Severidad: Media
+[18:40:55] Salida obtenida: 6 de 7 entradas se rechazaron correctamente (formato y dominio del correo, longitud 7, sin mayúscula, sin número y correo duplicado con 409). La contraseña 'PETCONNECT1!', sin minúscula, fue aceptada (HTTP 200 'Codigo enviado') e incumple la política de RS03.
