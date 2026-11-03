@@ -276,7 +276,7 @@ El proyecto sigue las convenciones de Python (PEP 8) adaptadas al contexto del d
 | Motor | MySQL (InnoDB) |
 | Charset | utf8mb4 / utf8mb4_unicode_ci |
 | Total de tablas | 32 |
-| Archivo SQL | `PetConnect.sql` |
+| Archivo SQL | `petconnect.Backend/sql/schema.sql` (ver `petconnect.Backend/sql/README.md`) |
 
 ### 10.2 Módulos de la base de datos
 
@@ -297,7 +297,7 @@ El proyecto sigue las convenciones de Python (PEP 8) adaptadas al contexto del d
 
 - Python 3.10 o superior instalado
 - MySQL Server ejecutándose en el puerto configurado (3310)
-- Base de datos `petconnect` creada (ejecutar `PetConnect.sql`)
+- Base de datos `petconnect` creada con `petconnect.Backend/sql/schema.sql`
 - Librería `mysql-connector-python` instalada
 
 ### 11.2 Pasos de instalación
@@ -317,9 +317,8 @@ pip install mysql-connector-python
 
 **Paso 3: Crear la base de datos en MySQL**
 
-```bash
-mysql -u root -p < PetConnect.sql
-```
+Primero `sql/schema.sql` (tablas) y después `seed.py` (datos de ejemplo). Los comandos exactos están en
+[`petconnect.Backend/sql/README.md`](petconnect.Backend/sql/README.md).
 
 **Paso 4: Configurar conexión en `config/db_config.py`**
 

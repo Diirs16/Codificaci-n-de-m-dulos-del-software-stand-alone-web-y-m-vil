@@ -1,14 +1,23 @@
 """
 Script de carga inicial de datos (seed) para PetConnect.
-Crea las categorías de productos e inserta los productos de ejemplo.
-Ejecutar una sola vez: python seed.py
+Inserta las categorías, los productos y las mascotas en adopción de ejemplo.
+
+Requiere que las tablas ya existan: primero se carga sql/schema.sql
+(ver sql/README.md). Se puede ejecutar varias veces: no duplica filas.
+    python seed.py
 """
 
 import sys
 import os
+import secrets
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from conexion.conexion_bd import ConexionBD
+from security.passwords import hash_password
+
+# Dueño ficticio de las mascotas en adopción (mascotas.id_usuario es obligatorio).
+# Queda inactivo y con una contraseña aleatoria que nadie conoce: no se puede usar para entrar.
+REFUGIO = ("Refugio PetConnect", "(cuenta de ejemplo)", "refugio@petconnect.test")
 
 CATEGORIAS = [
     (1, "Alimentos"),
@@ -56,24 +65,26 @@ PRODUCTOS = [
     189900, 6, "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=400&h=400&fit=crop", True),
 ]
 
-# (nombre, especie, raza, sexo, edad_aprox, foto, observaciones, estado)
+# (nombre, especie, raza, sexo, edad_aprox en años, color, foto, observaciones)
+# edad_aprox es un número entero: el modo estricto rechaza textos como "2 años".
+# El tamaño guardado en "color" se corrige en el ítem 3.4 (A-22).
 MASCOTAS_ADOPCION = [
-    ("Luna", "Perro", "Labrador Retriever", "hembra", "2 años", "Tamaño Grande",
+    ("Luna", "Perro", "Labrador Retriever", "hembra", 2, "Tamaño Grande",
     "https://images.unsplash.com/photo-1552053831-71594a27632d?w=400&h=400&fit=crop",
     "Luna es una labradora muy cariñosa y juguetona. Le encanta correr y jugar con pelotas. Vacunada, esterilizada y desparasitada. Busca un hogar con espacio para correr."),
-    ("Milo", "Gato", "Mestizo", "macho", "1 año", "Tamaño Mediano",
+    ("Milo", "Gato", "Mestizo", "macho", 1, "Tamaño Mediano",
     "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400&h=400&fit=crop",
     "Milo es un gato tranquilo y muy cariñoso. Le gusta dormir en el sol y que lo acaricien. Ideal para apartamentos. Vacunado y esterilizado."),
-    ("Rocky", "Perro", "Bulldog Francés", "macho", "3 años", "Tamaño Pequeño",
+    ("Rocky", "Perro", "Bulldog Francés", "macho", 3, "Tamaño Pequeño",
     "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=400&h=400&fit=crop",
     "Rocky es un bulldog muy sociable y tranquilo. Se lleva bien con niños y otras mascotas. Perfecto compañero para la familia."),
-    ("Nala", "Gato", "Siamés", "hembra", "6 meses", "Tamaño Pequeño",
+    ("Nala", "Gato", "Siamés", "hembra", 0, "Tamaño Pequeño",  # 6 meses: menos de 1 año
     "https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=400&h=400&fit=crop",
     "Nala es una gatita siamés muy curiosa y activa. Le encanta explorar y jugar. En proceso de vacunación. Busca un hogar amoroso."),
-    ("Max", "Perro", "Golden Retriever", "macho", "4 años", "Tamaño Grande",
+    ("Max", "Perro", "Golden Retriever", "macho", 4, "Tamaño Grande",
     "https://images.unsplash.com/photo-1633722715463-d30f4f325e24?w=400&h=400&fit=crop",
     "Max es un golden retriever noble y obediente. Entrenado en comandos básicos. Excelente con niños. Vacunado y esterilizado."),
-    ("Cleo", "Gato", "Persa", "hembra", "2 años", "Tamaño Mediano",
+    ("Cleo", "Gato", "Persa", "hembra", 2, "Tamaño Mediano",
     "https://images.unsplash.com/photo-1596854407944-bf87f6fdd49e?w=400&h=400&fit=crop",
     "Cleo es una gata persa de pelo largo. Tranquila y elegante, perfecta para personas que buscan compañía serena. Requiere cepillado regular."),
 ]
@@ -88,16 +99,8 @@ def seed():
 
     cursor = conn.cursor()
 
-    # --- Categorías de producto ---
-    print("\n→ Creando tabla categorias_producto si no existe...")
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS categorias_producto (
-            id_categoria_producto INT PRIMARY KEY AUTO_INCREMENT,
-            nombre VARCHAR(100) NOT NULL UNIQUE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    """)
-
-    print("→ Insertando categorías...")
+    # --- Categorías de producto (la tabla la crea sql/schema.sql) ---
+    print("\n→ Insertando categorías...")
     for id_cat, nombre in CATEGORIAS:
         cursor.execute("""
             INSERT INTO categorias_producto (id_categoria_producto, nombre)
@@ -118,15 +121,26 @@ def seed():
         insertados += cursor.rowcount
     print(f"  [OK] {insertados} productos insertados (los duplicados se omitieron).")
 
+    # --- Dueño ficticio de las mascotas en adopción ---
+    print("→ Creando la cuenta de ejemplo del refugio...")
+    nombres, apellidos, correo = REFUGIO
+    cursor.execute("""
+        INSERT INTO usuarios (nombres, apellidos, correo, password_hash, estado, verificado, acepta_datos)
+        SELECT %s, %s, %s, %s, 'inactivo', 0, 0
+        WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE correo = %s)
+    """, (nombres, apellidos, correo, hash_password(secrets.token_urlsafe(32)), correo))
+    cursor.execute("SELECT id_usuario FROM usuarios WHERE correo = %s", (correo,))
+    id_refugio = cursor.fetchone()[0]
+
     # --- Mascotas en adopción ---
     print("→ Insertando mascotas en adopción...")
     insertadas = 0
     for nombre, especie, raza, sexo, edad_aprox, color, foto, observaciones in MASCOTAS_ADOPCION:
         cursor.execute("""
-            INSERT INTO mascotas (nombre, especie, raza, sexo, edad_aprox, color, foto, observaciones, estado)
-            SELECT %s, %s, %s, %s, %s, %s, %s, %s, 'en_adopcion'
+            INSERT INTO mascotas (id_usuario, nombre, especie, raza, sexo, edad_aprox, color, foto, observaciones, estado)
+            SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, 'en_adopcion'
             WHERE NOT EXISTS (SELECT 1 FROM mascotas WHERE nombre = %s AND estado = 'en_adopcion')
-        """, (nombre, especie, raza, sexo, edad_aprox, color, foto, observaciones, nombre))
+        """, (id_refugio, nombre, especie, raza, sexo, edad_aprox, color, foto, observaciones, nombre))
         insertadas += cursor.rowcount
     print(f"  [OK] {insertadas} mascotas insertadas (los duplicados se omitieron).")
 
