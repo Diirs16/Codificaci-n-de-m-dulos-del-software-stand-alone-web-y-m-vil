@@ -1,0 +1,385 @@
+# Auditoría técnica completa — PetConnect
+
+| Dato | Valor |
+|---|---|
+| Fecha | 3 de noviembre de 2026 (inicio del Sprint 3 según el plan de pruebas) |
+| Commit auditado | `910c7cd` (rama `main`, 15/10/2026) + archivos sin commit en el directorio de trabajo |
+| Alcance | Backend Flask (API, consola, DAO, seguridad, correo, OTP), Web React/Vite, Móvil Expo, documentación y no conformidades (NC), historial de git, dependencias, Docker y configuración de Claude Code |
+| Método | Revisión estática del código, pruebas dinámicas de la API con el cliente de pruebas de Flask (sin base de datos real y con claves de prueba), pruebas automáticas, linter, build, `npm audit` y revisión del historial de git |
+| Guía usada | Auditoría previa de un compañero, **verificada punto por punto** (sección 4) |
+| Documento complementario | [PRIORIDADES-PetConnect-2026-11-03.md](PRIORIDADES-PetConnect-2026-11-03.md): qué arreglar primero |
+
+---
+
+## 1. Resumen ejecutivo
+
+**La base del proyecto es buena:** arquitectura por capas clara, SQL 100 % parametrizado, contraseñas con bcrypt
+(costo 12) con migración automática, códigos OTP generados con `secrets`, dependencias de Python fijadas y un
+historial de git **sin secretos**. El plan de pruebas del equipo es serio y ya había detectado la mayoría de los
+problemas graves.
+
+**El problema de fondo:** *el código va muy por detrás del plan.* Hoy empieza el Sprint 3 y, de lo que el cronograma
+prometía para los Sprints 1 y 2, en el repositorio solo están NC-001 y NC-008. Siguen abiertas NC-002, NC-003,
+NC-004, NC-005, NC-006, NC-007, NC-009, NC-010 y NC-011, y no existen ni `docker compose` funcional ni
+integración continua. Además, **nadie puede levantar el proyecto desde el repositorio** porque el script de la base de
+datos nunca se subió.
+
+Esta auditoría **confirmó 12 de los 13 puntos principales** de la auditoría del compañero (el restante, NC-009,
+no se puede verificar porque falta el esquema SQL), encontró **15 hallazgos nuevos** y amplió otros 4. Los más serios:
+
+1. El correo se envía por TLS **sin verificar el certificado**: la contraseña de aplicación de Gmail puede ser interceptada.
+2. Los formularios de **solicitud de adopción y de contacto** dicen “enviado” pero **no envían nada** (y recogen datos personales).
+3. Los códigos OTP y los correos de los usuarios se **imprimen en la consola** del servidor cuando el correo falla.
+4. La ficha de la mascota muestra **“Pendiente de vacunación”** a mascotas cuya descripción dice “Vacunada”: información de salud contradictoria.
+5. Los `Dockerfile` copiarían el `.env` **dentro de la imagen** (no hay `.dockerignore`) y la API no sería accesible desde el contenedor.
+6. Mover la API a Gunicorn (la solución de NC-003) **romperá los OTP**, porque se guardan en la memoria de cada proceso.
+
+### Conteo por severidad
+
+| Severidad | Cantidad | Significado |
+|---|---|---|
+| 🔴 Crítica | 5 | Explotable hoy o impide usar/evaluar el proyecto |
+| 🟠 Alta | 12 | Riesgo serio de seguridad, de datos personales o de credibilidad ante el instructor |
+| 🟡 Media | 11 | Defectos reales con impacto acotado |
+| ⚪ Baja | 13 | Orden, documentación y buenas prácticas |
+| **Total** | **41** | |
+
+---
+
+## 2. Lo que está bien (no tocar)
+
+| Aspecto | Evidencia |
+|---|---|
+| Arquitectura por capas | `modelo/`, `dao/`, `vista/`, `conexion/`, `config/`, `security/` bien separados |
+| SQL parametrizado | Todas las consultas de `dao/` y `api.py` usan `%s`; no se encontró concatenación de SQL |
+| Contraseñas | bcrypt costo 12 + migración de SHA-256 (`security/passwords.py`); comparación de SHA-256 con `hmac.compare_digest` |
+| OTP | `secrets.randbelow` (`otp/servicio.py:19`) |
+| Historial de git | Se revisaron los 10 commits: **ningún `.env`, llave ni contraseña** se ha subido; solo `.env.example` |
+| Dependencias Python | Versiones fijadas en `requirements.txt` |
+| Pruebas | 13 pruebas de regresión de NC-001/NC-008: **13/13 OK** |
+| Web | `npm run build` OK; `npm run lint` sin errores (2 avisos menores); `lang="es"`; todas las imágenes tienen `alt` |
+| Móvil | Valida la sesión al abrir (`/auth/me`) y muestra los errores de la API en pantalla (no esconde fallos) |
+| CORS | Restringido a los orígenes locales conocidos |
+| Plan de pruebas | Completo, honesto y con trazabilidad NC ↔ casos de prueba |
+
+---
+
+## 3. Hallazgos
+
+Formato: **ID · Severidad · Título** — Dónde — Qué pasa — Evidencia — Cómo arreglarlo.
+Las columnas **NC** relacionan el hallazgo con la bitácora oficial del plan de pruebas; **[A]** = estaba en la
+auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
+
+### 3.1 Bloqueantes de entrega
+
+#### A-01 · 🔴 Crítica · El script de la base de datos no existe en el repositorio [A]
+- **Dónde:** `README.md:279, 300, 321` menciona `PetConnect.sql`.
+- **Qué pasa:** ese archivo **nunca** se subió (se revisó todo el historial: 0 archivos `.sql`). `seed.py` solo crea
+  `categorias_producto`; las tablas `usuarios`, `mascotas`, `productos`, `proveedores_servicio`, `aplicaciones_vacuna`
+  no se pueden crear. El instructor o un compañero que clone el repositorio **no puede ejecutarlo**.
+- **Además:** sin el esquema no se puede verificar NC-009 (enum de `mascotas.estado`), NC-010 (fechas de vacunas)
+  ni armar Docker.
+- **Arreglo:** exportar el esquema (`mysqldump --no-data petconnect > petconnect.Backend/sql/schema.sql`), corregir el
+  enum de `estado` para incluir `en_adopcion`, agregar `CHECK` de fechas para NC-010 y un `sql/README` con el orden
+  (`schema.sql` → `seed.py`). **Sin datos personales reales.**
+
+#### A-02 · 🟠 Alta · El cronograma no coincide con el código [A]
+- Sprint 1 (5–16 oct) prometía: NC-004, NC-005, NC-009, NC-011, `docker compose` e integración continua. **Nada está en el repo.**
+- Sprint 2 (19–30 oct) prometía: NC-002, NC-006, NC-007, NC-010, ZAP. **Nada está en el repo.**
+- Último commit: 15/10/2026. No existe `.github/workflows/`.
+- **Arreglo:** cerrar las NC en el orden de [PRIORIDADES](PRIORIDADES-PetConnect-2026-11-03.md), **un commit por NC con su
+  prueba**, y actualizar la bitácora (Tabla de NC) con la fecha real de cierre.
+
+### 3.2 Seguridad del backend
+
+#### A-03 · 🔴 Crítica · Secreto JWT por defecto: cualquiera puede fabricar sesiones — NC-007 [A]
+- **Dónde:** `security/jwt_helper.py:9` → `os.environ.get("JWT_SECRET", "dev-secret-inseguro")`.
+- **Evidencia dinámica:** sin `JWT_SECRET`, un token firmado con `"dev-secret-inseguro"` **es aceptado** por `verify_token()`.
+- **Arreglo:** igual que con `FERNET_KEY`: si falta (o tiene menos de 32 bytes), la API **no arranca**.
+
+#### A-04 · 🔴 Crítica · Códigos OTP atacables por fuerza bruta — NC-006 [A parcial]
+- **Dónde:** `otp/servicio.py:42-63` (no cuenta intentos), rutas `/api/auth/login/verify` y `/api/auth/verify` sin límite de tasa.
+- **Evidencia dinámica:** **2000 intentos fallidos seguidos aceptados** y el código seguía vigente. Con 10 minutos de
+  vigencia y sin límite, un código de 6 dígitos se adivina con un script. Como el login exige primero la contraseña,
+  el riesgo mayor está en `/api/auth/verify` (registro).
+- **Arreglo:** máximo 5 intentos por código (luego se invalida) + Flask-Limiter por IP en `login`, `login/verify`,
+  `register`, `verify` y `utils/validar-correo`; comparar con `hmac.compare_digest`.
+
+#### A-05 · 🔴 Crítica · El correo de PetConnect se puede usar para phishing/spam [A]
+- **Dónde:** `correo/plantillas.py:42` y `:99` insertan `{name}` sin escapar; `correo/servicio.py:66,72` usa `.format(name=...)`.
+- **Evidencia dinámica:** con `name = '<a href="https://sitio-falso.example">Reclama tu premio</a>'` el HTML del correo
+  **contiene el enlace**. `/api/auth/register` lo envía a **cualquier** dirección y sin límite de peticiones.
+- **Impacto:** correos fraudulentos saliendo de la cuenta Gmail del proyecto → Google bloquea la cuenta.
+- **Arreglo:** `html.escape(name)` (y de cualquier dato del usuario) antes de la plantilla + limitador de A-04.
+
+#### A-06 · 🔴 Crítica · El correo viaja con TLS sin verificar el certificado [N]
+- **Dónde:** `correo/servicio.py:45` → `s.starttls()` sin `context`.
+- **Evidencia:** en Python 3.14, `smtplib.starttls()` sin contexto usa `ssl._create_stdlib_context`, que es
+  `_create_unverified_context` (`verify_mode=0`, `check_hostname=False`, comprobado en el `.venv`).
+- **Impacto:** en una red insegura (wifi pública, SENA), alguien en el medio puede hacerse pasar por `smtp.gmail.com`
+  y **robar `GMAIL_USER` y la contraseña de aplicación**.
+- **Arreglo (1 línea):** `s.starttls(context=ssl.create_default_context())`.
+
+#### A-07 · 🟠 Alta · Cualquiera ve cualquier mascota, incluidos datos de salud — NC-002 [A]
+- **Dónde:** `api.py:207-212` (consulta sin filtro de estado) y `api.py:235-246` (sin `@require_auth`).
+- **Qué pasa:** cambiando el número en `/api/mascotas/<id>` se obtiene cualquier mascota registrada, con sus observaciones.
+  Confirmado por el equipo el 5/10 (AA2, CP-006).
+- **Arreglo:** la ruta pública solo devuelve `estado = 'en_adopcion'` (404 si no); las mascotas privadas van por una
+  ruta con `@require_auth` que compare `id_usuario` con el del token. Prueba de regresión: sin token → 404.
+
+#### A-08 · 🟠 Alta · Configuración insegura y errores internos expuestos — NC-007 [A + N]
+- `api.py:458` → `app.run(debug=True)`: el depurador de Werkzeug permite ejecutar código si se expone. [A]
+- `api.py:39-41` → el manejador global devuelve `str(e)` al cliente. [A]
+- **Evidencia dinámica [N]:**
+
+  | Petición | Respuesta actual | Debería ser |
+  |---|---|---|
+  | `GET /api/no-existe` | **500** `"404 Not Found: ..."` | 404 |
+  | `POST /api/productos` | **500** `"405 Method Not Allowed..."` | 405 |
+  | `GET /api/mascotas/1` con la BD caída | **500** `"'NoneType' object has no attribute 'cursor'"` | 503 con mensaje genérico |
+  | `POST /api/auth/login/verify` con `"code": 123456` (número) | **500** `"'int' object has no attribute 'strip'"` | 400 |
+  | `POST /api/auth/login` con `"email": 5` | **500** `"'int' object has no attribute 'strip'"` | 400 |
+
+- **Arreglo:** `debug` desde variable de entorno (falso por defecto); manejar `HTTPException` aparte; mensaje genérico
+  para 500 (registrando el detalle en el servidor); validar tipos de entrada (`isinstance(x, str)`); si
+  `_get_conn()` devuelve `None`, responder 503.
+
+#### A-09 · 🟠 Alta · Un segundo registro pisa la contraseña del primero [A]
+- **Dónde:** `api.py:362-365` + `otp/servicio.py:35` (sobrescribe sin preguntar).
+- **Evidencia dinámica:** tras dos `/register` con el mismo correo, el hash pendiente es **el del segundo**. Si la
+  víctima luego verifica con su código, la cuenta queda con la contraseña del atacante.
+- **Arreglo:** si ya hay un registro pendiente y vigente, no sobrescribirlo (responder 409 “revisa tu correo” o reenviar
+  el mismo código).
+
+#### A-10 · 🟠 Alta · Códigos OTP y correos impresos en la consola [N]
+- **Dónde:** `api.py:305`, `:377`, `:421` → `print(f"[DEV] ... Codigo ... para {email}: {code}")`.
+- **Qué pasa:** si el correo falla, el **código de inicio de sesión** de cualquier usuario y su correo quedan en los logs.
+  Quien lea los logs puede entrar a cualquier cuenta (tras la contraseña) y se viola la regla de datos personales
+  (Ley 1581).
+- **Arreglo:** imprimir el código solo si `APP_ENV=desarrollo` explícito; en otro caso, registrar solo “fallo de envío”
+  y responder al cliente que reintente.
+
+#### A-11 · 🟠 Alta · Una sola conexión a la BD compartida entre hilos — NC-003 [A]
+- **Dónde:** `conexion/conexion_bd.py:17-31` (Singleton con una conexión). El equipo midió 56 % de errores con 500 usuarios.
+- **Arreglo:** `mysql.connector.pooling.MySQLConnectionPool`, pedir y devolver una conexión por petición (con
+  `try/finally`), cerrar cursores siempre.
+
+#### A-12 · 🟠 Alta · Pasar a Gunicorn romperá los OTP [N]
+- **Dónde:** `api.py:44-45` (`AlmacenOTP()` en memoria), `otp/servicio.py`.
+- **Qué pasa:** NC-003 propone Gunicorn. Con varios *workers* (procesos), el código se guarda en un proceso y la
+  verificación puede llegar a otro → “No hay verificación pendiente”. Además los códigos se pierden al reiniciar,
+  el diccionario no es seguro entre hilos y **nunca se limpian los vencidos** (crece sin límite si alguien hace spam;
+  igual `_mx_cache` en `api.py:81`).
+- **Arreglo:** guardar los OTP en una tabla de la BD (`otp_pendientes` con hash del código, intentos y expiración) o
+  usar 1 worker con hilos mientras tanto; limpiar vencidos.
+
+#### A-13 · 🟡 Media · El cifrado Fernet no se usa pero es obligatorio para arrancar [A]
+- `api.py:29` importa `encrypt/decrypt` y el comentario de `api.py:400-401` dice que el teléfono se guarda cifrado:
+  **no se cifra nada**. `security/crypto.py:14-18` impide arrancar sin `FERNET_KEY`; **comprobado**: hasta importar
+  `security.jwt_helper` falla sin esa clave. `decrypt()` (`:30-37`) se traga cualquier error y devuelve el texto cifrado.
+- **Arreglo:** usarlo de verdad (teléfono) o quitarlo; corregir el comentario; que `decrypt` lance error.
+
+#### A-14 · 🟡 Media · Enumeración de correos en el registro [N, ya en el plan A07]
+- `api.py:359-360` responde **409 “El correo ya está registrado”**: permite saber quién tiene cuenta.
+- **Arreglo:** respuesta neutra (“Si el correo es válido te enviamos un código”) y avisar por correo al titular.
+
+#### A-15 · 🟡 Media · `autocommit=True` vuelve inútiles los `rollback()` [N]
+- `config/db_config.py:13` → `autocommit: True`; los DAO llaman `commit()/rollback()` como si hubiera transacciones.
+  Una operación de varios pasos no es atómica. El README (`README.md:116,128`) dice `False`.
+- **Arreglo:** decidir: `False` + `commit` explícito (lo que documenta el README) o dejar `True` y quitar los `rollback`.
+
+#### A-16 · 🟡 Media · `generate_keys.py` borra el `.env` existente sin preguntar [N]
+- `generate_keys.py:41` abre el archivo de entorno en modo `"w"`: si se corre dos veces, **borra** la contraseña de la
+  BD y las credenciales de Gmail, y cambia `JWT_SECRET` (cierra todas las sesiones).
+- **Arreglo:** si el archivo existe, solo agregar las claves que falten o pedir confirmación.
+
+#### A-17 · 🟡 Media · Política de contraseña sin minúscula — NC-004 [A]
+- `api.py:66-77` y `RegisterModal.jsx:8-11`. **Evidencia:** `PETCONNECT1!` es aceptada.
+- **Arreglo:** `re.search(r'[a-z]', ...)` en API, web y móvil.
+
+#### A-18 · 🟡 Media · La consola registra usuarios saltándose las reglas [N]
+- `vista/menu_usuarios.py:61` usa `input()` para la contraseña (**se ve en pantalla**; usar `getpass`), le hace
+  `.strip()` (la API no, así que la misma contraseña puede no coincidir) y **no aplica** `_validate_password` ni pide
+  autorización de datos.
+- **Arreglo:** mover la validación a un módulo común (`security/politica.py`) y usarlo en API y consola.
+
+#### A-19 · ⚪ Baja · Búsqueda de proveedores devuelve inactivos — NC-011
+- `dao/proveedor_dao.py:49-54` (falta `AND activo = TRUE`, que sí tiene `:56-62`). Una línea.
+
+### 3.3 Datos personales (Ley 1581) y contenido
+
+#### A-20 · 🟠 Alta · Autorización de datos falsa — NC-005 [A]
+- `api.py:409` crea el usuario con `acepta_datos=True` fijo; `modelo/usuario.py:10` también lo trae en `True` por
+  defecto. Ni la web ni el móvil tienen casilla.
+- **Arreglo:** casilla **sin marcar** con enlace a la política; la API rechaza el registro sin ella; guardar fecha y versión.
+
+#### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
+- **Solicitud de adopción** (`PetDetail.jsx:56-60`) y **Contacto** (`Contact.jsx:15-17`) piden nombre, correo, teléfono y
+  mensaje y muestran *“Solicitud enviada. Nos pondremos en contacto contigo pronto”*… **sin enviar nada**.
+  Lo mismo el **checkout** (`Checkout.jsx:41-45`) [A].
+- **Impacto:** una persona que quiere adoptar cree que ya aplicó; además se recogen datos sin aviso de privacidad.
+- **Arreglo:** o se implementa el endpoint (con consentimiento y `@require_auth`), o se rotula claramente **“Demo — no
+  se envía”** y se deshabilita el botón.
+
+#### A-22 · 🟡 Media · Información de salud contradictoria en la ficha de la mascota [N]
+- La API pone siempre `vaccinated=False`, `sterilized=False`, `size="Mediano"` (`api.py:215-220`), así que
+  `PetDetail.jsx:115-129` muestra **“Pendiente de vacunación / esterilización”** a Luna, Milo y Max, cuyas
+  descripciones dicen “Vacunada, esterilizada…”.
+- Además `seed.py:61-79` guarda “Tamaño Grande/Mediano/Pequeño” **en la columna `color`** (el comentario de
+  `seed.py:59` no coincide con las tuplas).
+- **Arreglo:** columnas reales (`vacunada`, `esterilizada`, `tamano`) o no mostrar el dato; corregir la semilla;
+  pasar los textos por `/revision-contenido-mascotas` (regla 6: validación veterinaria).
+
+### 3.4 Web (React)
+
+#### A-23 · 🟠 Alta · La web esconde los fallos de la API con datos falsos [A]
+- `Catalog.jsx:16-25`, `Adoption.jsx:9-18` (si la API devuelve **0** mascotas, también muestra las falsas),
+  `PetDetail.jsx:21-31`, `ProductDetail.jsx:24-30` → `.catch(() => {})` o *fallback* a `data/*.js`.
+- `Home.jsx:4,8-9` **siempre** usa `data/products.js` (campos `discount`/`isNew` que la BD no tiene) [N].
+- Así se ocultó NC-009. **Arreglo:** estados de carga / vacío / error como en el móvil; usar `data/*.js` solo en pruebas.
+
+#### A-24 · 🟡 Media · La sesión web nunca se revalida [A]
+- `AuthContext.jsx:23-33` carga el usuario de `localStorage` y lo da por bueno siempre, aunque el token (24 h) venza.
+- **Arreglo:** llamar a `/auth/me` al iniciar (como el móvil) y cerrar sesión ante un 401.
+
+#### A-25 · ⚪ Baja · `innerHTML` con el nombre del producto [A]
+- `assets/js/addToCartToast.js:23-28`. Hoy el nombre viene de la BD, pero es XSS en potencia. Usar `textContent`.
+
+#### A-26 · ⚪ Baja · Precio calculado en el navegador [A]
+- `CartContext.jsx:37`. Aceptable mientras el checkout sea demo; si se implementa, el servidor recalcula precio y stock.
+
+### 3.5 Móvil (Expo)
+
+#### A-27 · 🟡 Media · La app solo funciona en el emulador [A]
+- `src/services/api.js:9-14`: `10.0.2.2` (Android) o `localhost`, por HTTP. HTTP sin cifrar solo está permitido en
+  los manifiestos *debug* (`usesCleartextTraffic`), así que el APK *release* no conectaría.
+- **Arreglo:** `EXPO_PUBLIC_API_URL` y HTTPS al desplegar.
+
+#### A-28 · ⚪ Baja · Token en AsyncStorage sin cifrar y cierre de sesión ante cualquier error
+- `src/services/api.js:87` (el plan ya propone `expo-secure-store`). `AuthContext.js:22-25` borra el token ante
+  **cualquier** error (también sin internet), no solo ante 401.
+
+### 3.6 Dependencias
+
+#### A-29 · 🟡 Media · Vulnerabilidades conocidas en dependencias [N]
+| Módulo | Resultado `npm audit` | Lectura |
+|---|---|---|
+| Web | 2 **altas** (`react-router` / `react-router-dom` ≤ 7.18.1, CSRF en modo RSC) | La app no usa RSC → impacto real bajo; se arregla con `npm audit fix` |
+| Móvil | 30 (1 crítica `shell-quote`, 14 altas, 13 moderadas, 2 bajas) | Casi todas en herramientas de Expo/compilación, no en la app instalada; arreglo completo exige subir de versión mayor de Expo |
+| Backend | **No se pudo auditar** (`pip-audit` no está instalado; instalarlo requiere permiso) | Recomendado en CI |
+
+### 3.7 Docker, CI y pruebas
+
+#### A-30 · 🟠 Alta · Los archivos de Docker no funcionan y filtrarían secretos [N]
+Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, `PetConnect.Front/.../Dockerfile`,
+`PetConnect.Mobile/Dockerfile`.
+- **No hay `.dockerignore`** → `COPY . .` mete el **`.env` real**, `node_modules` y `__pycache__` en la imagen.
+- `docker-compose.yml` está dentro de `petconnect.Backend/` pero sus rutas (`./petconnect.Backend`, `./PetConnect.Front/...`)
+  solo funcionan desde la raíz; el servicio `db` no tiene variables, volumen ni script inicial (`# ...`).
+- `api.py:458` → `app.run(...)` escucha en `127.0.0.1`: **dentro del contenedor la API no es accesible**.
+- El Front corre el servidor de **desarrollo** y su proxy apunta a `localhost:5000` (dentro del contenedor no es el backend).
+- El Móvil usa `--localhost`: no se ve desde fuera del contenedor.
+- **Arreglo:** `.dockerignore` por módulo, compose en la raíz, `host="0.0.0.0"` controlado por variable, MySQL/MariaDB
+  con `schema.sql` en `docker-entrypoint-initdb.d`, secretos vía `env_file` (nunca en la imagen), Gunicorn.
+
+#### A-31 · 🟠 Alta · No hay integración continua y las pruebas cubren poco [A]
+- No existe `.github/workflows/`. Solo 13 pruebas (seguridad); **ninguna** prueba endpoints de mascotas, productos,
+  OTP ni errores.
+- **Arreglo:** GitHub Actions con `unittest` + `npm run lint` + `npm run build`; pruebas de regresión para cada NC
+  (p. ej. `/api/mascotas/<id>` sin token → 404; 6.º intento OTP → bloqueado; ruta inexistente → 404).
+
+### 3.8 Documentación y orden
+
+| ID | Sev. | Hallazgo | Dónde |
+|---|---|---|---|
+| A-32 | ⚪ | README desactualizado: dice MySQL 8 (es MariaDB 10.4), `autocommit False` (es `True`), `mysql-connector 9.7.0` (es `9.1.0`) y solo explica la consola | `README.md:16,116,128` [A] |
+| A-33 | ⚪ | El plan dice que las pruebas se corren con `pytest` y `.env.test`; el repo usa `unittest` y no hay `.env.test` | Plan GA9, nota de la tabla de pruebas de la API |
+| A-34 | ⚪ | `PetConnect.Mobile/LICENSE` es la licencia de Expo (“650 Industries”) | [A] |
+| A-35 | ⚪ | Colecciones de Postman duplicadas (“PetConnect API” y “PetConnect API Copy”) y carpeta anidada `postman/postman/` | `PetConnect.Mobile/postman/` [A] |
+| A-36 | ⚪ | Rutas personales de Windows (`C:\Users\goku8\...`) en la guía | `PetConnect.Mobile/EJECUCION.md:60-74` [A] |
+| A-37 | ⚪ | Nombre del repositorio con acentos rotos (`Codificaci-n-de-m-dulos-...`) | GitHub [A] |
+| A-38 | ⚪ | Se llegó a subir un archivo temporal de Word (`~$9-220501096-AA3-EV02-PetConnect.docx`); falta `~$*` en `.gitignore` | historial de `Documentacion/GA9/` [N] |
+| A-39 | ⚪ | Carpeta local `.github/modernize/java-upgrade/` (restos de una extensión de Java, sin seguimiento): no aplica a este proyecto | raíz [N] |
+
+### 3.9 Configuración de Claude Code (instalada hoy)
+
+#### A-40 · ⚪ Baja · El hook de secretos bloquea búsquedas legítimas [N]
+- `proteger-secretos.js` bloqueó **3 comandos de esta auditoría** que solo *contenían el texto* `.env` dentro de una
+  búsqueda (`grep`), sin leer el archivo.
+- **Arreglo:** que el patrón exija que `.env` sea una ruta argumento (no parte de una expresión regular entre comillas).
+
+#### A-41 · 🟡 Media · Los hooks no detectan lecturas indirectas de secretos [N] — ver incidente §5
+- Un script que **importa `api.py`** carga el `.env` real mediante `load_dotenv()`; ningún hook lo puede ver.
+- **Arreglo:** regla nueva en `CLAUDE.md`: los scripts de prueba que importen la API deben desactivar `load_dotenv`
+  o usar variables de prueba explícitas, y **nunca imprimir** valores de configuración.
+
+---
+
+## 4. Verificación de la auditoría del compañero
+
+| # | Afirmación del compañero | Veredicto | Nota |
+|---|---|---|---|
+| Bien | Arquitectura, SQL parametrizado, bcrypt, historial limpio, OTP con `secrets`, versiones fijadas | ✅ Cierto | Confirmado |
+| Fondo | La documentación va por delante del código | ✅ Cierto | Ver A-02 |
+| 1 | `PetConnect.sql` nunca se subió | ✅ Cierto | 0 archivos `.sql` en todo el historial (A-01) |
+| 2 | NC-002 en `api.py:235` | ✅ Cierto | A-07 |
+| 3 | Correo para phishing (`plantillas.py:42`) y sin límite | ✅ Cierto, **probado** | También la plantilla de bienvenida (`:99`). El límite de tasa **sí** estaba en NC-006; la inyección HTML no (A-05) |
+| 4 | Singleton de una conexión (NC-003) | ✅ Cierto | A-11; ojo con A-12 al pasar a Gunicorn |
+| 5 | `debug=True` (`:458`), `str(e)`, secreto JWT por defecto (`jwt_helper.py:9`) | ✅ Cierto, **probado** | Además 404/405 se vuelven 500 (A-08) |
+| 6 | `acepta_datos=True` fijo (NC-005) | ✅ Cierto | Hoy está en `api.py:409` (el plan cita la 401) |
+| 7 | La web esconde errores con datos falsos | ✅ Cierto | Y `Home` siempre usa datos fijos (A-23) |
+| 8 | Checkout falso (`Checkout.jsx:41`) | ✅ Cierto | También adopción y contacto (A-21) |
+| 9 | NC-009, enum sin `en_adopcion` | ⚠️ No verificable en el repo | No hay esquema SQL; se acepta por la evidencia del equipo (AA2, CP-012) |
+| 10 | Móvil fijo a `10.0.2.2` (`api.js:14`) | ✅ Cierto con matiz | En web usa `localhost`; HTTP solo permitido en *debug* (A-27) |
+| 11 | La web no revalida la sesión | ✅ Cierto | A-24 |
+| 12 | Registro pisado (`api.py:362`) | ✅ Cierto, **probado** | A-09 |
+| 13 | Cifrado no usado, `decrypt()` traga errores | ✅ Cierto, **probado** | A-13 |
+| — | README, LICENSE, Postman, EJECUCION, `innerHTML`, NC-004, pruebas/CI, nombre del repo | ✅ Ciertos | A-25, A-31, A-32 a A-37 |
+| — | “Quitar `AGENTS.md`, es de la plantilla” | ❌ No recomendado | Sí viene de la plantilla, pero sirve (pide leer la documentación de Expo 57) y ahora lo usa `PetConnect.Mobile/CLAUDE.md` |
+
+**Conclusión:** la auditoría del compañero es **precisa y sirve como guía**. Le faltaron sobre todo: TLS sin verificar
+(A-06), OTP en logs (A-10), el choque OTP-en-memoria/Gunicorn (A-12), formularios falsos de adopción y contacto (A-21),
+la información de salud contradictoria (A-22), Docker (A-30) y las dependencias (A-29).
+
+---
+
+## 5. Incidente durante la auditoría (transparencia)
+
+Durante las pruebas dinámicas, un script importó `api.py` para probarlo sin base de datos. `api.py` ejecuta
+`load_dotenv()` y cargó el `.env` real; el script imprimió el valor de **`JWT_SECRET`** en la conversación con Claude.
+El valor **no** quedó en ningún archivo del repositorio ni en git.
+
+**Acción requerida:** rotar `JWT_SECRET`, es decir, generar uno nuevo (por ejemplo, `python -c "import secrets; print(secrets.token_hex(32))"`)
+y pegarlo a mano en `petconnect.Backend/.env`, **sin** correr `generate_keys.py`, porque borraría el resto del archivo (A-16).
+Efecto: todas las sesiones abiertas se cierran. Prevención: A-41.
+
+**Estado: resuelto el 03/11/2026 (ítem 0.1 de PRIORIDADES).** El dueño del proyecto generó un `JWT_SECRET` nuevo
+(`secrets.token_hex(32)`) en su propia terminal y reemplazó a mano solo esa línea del `.env`; el valor no pasó por la
+conversación. Verificación: la API arranca y se conecta a la BD; `GET /api/auth/me` responde **401** sin token, con
+un token inventado y con el token que la web tenía guardado de antes de la rotación. Pruebas `unittest`: 13 de 13 OK.
+
+---
+
+## 6. Qué NO se pudo auditar
+
+| Tema | Motivo | Cómo cubrirlo |
+|---|---|---|
+| Esquema de la BD, NC-009, NC-010 | No hay `.sql` en el repo | Subir el esquema (A-01) |
+| Pruebas contra MariaDB real y carga (NC-003) | No se levantó la BD en esta auditoría | Tras A-01, repetir CP-008 / JMeter |
+| `pip-audit` del backend | No instalado (instalar requiere permiso) | Agregarlo a CI |
+| Revisión visual / accesibilidad con la app corriendo | Requiere backend + BD | `/levantar-proyecto` y luego `/impeccable audit` |
+| Escaneo ZAP | Fuera del alcance de una revisión local | Sprint 3 del plan |
+
+---
+
+## 7. Comandos ejecutados y resultados
+
+| Comando | Resultado |
+|---|---|
+| `python -m unittest discover -s tests` | 13/13 OK |
+| `npm run lint` (web) | 0 errores, 2 avisos (`only-export-components` en los contextos) |
+| `npm run build` (web) | OK, 293.9 kB JS (88.2 kB gzip) |
+| `npm audit` (web) | 2 altas |
+| `npm audit` (móvil) | 30 (1 crítica, 14 altas) |
+| Sondeo dinámico de la API (cliente de pruebas de Flask, BD caída a propósito) | Tabla de A-08; A-04, A-05, A-09, A-17 confirmados |
+| Revisión de los 10 commits | 0 secretos, 0 `.sql`, 0 `.env` |
