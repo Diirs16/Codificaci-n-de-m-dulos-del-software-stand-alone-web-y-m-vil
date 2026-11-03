@@ -2,10 +2,14 @@
 Pruebas de regresion de A-01 (esquema de la BD), NC-009 (estado en_adopcion
 y modo estricto) y NC-010 (fechas de vacunas).
 
-- PruebasEsquemaSinBD: leen sql/schema.sql como texto. No necesitan base de datos.
+- PruebasEsquemaSinBD y PruebasMigracionSinBD: leen los .sql como texto.
+  No necesitan base de datos.
 - PruebasEsquemaEnBD: solo corren con PETCONNECT_PRUEBA_BD=1. Crean una base
   temporal "petconnect_prueba", cargan schema.sql y seed.py, y al final la borran.
-  Nunca tocan la base "petconnect".
+- PruebasMigracionEnBD: tambien con PETCONNECT_PRUEBA_BD=1. Crean la tabla vieja
+  en "petconnect_prueba_migracion", reproducen el estado vacio y aplican la
+  migracion de PRIORIDADES 1.2. Al final borran esa base.
+  Ninguna toca la base "petconnect".
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -v
@@ -22,7 +26,9 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
 RUTA_ESQUEMA = os.path.join(RAIZ, "sql", "schema.sql")
+RUTA_MIGRACION = os.path.join(RAIZ, "sql", "migraciones", "2026-11-03_estado_en_adopcion.sql")
 BD_PRUEBA = "petconnect_prueba"
+BD_PRUEBA_MIGRACION = "petconnect_prueba_migracion"
 
 
 def _leer(ruta):
@@ -219,6 +225,159 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         cursor.execute(sql, (id_mascota, id_vacuna, "2026-10-05", None))
         self.assertEqual(self._contar("SELECT COUNT(*) FROM aplicaciones_vacuna"), 2)
         cursor.close()
+
+
+def _lista_estados(sql):
+    """Devuelve la ultima lista enum de `estado` que aparece en el texto."""
+    return re.findall(r"`estado` enum\(([^)]*)\)", sql)[-1]
+
+
+def _regla_fechas(sql):
+    return re.search(r"`chk_aplicacion_fechas` CHECK (\(.*\))", sql).group(1)
+
+
+class PruebasMigracionSinBD(unittest.TestCase):
+    """PRIORIDADES 1.2: la migracion de la BD existente sigue igual a schema.sql."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sql = _leer(RUTA_MIGRACION)
+        cls.esquema = _leer(RUTA_ESQUEMA)
+        cls.sentencias = _sentencias(cls.sql)
+
+    def test_usa_la_misma_lista_de_estados_que_el_esquema(self):
+        self.assertEqual(_lista_estados(self.sql), _lista_estados(_bloque_tabla(self.esquema, "mascotas")))
+
+    def test_usa_la_misma_regla_de_fechas_que_el_esquema(self):
+        self.assertEqual(_regla_fechas(self.sql), _regla_fechas(self.esquema))
+
+    def test_nunca_apaga_el_modo_estricto(self):
+        """Sin modo estricto, un estado desconocido se vaciaria y luego pasaria a en_adopcion."""
+        modos = [s for s in self.sentencias if "sql_mode" in s]
+        self.assertTrue(self.sentencias[0].startswith("SET SESSION sql_mode"))
+        for modo in modos:
+            self.assertIn("STRICT_TRANS_TABLES", modo)
+
+    def test_corrige_los_vacios_antes_de_cerrar_la_lista(self):
+        def posicion(patron):
+            return next(i for i, s in enumerate(self.sentencias) if re.search(patron, s))
+
+        a_texto = posicion(r"MODIFY `estado` varchar")
+        correccion = posicion(r"UPDATE `mascotas` SET `estado` = 'en_adopcion' WHERE `estado` = ''")
+        a_lista = posicion(r"MODIFY `estado` enum")
+        self.assertLess(a_texto, correccion)
+        self.assertLess(correccion, a_lista)
+
+
+@unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",
+                     "Prueba con MariaDB real: activar con PETCONNECT_PRUEBA_BD=1")
+class PruebasMigracionEnBD(unittest.TestCase):
+    """PRIORIDADES 1.2: una BD vieja queda sin estados vacios y sin perder datos."""
+
+    ESTADOS_VIEJOS = "'activa','perdida','adoptada','fallecida'"
+
+    @classmethod
+    def setUpClass(cls):
+        import mysql.connector
+        from config.db_config import DB_CONFIG
+
+        cls.Error = mysql.connector.Error
+        servidor = {k: v for k, v in DB_CONFIG.items() if k not in ("database", "sql_mode")}
+        try:
+            cls.conn = mysql.connector.connect(**servidor)
+        except mysql.connector.Error:
+            raise unittest.SkipTest("No hay conexion con MariaDB")
+        cls.conn.autocommit = True
+
+        cursor = cls.conn.cursor()
+        # Nombre constante del archivo: los identificadores no van como parametro.
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_MIGRACION}`")
+        cursor.execute(f"CREATE DATABASE `{BD_PRUEBA_MIGRACION}` CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci")
+        cls.addClassCleanup(cls._borrar_bd_prueba)
+        cursor.execute(f"USE `{BD_PRUEBA_MIGRACION}`")
+        cursor.close()
+
+    @classmethod
+    def _borrar_bd_prueba(cls):
+        cursor = cls.conn.cursor()
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_MIGRACION}`")
+        cursor.close()
+        cls.conn.close()
+
+    def setUp(self):
+        self.cursor = self.conn.cursor()
+        self._crear_tablas_viejas(self.ESTADOS_VIEJOS)
+
+    def tearDown(self):
+        self.cursor.close()
+
+    def _crear_tablas_viejas(self, estados):
+        """Tablas como las de la BD creada antes del 03/11/2026, en modo no estricto."""
+        self.cursor.execute("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'")
+        self.cursor.execute("DROP TABLE IF EXISTS mascotas, aplicaciones_vacuna")
+        # La lista de estados es una constante de la prueba, no un dato del usuario.
+        self.cursor.execute(
+            "CREATE TABLE mascotas (id_mascota int AUTO_INCREMENT PRIMARY KEY, "
+            f"nombre varchar(80) NOT NULL, estado enum({estados}) DEFAULT 'activa') ENGINE=InnoDB"
+        )
+        self.cursor.execute(
+            "CREATE TABLE aplicaciones_vacuna (id_aplicacion int AUTO_INCREMENT PRIMARY KEY, "
+            "fecha_aplicacion date NOT NULL, fecha_proxima date DEFAULT NULL) ENGINE=InnoDB"
+        )
+
+    def _insertar_mascota(self, nombre, estado):
+        self.cursor.execute("INSERT INTO mascotas (nombre, estado) VALUES (%s, %s)", (nombre, estado))
+
+    def _estados(self):
+        self.cursor.execute("SELECT nombre, estado FROM mascotas")
+        return dict(self.cursor.fetchall())
+
+    def _migrar(self):
+        for sentencia in _sentencias(_leer(RUTA_MIGRACION)):
+            self.cursor.execute(sentencia)
+
+    def test_corrige_los_estados_vacios_y_respeta_los_demas(self):
+        self._insertar_mascota("Luna", "en_adopcion")
+        self._insertar_mascota("Toby", "activa")
+        self._insertar_mascota("Max", "adoptada")
+        self.assertEqual(self._estados()["Luna"], "", "No se reprodujo NC-009 en la tabla vieja")
+
+        self._migrar()
+
+        self.assertEqual(self._estados(), {"Luna": "en_adopcion", "Toby": "activa", "Max": "adoptada"})
+
+    def test_se_puede_ejecutar_dos_veces(self):
+        self._insertar_mascota("Luna", "en_adopcion")
+        self._migrar()
+        self._migrar()
+        self._insertar_mascota("Kira", "en_adopcion")
+        self.assertEqual(self._estados(), {"Luna": "en_adopcion", "Kira": "en_adopcion"})
+
+    def test_un_estado_desconocido_detiene_la_migracion_sin_perderse(self):
+        """Con el modo estricto apagado, 'extraviada' se habria vaciado y publicado en adopcion."""
+        self._crear_tablas_viejas(self.ESTADOS_VIEJOS + ",'extraviada'")
+        self._insertar_mascota("Rocky", "extraviada")
+
+        with self.assertRaises(self.Error):
+            self._migrar()
+
+        self.assertEqual(self._estados(), {"Rocky": "extraviada"})
+
+    def test_agrega_la_regla_de_fechas(self):
+        self._migrar()
+        with self.assertRaises(self.Error):
+            self.cursor.execute(
+                "INSERT INTO aplicaciones_vacuna (fecha_aplicacion, fecha_proxima) VALUES (%s, %s)",
+                ("2026-10-05", "2026-10-01"),
+            )
+
+    def test_fechas_invertidas_detienen_la_migracion(self):
+        self.cursor.execute(
+            "INSERT INTO aplicaciones_vacuna (fecha_aplicacion, fecha_proxima) VALUES (%s, %s)",
+            ("2026-10-05", "2026-10-01"),
+        )
+        with self.assertRaises(self.Error):
+            self._migrar()
 
 
 if __name__ == "__main__":

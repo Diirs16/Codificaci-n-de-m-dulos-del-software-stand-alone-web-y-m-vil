@@ -48,10 +48,40 @@ pasos no borra nada.
 
 ## ¿Ya tenías la base creada antes del 03/11/2026?
 
-Tu tabla `mascotas` no tiene el estado `en_adopcion`, y `schema.sql` no modifica tablas que ya existen. Para
-corregirla está el ítem 1.2 de `Documentacion/Auditoria/PRIORIDADES-PetConnect-2026-11-03.md`. Mientras tanto, con
-el modo estricto, `seed.py` mostrará un error al insertar mascotas en esa base vieja en lugar de guardarlas con el
-estado vacío.
+Tu tabla `mascotas` no tiene el estado `en_adopcion` (las mascotas en adopción quedaron con el estado vacío) y
+`aplicaciones_vacuna` no tiene la regla de fechas. `schema.sql` no modifica tablas que ya existen; para eso está la
+migración `migraciones/2026-11-03_estado_en_adopcion.sql`. Desde la carpeta `petconnect.Backend`:
+
+**1. Respaldo** (fuera del repositorio: contiene datos personales y **nunca** se sube a git):
+
+```bash
+mysqldump -u root -p -P 3310 petconnect --result-file="$HOME/respaldo_petconnect_2026-11-03.sql"
+```
+
+En PowerShell cambia `$HOME` por `$env:USERPROFILE`. Se usa `--result-file` en vez de `>` porque en PowerShell `>`
+guarda el archivo en otra codificación.
+
+**2. Migración:**
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "source sql/migraciones/2026-11-03_estado_en_adopcion.sql"
+```
+
+**3. Comprobar** que ninguna mascota quedó con el estado vacío (la consulta solo muestra conteos):
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SELECT estado, COUNT(*) AS total FROM mascotas GROUP BY estado"
+```
+
+No debe aparecer una fila con el estado vacío, y `en_adopcion` debe tener tus mascotas de adopción (6 si cargaste
+`seed.py`).
+
+La migración trabaja siempre en modo estricto y se puede ejecutar varias veces. Si se detiene con un error:
+
+- **`Data truncated for column 'estado'`**: alguna mascota tiene un estado que no está en la lista nueva. Ese valor
+  **no se pierde** (la columna queda como texto mientras tanto). Cámbialo por uno válido y vuelve a ejecutar el paso 2.
+- **`CONSTRAINT chk_aplicacion_fechas failed`**: hay vacunas con la próxima dosis igual o anterior a la aplicación.
+  Corrige esas fechas y vuelve a ejecutar el paso 2.
 
 ## Prueba automática
 
