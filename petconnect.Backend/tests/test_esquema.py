@@ -174,7 +174,11 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
         import api
 
-        respuesta = api.app.test_client().get("/api/mascotas/adopcion")
+        # Se llama la funcion de la ruta sin test_client(): una peticion completa
+        # marca la app como "ya atendio su primera peticion" y Flask prohibe
+        # despues registrar rutas, como hace test_seguridad.PruebasEndpointProtegido.
+        with api.app.test_request_context("/api/mascotas/adopcion"):
+            respuesta = api.get_mascotas_adopcion()
         self.assertEqual(respuesta.status_code, 200)
         mascotas = respuesta.get_json()
         self.assertEqual(len(mascotas), 6)
