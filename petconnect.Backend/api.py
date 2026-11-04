@@ -6,6 +6,9 @@ Ejecutar con: python api.py
 import sys
 import os
 import re
+import json
+import secrets
+import traceback
 from datetime import datetime, date
 from functools import wraps
 
@@ -18,7 +21,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dns.resolver
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from mysql.connector import Error
+from mysql.connector.errors import InterfaceError, OperationalError
+from werkzeug.exceptions import BadRequest, HTTPException
 
 from conexion.conexion_bd import ConexionBD
 from dao.usuario_dao import UsuarioDAO
@@ -36,21 +40,115 @@ CORS(app, origins=[
     "http://localhost:19006",  # PetConnect.Mobile (Expo web, puerto legado)
 ])
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    return jsonify({"error": str(e)}), 500
-
 _conexion_bd = ConexionBD()
 _otp_registro = AlmacenOTP()
 _otp_login = AlmacenOTP()
 
 
 # ---------------------------------------------------------------------------
+# Manejo de errores (NC-007): codigo HTTP real y nunca detalles internos al cliente
+# ---------------------------------------------------------------------------
+
+class BDNoDisponible(Exception):
+    """La base de datos no respondio: la API contesta 503."""
+
+
+class EntradaInvalida(BadRequest):
+    """Dato de entrada con formato incorrecto (400); su mensaje si se muestra al cliente."""
+
+
+_MENSAJES_HTTP = {
+    400: "La peticion no es valida",
+    404: "Recurso no encontrado",
+    405: "Metodo no permitido para esta ruta",
+    413: "La peticion es demasiado grande",
+    415: "Tipo de contenido no soportado",
+}
+
+
+def _registrar_error(e) -> str:
+    """
+    Registra el error en la consola del servidor y devuelve un id corto para
+    encontrarlo despues. Se guarda el tipo de error y la pila (archivo, linea y
+    funcion), pero NO el mensaje: puede traer datos personales, como
+    "Duplicate entry 'correo@...'" (Ley 1581).
+    """
+    id_error = secrets.token_hex(4)
+    ruta = request.url_rule.rule if request.url_rule else "(sin ruta)"
+    pila = "".join(traceback.format_list(traceback.extract_tb(e.__traceback__)))
+    app.logger.error("Error %s en %s %s: %s\n%s", id_error, request.method, ruta, type(e).__name__, pila)
+    return id_error
+
+
+@app.errorhandler(HTTPException)
+def manejar_error_http(e):
+    """404, 405, 400...: se responde con su codigo real y un mensaje en espanol."""
+    if isinstance(e, EntradaInvalida):
+        mensaje = e.description
+    else:
+        mensaje = _MENSAJES_HTTP.get(e.code, "No se pudo procesar la peticion")
+    respuesta = e.get_response()   # conserva cabeceras como Allow (405)
+    respuesta.set_data(json.dumps({"error": mensaje}))
+    respuesta.content_type = "application/json"
+    return respuesta
+
+
+@app.errorhandler(BDNoDisponible)
+@app.errorhandler(InterfaceError)
+@app.errorhandler(OperationalError)
+def manejar_bd_no_disponible(e):
+    id_error = _registrar_error(e)
+    return jsonify({
+        "error": "El servicio no esta disponible en este momento. Intenta de nuevo mas tarde",
+        "id_error": id_error,
+    }), 503
+
+
+@app.errorhandler(Exception)
+def manejar_error_interno(e):
+    id_error = _registrar_error(e)
+    return jsonify({
+        "error": "Error interno del servidor. Intenta de nuevo mas tarde",
+        "id_error": id_error,
+    }), 500
+
+
+# ---------------------------------------------------------------------------
 # Utilidades
 # ---------------------------------------------------------------------------
 
+def _modo_debug() -> bool:
+    """
+    NC-007: el depurador de Werkzeug permite ejecutar codigo en el servidor.
+    Solo se enciende con FLASK_DEBUG=1 (en tu computador, nunca en un servidor publico).
+    """
+    return os.getenv("FLASK_DEBUG", "").strip() == "1"
+
+
 def _get_conn():
-    return _conexion_bd.obtener_conexion()
+    """Conexion a la BD; si no responde lanza BDNoDisponible (la API contesta 503)."""
+    conn = _conexion_bd.obtener_conexion()
+    if conn is None:
+        raise BDNoDisponible()
+    return conn
+
+
+def _cuerpo_json() -> dict:
+    """Cuerpo JSON de la peticion ({} si viene vacio); si no es un objeto responde 400."""
+    datos = request.get_json(silent=True)
+    if datos is None:
+        return {}
+    if not isinstance(datos, dict):
+        raise EntradaInvalida("El cuerpo de la peticion debe ser un objeto JSON")
+    return datos
+
+
+def _texto(datos: dict, campo: str) -> str:
+    """Devuelve el campo si es texto ("" si falta); si es numero, null, lista... responde 400."""
+    valor = datos.get(campo, "")
+    if not isinstance(valor, str):
+        raise EntradaInvalida(f"El campo '{campo}' debe ser texto")
+    return valor
 
 
 def _serialize(value):
@@ -147,6 +245,8 @@ def require_auth(f):
 # ---------------------------------------------------------------------------
 # Productos  (publico - catalogo)
 # ---------------------------------------------------------------------------
+# Las rutas no atrapan los errores de la BD: los responden los manejadores
+# globales (503 si la BD no responde, 500 generico en otro caso).
 
 _SQL_PRODUCTOS = """
     SELECT p.id_producto AS id, p.nombre AS name, p.descripcion AS description,
@@ -169,28 +269,22 @@ _SQL_PRODUCTO_BY_ID = """
 
 @app.route("/api/productos", methods=["GET"])
 def get_productos():
-    try:
-        cursor = _get_conn().cursor(dictionary=True)
-        cursor.execute(_SQL_PRODUCTOS)
-        rows = cursor.fetchall()
-        cursor.close()
-        return jsonify([_row_to_dict(r) for r in rows])
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
+    cursor = _get_conn().cursor(dictionary=True)
+    cursor.execute(_SQL_PRODUCTOS)
+    rows = cursor.fetchall()
+    cursor.close()
+    return jsonify([_row_to_dict(r) for r in rows])
 
 
 @app.route("/api/productos/<int:id_producto>", methods=["GET"])
 def get_producto(id_producto):
-    try:
-        cursor = _get_conn().cursor(dictionary=True)
-        cursor.execute(_SQL_PRODUCTO_BY_ID, (id_producto,))
-        row = cursor.fetchone()
-        cursor.close()
-        if row is None:
-            return jsonify({"error": "Producto no encontrado"}), 404
-        return jsonify(_row_to_dict(row))
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
+    cursor = _get_conn().cursor(dictionary=True)
+    cursor.execute(_SQL_PRODUCTO_BY_ID, (id_producto,))
+    row = cursor.fetchone()
+    cursor.close()
+    if row is None:
+        return jsonify({"error": "Producto no encontrado"}), 404
+    return jsonify(_row_to_dict(row))
 
 
 # ---------------------------------------------------------------------------
@@ -222,28 +316,22 @@ def _mascota_to_dict(row):
 
 @app.route("/api/mascotas/adopcion", methods=["GET"])
 def get_mascotas_adopcion():
-    try:
-        cursor = _get_conn().cursor(dictionary=True)
-        cursor.execute(_SQL_MASCOTAS_ADOPCION)
-        rows = cursor.fetchall()
-        cursor.close()
-        return jsonify([_mascota_to_dict(r) for r in rows])
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
+    cursor = _get_conn().cursor(dictionary=True)
+    cursor.execute(_SQL_MASCOTAS_ADOPCION)
+    rows = cursor.fetchall()
+    cursor.close()
+    return jsonify([_mascota_to_dict(r) for r in rows])
 
 
 @app.route("/api/mascotas/<int:id_mascota>", methods=["GET"])
 def get_mascota(id_mascota):
-    try:
-        cursor = _get_conn().cursor(dictionary=True)
-        cursor.execute(_SQL_MASCOTA_BY_ID, (id_mascota,))
-        row = cursor.fetchone()
-        cursor.close()
-        if row is None:
-            return jsonify({"error": "Mascota no encontrada"}), 404
-        return jsonify(_mascota_to_dict(row))
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
+    cursor = _get_conn().cursor(dictionary=True)
+    cursor.execute(_SQL_MASCOTA_BY_ID, (id_mascota,))
+    row = cursor.fetchone()
+    cursor.close()
+    if row is None:
+        return jsonify({"error": "Mascota no encontrada"}), 404
+    return jsonify(_mascota_to_dict(row))
 
 
 # ---------------------------------------------------------------------------
@@ -257,8 +345,7 @@ def validar_correo():
     Pensado para llamarse en vivo mientras el usuario escribe en el
     formulario de registro (con debounce en el frontend).
     """
-    data = request.get_json(silent=True) or {}
-    email = data.get("email", "")
+    email = _texto(_cuerpo_json(), "email")
 
     valido, mensaje = _validar_correo(email)
     return jsonify({"valido": valido, "mensaje": mensaje})
@@ -270,13 +357,15 @@ def validar_correo():
 
 @app.route("/api/auth/login", methods=["POST"])
 def login():
-    data = request.get_json(silent=True) or {}
-    email = data.get("email", "").strip()
-    password = data.get("password", "")
+    data = _cuerpo_json()
+    email = _texto(data, "email").strip()
+    password = _texto(data, "password")
 
     if not email or not password:
         return jsonify({"error": "Correo y contrasena son requeridos"}), 400
 
+    # Sin BD el DAO devuelve None y pareceria "credenciales incorrectas": mejor 503
+    _get_conn()
     dao = UsuarioDAO()
     usuario = dao.consultar_por_correo(email)
 
@@ -309,9 +398,9 @@ def login():
 
 @app.route("/api/auth/login/verify", methods=["POST"])
 def login_verify():
-    data  = request.get_json(silent=True) or {}
-    email = data.get("email", "").strip()
-    code  = data.get("code", "").strip()
+    data  = _cuerpo_json()
+    email = _texto(data, "email").strip()
+    code  = _texto(data, "code").strip()
 
     pending, error = _otp_login.verificar(email, code)
     if error == "no_pendiente":
@@ -321,6 +410,7 @@ def login_verify():
     if error == "incorrecto":
         return jsonify({"error": "Codigo incorrecto"}), 400
 
+    _get_conn()   # 503 antes de gastar el codigo si la BD no responde
     _otp_login.descartar(email)
 
     dao = UsuarioDAO()
@@ -339,10 +429,10 @@ def login_verify():
 
 @app.route("/api/auth/register", methods=["POST"])
 def register():
-    data = request.get_json(silent=True) or {}
-    name     = data.get("name", "").strip()
-    email    = data.get("email", "").strip()
-    password = data.get("password", "")
+    data = _cuerpo_json()
+    name     = _texto(data, "name").strip()
+    email    = _texto(data, "email").strip()
+    password = _texto(data, "password")
 
     if not name or not email or not password:
         return jsonify({"error": "Nombre, correo y contrasena son requeridos"}), 400
@@ -355,6 +445,7 @@ def register():
     if error_pw:
         return jsonify({"error": error_pw}), 400
 
+    _get_conn()
     dao = UsuarioDAO()
     if dao.consultar_por_correo(email) is not None:
         return jsonify({"error": "El correo ya esta registrado"}), 409
@@ -381,9 +472,9 @@ def register():
 
 @app.route("/api/auth/verify", methods=["POST"])
 def verify():
-    data  = request.get_json(silent=True) or {}
-    email = data.get("email", "").strip()
-    code  = data.get("code", "").strip()
+    data  = _cuerpo_json()
+    email = _texto(data, "email").strip()
+    code  = _texto(data, "code").strip()
 
     pending, error = _otp_registro.verificar(email, code)
     if error == "no_pendiente":
@@ -409,6 +500,7 @@ def verify():
         acepta_datos=True,
     )
 
+    _get_conn()
     dao = UsuarioDAO()
     if not dao.insertar(usuario):
         return jsonify({"error": "Error al crear el usuario"}), 500
@@ -433,6 +525,7 @@ def verify():
 @require_auth
 def me():
     """Endpoint protegido - valida que el token JWT es valido."""
+    _get_conn()
     dao = UsuarioDAO()
     usuario = dao.consultar_por_id(request.current_user_id)
     if not usuario:
@@ -449,10 +542,14 @@ def me():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    conn = _get_conn()
-    if conn is None:
+    try:
+        _get_conn()
+    except BDNoDisponible:
         print("[ERROR] No se pudo conectar a la base de datos.")
         sys.exit(1)
     print("[OK] Conexion a la base de datos establecida.")
+    modo_debug = _modo_debug()
+    if modo_debug:
+        print("[AVISO] Modo debug activo (FLASK_DEBUG=1): usalo solo en tu computador.")
     print("[OK] API PetConnect corriendo en http://localhost:5000")
-    app.run(debug=True, port=5000)
+    app.run(debug=modo_debug, port=5000)

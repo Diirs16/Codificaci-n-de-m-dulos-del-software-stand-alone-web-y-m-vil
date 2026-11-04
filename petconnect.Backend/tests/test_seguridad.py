@@ -92,16 +92,20 @@ class PruebasToken(unittest.TestCase):
         self.assertIsNone(verify_token(vencido))
 
 
+# La ruta de prueba se registra al importar el archivo: unittest importa todas las
+# pruebas antes de correr la primera, y Flask prohibe registrar rutas despues de
+# atender una peticion (otras pruebas, como test_errores.py, usan test_client()).
+@api.app.route("/_prueba/protegida")
+@api.require_auth
+def _protegida():
+    return jsonify(id=request.current_user_id, tipo=type(request.current_user_id).__name__)
+
+
 class PruebasEndpointProtegido(unittest.TestCase):
     """NC-008 de punta a punta: una ruta con @require_auth acepta el token emitido."""
 
     @classmethod
     def setUpClass(cls):
-        @api.app.route("/_prueba/protegida")
-        @api.require_auth
-        def _protegida():
-            return jsonify(id=request.current_user_id, tipo=type(request.current_user_id).__name__)
-
         cls.cliente = api.app.test_client()
 
     def test_acepta_el_token_emitido(self):

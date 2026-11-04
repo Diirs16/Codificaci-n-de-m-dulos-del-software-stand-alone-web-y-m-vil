@@ -160,6 +160,14 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - **Arreglo:** `debug` desde variable de entorno (falso por defecto); manejar `HTTPException` aparte; mensaje genérico
   para 500 (registrando el detalle en el servidor); validar tipos de entrada (`isinstance(x, str)`); si
   `_get_conn()` devuelve `None`, responder 503.
+- **Estado: resuelto el 03/11/2026 (ítem 2.3 de PRIORIDADES).** `api.py`: `debug` solo con `FLASK_DEBUG=1` (apagado por
+  defecto, en `.env.example`); manejador de `HTTPException` con el código real (404, 405 con cabecera `Allow`); 500
+  genérico con `id_error`, registrando en el servidor el id, la ruta, el tipo de error y la pila **sin** el mensaje de la
+  excepción (Ley 1581); `BDNoDisponible`, `InterfaceError` y `OperationalError` → 503 genérico, también en las rutas de
+  usuario (el login ya no dice “credenciales incorrectas” con la BD caída); las rutas de catálogo ya no devuelven el
+  mensaje de MySQL; `email`, `code`, `password` y `name` deben ser texto (400) y el cuerpo debe ser un objeto JSON.
+  Las 5 filas de la tabla quedan en 404, 405, 503, 400 y 400. Prueba de regresión: `tests/test_errores.py` (10 pruebas;
+  las 10 fallan con el código viejo). NC-007 sigue en corrección solo por `decrypt()` (4.8).
 
 #### A-09 · 🟠 Alta · Un segundo registro pisa la contraseña del primero [A]
 - **Dónde:** `api.py:362-365` + `otp/servicio.py:35` (sobrescribe sin preguntar).
