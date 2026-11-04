@@ -175,7 +175,24 @@ def _validate_password(password: str) -> str | None:
     return None
 
 
-_EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+# A-05: un nombre son palabras de letras (con tildes y ñ) separadas por espacios.
+# Dentro de una palabra se permite ' o - (O'Neil, Pérez-Gil) y al final un punto
+# (Ma. José). Sin numeros, ':', '/', '<' ni un punto pegado a otra palabra, asi
+# que no cabe una URL (https://..., sitio-falso.example) ni HTML.
+_PALABRA_NOMBRE = r"[^\W\d_]+(?:['\-][^\W\d_]+)*\.?"
+_NOMBRE_REGEX = re.compile(rf"{_PALABRA_NOMBRE}(?: +{_PALABRA_NOMBRE})*")
+NOMBRE_MIN, NOMBRE_MAX = 2, 60
+
+
+def _validar_nombre(nombre: str) -> str | None:
+    """Mensaje de error si el nombre no parece un nombre de persona; None si es valido."""
+    if not (NOMBRE_MIN <= len(nombre) <= NOMBRE_MAX) or not _NOMBRE_REGEX.fullmatch(nombre):
+        return (f"El nombre debe tener entre {NOMBRE_MIN} y {NOMBRE_MAX} caracteres y solo "
+                "letras, espacios, guiones, apostrofos o puntos")
+    return None
+
+
+_EMAIL_REGEX =re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 _mx_cache: dict[str, bool] = {}
 
 
@@ -436,6 +453,11 @@ def register():
 
     if not name or not email or not password:
         return jsonify({"error": "Nombre, correo y contrasena son requeridos"}), 400
+
+    # Antes del DNS y de la BD: el nombre viaja en el correo que se envia (A-05)
+    error_nombre = _validar_nombre(name)
+    if error_nombre:
+        return jsonify({"error": error_nombre}), 400
 
     correo_valido, mensaje_correo = _validar_correo(email)
     if not correo_valido:

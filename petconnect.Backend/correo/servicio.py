@@ -10,6 +10,7 @@ Aislado del resto de la API para poder agregar nuevos tipos de correo
 (recordatorios, notificaciones de pedidos, etc.) sin tocar api.py.
 """
 
+import html
 import smtplib
 import ssl
 from email.mime.text import MIMEText
@@ -65,17 +66,24 @@ def enviar_codigo(
     asunto: str = "PetConnect - Codigo de verificacion",
     proposito: str = "Usa este codigo para verificar tu correo:",
 ):
-    html = HTML_CODE.format(name=name, code=code, proposito=proposito)
+    # A-05: todo dato se escapa antes de entrar al HTML. Asi un nombre como
+    # '<a href="...">' se ve como texto y no se convierte en un enlace del correo.
+    # El texto plano no se escapa: ahi las etiquetas no se dibujan.
+    cuerpo_html = HTML_CODE.format(
+        name=html.escape(name),
+        code=html.escape(code),
+        proposito=html.escape(proposito),
+    )
     texto = f"Hola {name},\n\n{proposito}\n\n{code}\n\nExpira en 10 minutos.\n\nEquipo PetConnect"
-    enviar_correo(to_email, asunto, texto, html)
+    enviar_correo(to_email, asunto, texto, cuerpo_html)
 
 
 def enviar_bienvenida(to_email: str, name: str):
-    html = HTML_WELCOME.format(name=name)
+    cuerpo_html = HTML_WELCOME.format(name=html.escape(name))
     texto = (
         f"Bienvenido a la familia PetConnect, {name}!\n\n"
         "Todo para tu mascota en un solo lugar: productos de calidad y un "
         "programa de adopcion responsable.\n\n"
         "Equipo PetConnect"
     )
-    enviar_correo(to_email, "Bienvenido a la familia PetConnect", texto, html)
+    enviar_correo(to_email, "Bienvenido a la familia PetConnect", texto, cuerpo_html)

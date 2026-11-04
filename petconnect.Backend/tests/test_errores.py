@@ -135,6 +135,63 @@ class PruebasRespuestasDeError(unittest.TestCase):
         self.assertEqual(r.get_json(), {"error": "El cuerpo de la peticion debe ser un objeto JSON"})
 
 
+class PruebasNombreRegistro(unittest.TestCase):
+    """
+    A-05 (item 2.4): /api/auth/register solo acepta nombres de persona, porque el
+    nombre viaja en el correo que se envia a la direccion que den. Se rechaza antes
+    de consultar el DNS o la BD, y sin enviar ningun correo.
+    """
+
+    VALIDOS = ["Laura", "María José", "Ana O'Neil", "Pérez-Gil", "Ma. José", "Ñoño Núñez", "Lu"]
+    INVALIDOS = [
+        '<a href="https://sitio-falso.example">Reclama tu premio</a>',
+        '<a/href="https://sitio-falso.example">Premio</a>',
+        "https://sitio-falso.example",
+        "sitio-falso.example",
+        "www.premio.com",
+        "Laura 🐶",
+        "R2D2",
+        "L",
+        "A" * 61,
+        "Laura\tGómez",
+        "Laura\nBcc: otro@ejemplo.test",
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.api = _importar_api()
+        cls.cliente = cls.api.app.test_client()
+
+    def setUp(self):
+        # Si algo pasara el filtro, que no toque red, BD ni correo
+        for nombre, valor in (("_validar_correo", (False, "correo rechazado en la prueba")),
+                              ("enviar_codigo", None)):
+            parche = mock.patch.object(self.api, nombre, return_value=valor)
+            setattr(self, nombre, parche.start())
+            self.addCleanup(parche.stop)
+
+    def _registrar(self, nombre):
+        return self.cliente.post("/api/auth/register",
+                                 json={"name": nombre, "email": CORREO_PRUEBA, "password": CONTRASENA})
+
+    def test_nombre_con_html_o_url_responde_400_sin_enviar_correo(self):
+        for nombre in self.INVALIDOS:
+            with self.subTest(nombre=nombre):
+                r = self._registrar(nombre)
+                self.assertEqual(r.status_code, 400)
+                self.assertIn("El nombre debe tener entre 2 y 60", r.get_json()["error"])
+        self._validar_correo.assert_not_called()    # ni siquiera llego al DNS
+        self.enviar_codigo.assert_not_called()
+
+    def test_nombres_de_persona_pasan_el_filtro(self):
+        for nombre in self.VALIDOS:
+            with self.subTest(nombre=nombre):
+                r = self._registrar(nombre)
+                # Sigue al siguiente paso (validar el correo, aqui simulado como invalido)
+                self.assertEqual(r.get_json(), {"error": "correo rechazado en la prueba"})
+        self.assertEqual(self._validar_correo.call_count, len(self.VALIDOS))
+
+
 class PruebasModoDebug(unittest.TestCase):
     """El depurador de Werkzeug queda apagado salvo FLASK_DEBUG=1 explicito."""
 

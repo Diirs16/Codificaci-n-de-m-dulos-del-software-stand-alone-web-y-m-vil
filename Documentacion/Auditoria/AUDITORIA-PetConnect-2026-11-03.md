@@ -125,6 +125,23 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   **contiene el enlace**. `/api/auth/register` lo envía a **cualquier** dirección y sin límite de peticiones.
 - **Impacto:** correos fraudulentos saliendo de la cuenta Gmail del proyecto → Google bloquea la cuenta.
 - **Arreglo:** `html.escape(name)` (y de cualquier dato del usuario) antes de la plantilla + limitador de A-04.
+- **Estado: resuelto el 03/11/2026 (ítem 2.4 de PRIORIDADES), salvo el limitador (ítem 2.6).** Dos capas:
+  (1) `correo/servicio.py` aplica `html.escape()` a `name`, `code` y `proposito` antes de las dos plantillas, así que
+  `<a href=...>` llega como texto (`&lt;a href=...`); el texto plano no se escapa (ahí no se dibujan etiquetas).
+  (2) `/api/auth/register` valida el nombre **antes** del DNS y de la BD (`_validar_nombre` en `api.py`): de 2 a 60
+  caracteres, palabras de letras (con tildes y ñ) separadas por espacios, con `'` o `-` dentro de la palabra y un punto
+  al final (`Ma. José`); si no, 400. Esto corta también las URL sueltas (`https://...`, `sitio-falso.example`), que
+  Gmail convierte en enlace aunque estén escapadas. Además se comprobó que en las cabeceras no se puede inyectar un salto
+  de línea: el asunto es fijo en el código, el destinatario pasa por la expresión regular del correo y Python 3.14 se
+  niega a armar un mensaje con una cabecera escondida (`email.errors.MessageError`).
+  Pruebas de regresión: `tests/test_correo.py` (`PruebasEscapeHTML`, 3; `PruebasCabeceras`, 1) y `tests/test_errores.py`
+  (`PruebasNombreRegistro`, 2), sin enviar correos ni consultar el DNS. Contraprueba: con el `servicio.py` anterior fallan
+  `test_el_html_no_trae_el_enlace_del_nombre` (4 casos: código y bienvenida, con y sin espacios) y
+  `test_nombre_con_simbolos_se_ve_bien`; con el `api.py` anterior falla `test_nombre_con_html_o_url_responde_400_sin_enviar_correo`
+  (11 casos). Pasan con ambos códigos, a propósito: `test_la_plantilla_propia_sigue_siendo_html` (el botón propio de la
+  plantilla), `test_salto_de_linea_en_cabeceras_no_envia_nada` (la protección es de Python) y
+  `test_nombres_de_persona_pasan_el_filtro` (un nombre normal nunca fue el problema). Suite: 57 pruebas, 47 OK y 10
+  omitidas que requieren MariaDB.
 
 #### A-06 · 🔴 Crítica · El correo viaja con TLS sin verificar el certificado [N]
 - **Dónde:** `correo/servicio.py:45` → `s.starttls()` sin `context`.

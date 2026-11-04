@@ -39,7 +39,7 @@ Dentro de cada fase van primero los arreglos más rápidos.
 | [x] | 2.1 | A-06 | — | `s.starttls(context=ssl.create_default_context())` en `correo/servicio.py:45` | 🟢 | Prueba que verifique que `starttls` recibe un contexto con `verify_mode == CERT_REQUIRED` (con *mock*) — *Hecho el 03/11/2026: `tests/test_correo.py` (falla con el código viejo, pasa con el nuevo)* |
 | [x] | 2.2 | A-03 | NC-007 | `JWT_SECRET` obligatorio (≥ 32 bytes) o la API no arranca | 🟢 | Importar sin `JWT_SECRET` lanza error — *Hecho el 03/11/2026: `tests/test_seguridad.py`, `PruebasSecretoObligatorio` (falla con el código viejo, pasa con el nuevo)* |
 | [x] | 2.3 | A-08 | NC-007 | `debug` por variable de entorno (falso por defecto); `HTTPException` con su código real; 500 con mensaje genérico; validar que `email`, `code`, `password`, `name` sean texto; 503 si no hay BD | 🟡 | `/api/no-existe` → 404; `code` numérico → 400; BD caída → 503 sin detalles internos — *Hecho el 03/11/2026: `tests/test_errores.py` (falla con el código viejo, pasa con el nuevo)* |
-| [ ] | 2.4 | A-05 | — | `html.escape()` de `name` (y todo dato del usuario) en `correo/servicio.py` | 🟢 | El HTML generado no contiene `<a href` cuando el nombre lo trae |
+| [x] | 2.4 | A-05 | — | `html.escape()` de `name` (y todo dato del usuario) en `correo/servicio.py` | 🟢 | El HTML generado no contiene `<a href` cuando el nombre lo trae — *Hecho el 03/11/2026: escape en `correo/servicio.py` + nombre validado en `/register` (`api.py`); `tests/test_correo.py` y `tests/test_errores.py` (fallan con el código viejo, pasan con el nuevo)* |
 | [ ] | 2.5 | A-04 | NC-006 | Máximo 5 intentos por OTP (luego se invalida) + `hmac.compare_digest` | 🟢 | El 6.º intento devuelve “código bloqueado” aunque sea el correcto |
 | [ ] | 2.6 | A-04, A-05 | NC-006 | Flask-Limiter (versión fijada) en `login`, `login/verify`, `register`, `verify`, `utils/validar-correo` (ej. 5/min por IP) | 🟡 | La 6.ª petición en un minuto → 429 |
 | [ ] | 2.7 | A-09 | — | No sobrescribir un registro pendiente vigente | 🟢 | Segundo `/register` con el mismo correo → no cambia el hash pendiente |
@@ -131,8 +131,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 03/11/2026, ajustada después del ítem 2.3: agrega el estado conocido, reutiliza los manejadores de
-error y los modelos de prueba, exige la contraprueba con el código viejo y comandos para PowerShell 5.1.*
+*Versión del 03/11/2026, ajustada después del ítem 2.4: agrega el estado conocido, reutiliza los manejadores de
+error y los modelos de prueba, exige la contraprueba con el código viejo, comandos para PowerShell 5.1 y el contexto
+del próximo ítem.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -146,18 +147,32 @@ Lee primero:
   git status -sb si hay commits sin push)
 
 Estado conocido (3/11/2026; si el git log muestra más ítems hechos, manda el git log):
-- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3 (commit 82b0e42).
-- Pruebas: 51 (41 OK + 10 omitidas que necesitan MariaDB).
+- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4 (ver git log).
+- Pruebas: 57 (47 OK + 10 omitidas que necesitan MariaDB).
 - NC-007 solo espera decrypt() (4.8).
 - api.py ya tiene manejadores de error: 404/405 reales, 500 genérico con id_error
   (registra tipo y pila, sin el mensaje), 503 si no hay BD (BDNoDisponible), y
   _cuerpo_json()/_texto() para validar que los campos sean texto. Reutilízalos.
+  /register valida el nombre con _validar_nombre() antes del DNS y la BD (2.4).
 - tests/test_errores.py es el modelo para probar rutas: test_client, BD simulada
-  apagada con mock, sin enviar correos. tests/test_correo.py es el modelo para el
-  correo (mock de smtplib). Si una prueba importa api.py, que no cargue el .env
-  real por su cuenta (pendiente 4.14 para test_seguridad.py).
+  apagada con mock, sin enviar correos (mock de api.enviar_codigo y, si hace falta,
+  de api._validar_correo para no consultar el DNS). tests/test_correo.py es el
+  modelo para el correo (mock de smtplib). Si una prueba importa api.py, que no
+  cargue el .env real por su cuenta (pendiente 4.14 para test_seguridad.py).
 - Las rutas de prueba se registran al importar el archivo, no en setUpClass
   (Flask prohíbe registrar rutas después de la primera petición).
+
+Contexto del próximo ítem (2.5, A-04, NC-006):
+- otp/servicio.py: AlmacenOTP.verificar() compara con != (línea 60) y no cuenta
+  intentos; la auditoría aceptó 2000 intentos fallidos seguidos.
+- api.py tiene dos almacenes: _otp_login (/api/auth/login/verify) y _otp_registro
+  (/api/auth/verify). Ambos responden "Codigo incorrecto" con 400.
+- Meta: máximo 5 intentos por código; al 6.º se invalida (aunque sea el correcto) y
+  hay que pedir otro. Comparar con hmac.compare_digest. Decidir qué código HTTP y
+  mensaje devuelve el bloqueo (ej. 429 o 400 "Codigo bloqueado, pide uno nuevo").
+- Probar primero AlmacenOTP solo (sin Flask) y luego una ruta con test_client.
+  No hace falta tocar la BD (los OTP siguen en memoria hasta 4.6).
+- NC-006 se cierra con 2.5 + 2.6 (limitador); con 2.5 queda "En corrección".
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases. Si dos seguidos son
@@ -192,4 +207,4 @@ Luego:
    prompt listo para el siguiente ítem.
 ```
 
-**Próximo ítem: 2.4**
+**Próximo ítem: 2.5**
