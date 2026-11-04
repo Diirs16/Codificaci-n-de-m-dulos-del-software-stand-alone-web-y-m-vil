@@ -99,7 +99,10 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - **Estado: resuelto el 03/11/2026 (ítem 2.2 de PRIORIDADES).** `jwt_helper.py` lanza `RuntimeError` al importarse
   si `JWT_SECRET` falta o mide menos de 32 bytes (HS256, RFC 7518 §3.2), sin mostrar el valor; `.env.example` lo marca
   como obligatorio. Prueba de regresión: `tests/test_seguridad.py` (`PruebasSecretoObligatorio`), cada caso en un
-  proceso aparte con entorno mínimo; falla con el código viejo y pasa con el nuevo. NC-007 sigue en corrección (2.3 y 4.8).
+  proceso aparte con entorno mínimo. Con el código nuevo pasan los 4 casos. Con el código viejo fallan 3 a propósito
+  (`test_sin_jwt_secret_no_arranca`, `test_secreto_publico_de_ejemplo_no_arranca`, `test_secreto_de_31_bytes_no_arranca`:
+  el código viejo arrancaba igual) y `test_secreto_de_64_caracteres_importa_bien` pasa con ambos (una clave válida
+  nunca fue el problema). NC-007 sigue en corrección (2.3 y 4.8).
 - **Pendiente relacionado (ítem 4.13, sin implementar):** hoy `require_auth` acepta el token solo por su firma, sin
   consultar la BD, así que una sesión no se puede cerrar antes de 24 h (ni al cambiar la contraseña). Además el token
   lleva el **correo**, y el contenido de un JWT se puede leer (base64, no cifrado). Propuesta: columna

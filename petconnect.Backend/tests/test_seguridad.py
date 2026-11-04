@@ -124,6 +124,9 @@ class PruebasSecretoObligatorio(unittest.TestCase):
 
     El modulo revisa la clave una sola vez, al cargarse; por eso cada caso corre en un
     Python aparte con un entorno minimo armado a mano (sin copiar os.environ ni leer .env).
+
+    Con el codigo anterior (valor por defecto "dev-secret-inseguro") fallaban los tres
+    casos "no_arranca", porque el modulo cargaba igual; el de 64 caracteres pasa con ambos.
     """
 
     CARPETA_BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
