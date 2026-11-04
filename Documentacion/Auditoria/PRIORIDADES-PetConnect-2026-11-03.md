@@ -131,44 +131,65 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 03/11/2026, ajustada después del ítem 1.2: revisa el historial, compara opciones, deja al usuario los
-comandos sobre la BD real y explica cómo se solucionó.*
+*Versión del 03/11/2026, ajustada después del ítem 2.3: agrega el estado conocido, reutiliza los manejadores de
+error y los modelos de prueba, exige la contraprueba con el código viejo y comandos para PowerShell 5.1.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
 
 Lee primero:
-- Documentacion/Auditoria/PRIORIDADES-PetConnect-2026-11-03.md (lista con casillas)
-- Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle de cada A-xx)
+- Documentacion/Auditoria/PRIORIDADES-PetConnect-2026-11-03.md (lista con casillas
+  y "Próximo ítem")
+- Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle del A-xx)
 - Documentacion/GA9-220501096-AA1-EV02-PetConnect.md (bitácora de NC)
-- git log --oneline -10 (para ver qué se hizo en sesiones anteriores)
+- git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
+  git status -sb si hay commits sin push)
+
+Estado conocido (3/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3 (commit 82b0e42).
+- Pruebas: 51 (41 OK + 10 omitidas que necesitan MariaDB).
+- NC-007 solo espera decrypt() (4.8).
+- api.py ya tiene manejadores de error: 404/405 reales, 500 genérico con id_error
+  (registra tipo y pila, sin el mensaje), 503 si no hay BD (BDNoDisponible), y
+  _cuerpo_json()/_texto() para validar que los campos sean texto. Reutilízalos.
+- tests/test_errores.py es el modelo para probar rutas: test_client, BD simulada
+  apagada con mock, sin enviar correos. tests/test_correo.py es el modelo para el
+  correo (mock de smtplib). Si una prueba importa api.py, que no cargue el .env
+  real por su cuenta (pendiente 4.14 para test_seguridad.py).
+- Las rutas de prueba se registran al importar el archivo, no en setUpClass
+  (Flask prohíbe registrar rutas después de la primera petición).
 
 Luego:
-1. Toma el PRIMER ítem sin marcar ([ ]), en orden de fases. Si dos ítems seguidos
-   son 🟢 y tocan el mismo archivo, puedes agruparlos (dímelo).
-2. Antes de tocar código explícame en lenguaje sencillo: qué está mal, qué riesgo
-   tiene, tu plan (archivos, cambio, prueba de regresión) y, si hay más de una forma,
-   las opciones con pros y contras. Si hay borradores sin commit relacionados,
-   revísalos primero. Espera mi aprobación.
+1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases. Si dos seguidos son
+   🟢 y tocan el mismo archivo, puedes agruparlos (dímelo).
+2. Antes de tocar código explícame en lenguaje sencillo qué está mal, el riesgo
+   y tu plan (archivos, cambio, prueba de regresión), con opciones y pros/contras
+   si hay varias. Si hay cambios sin commit relacionados, revísalos primero.
+   Espera mi aprobación.
 3. Implementa solo ese ítem respetando CLAUDE.md (secretos, SQL parametrizado,
-   español). No leas ni imprimas el .env; si un script importa api.py, desactiva
-   load_dotenv y usa valores de prueba.
-4. Agrega la prueba de regresión en petconnect.Backend/tests/ (o la verificación de
-   la web/móvil) y corre:
+   español, Ley 1581). No leas ni imprimas el .env. Si necesita una dependencia
+   nueva (ej. Flask-Limiter en 2.6), pídeme permiso y fija la versión en
+   requirements.txt.
+4. Agrega la prueba de regresión y corre:
    - Backend: ../.venv/Scripts/python -m unittest discover -s tests -v
+     (deben seguir pasando todas las anteriores más las nuevas)
    - Si toca la BD: también con PETCONNECT_PRUEBA_BD=1 (solo bases temporales)
-   - Web (si cambió): npm run lint && npm run build
-5. Si hay que cambiar mi base real o hacer algo con contraseña, NO lo hagas tú:
-   dame los comandos exactos para PowerShell (MySQL está en C:\xampp\mysql\bin\),
-   primero un respaldo fuera del repo, y espera mi captura del resultado.
-6. Si el ítem cierra o avanza una NC, actualiza su fila en la bitácora GA9 con la
-   fecha y la evidencia.
-7. Marca [x] en PRIORIDADES y haz el commit con /guardar-partida: un commit por ítem,
-   agregando archivos por ruta. No incluyas .gitignore ni archivos sin seguimiento
-   que no sean de este ítem.
-8. Explícame qué cambió (estilo /explicar): qué estaba mal, cómo lo solucionaste
-   paso a paso, qué archivos tocaste y cómo verlo funcionando. Luego pregúntame si
-   seguimos con el siguiente ítem.
+   - Web (si cambió): npm run lint y luego npm run build
+   Comprueba que la prueba nueva FALLA con el código viejo (contraprueba con
+   git stash solo del archivo corregido) y dime cuántas fallan.
+5. Si hay que tocar mi BD real, arrancar la API con mi .env o algo con
+   contraseña, NO lo hagas tú: dame los comandos para Windows PowerShell 5.1
+   (sin &&, un comando por bloque, indicando desde qué carpeta; MySQL está en
+   C:\xampp\mysql\bin\), con respaldo previo fuera del repo, y espera mi captura.
+6. Actualiza la fila de la NC en la bitácora GA9 (fecha y evidencia, incluida la
+   contraprueba) y el "Estado" bajo el A-xx en la AUDITORÍA. Si con este ítem se
+   completa una NC, cambia su estado a "Cerrada el dd/mm/2026".
+7. Marca [x] en PRIORIDADES y actualiza "Próximo ítem".
+8. Commit con /guardar-partida: un commit por ítem, agregando archivos por ruta.
+   No incluyas .gitignore, CLAUDE.md ni archivos sin seguimiento ajenos al ítem.
+   No hagas push.
+9. Explícame qué cambió (estilo /explicar), cómo verlo funcionando y déjame el
+   prompt listo para el siguiente ítem.
 ```
 
 **Próximo ítem: 2.4**
