@@ -29,7 +29,8 @@ no se puede verificar porque falta el esquema SQL), encontró **15 hallazgos nue
 
 1. El correo se envía por TLS **sin verificar el certificado**: la contraseña de aplicación de Gmail puede ser interceptada.
 2. Los formularios de **solicitud de adopción y de contacto** dicen “enviado” pero **no envían nada** (y recogen datos personales).
-3. Los códigos OTP y los correos de los usuarios se **imprimen en la consola** del servidor cuando el correo falla.
+3. Los códigos OTP y los correos de los usuarios se **imprimen en la consola** del servidor cuando el correo falla
+   *(resuelto el 04/11/2026, ítem 2.8: ver A-10)*.
 4. La ficha de la mascota muestra **“Pendiente de vacunación”** a mascotas cuya descripción dice “Vacunada”: información de salud contradictoria.
 5. Los `Dockerfile` copiarían el `.env` **dentro de la imagen** (no hay `.dockerignore`) y la API no sería accesible desde el contenedor.
 6. Mover la API a Gunicorn (la solución de NC-003) **romperá los OTP**, porque se guardan en la memoria de cada proceso.
@@ -228,6 +229,29 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   (Ley 1581).
 - **Arreglo:** imprimir el código solo si `APP_ENV=desarrollo` explícito; en otro caso, registrar solo “fallo de envío”
   y responder al cliente que reintente.
+- **Estado: resuelto el 04/11/2026 (ítem 2.8 de PRIORIDADES).** `api.py`: variable nueva `APP_ENV` (`_es_desarrollo()`:
+  solo vale `desarrollo`, sin importar espacios ni mayúsculas; vacía, `produccion` o cualquier otro valor = no es
+  desarrollo). Es aparte de `FLASK_DEBUG`, para que ver códigos no exija encender el depurador de Werkzeug. Los 3
+  `print()` se reemplazaron por `_avisar_fallo_envio(e, codigo=None)`, que registra con `app.logger.warning` solo
+  “Fallo de envio de correo en <ruta>: <tipo de error>”, **nunca** el correo ni `str(e)` (el mensaje de SMTP puede
+  traer la dirección, Ley 1581). Con `APP_ENV=desarrollo` imprime **solo el código** (`[DEV] Codigo de verificacion …`)
+  y `/login` y `/register` responden “Codigo enviado” como antes. Fuera de desarrollo se descarta el código pendiente
+  (`_otp_login.descartar` / `_otp_registro.descartar`) y se responde **503** “No pudimos enviar el código a tu correo.
+  Intenta de nuevo en unos minutos”. No revela cuentas (A-14): en `/login` ese 503 sale después de comprobar la
+  contraseña y en `/register` después del 409 que ya existía. La bienvenida de `/verify` sigue respondiendo 201 (la
+  cuenta ya se creó); solo se registra el fallo. Al arrancar, la API avisa si `APP_ENV=desarrollo`. `.env.example`
+  documenta `APP_ENV=` (vacía) y ya no dice que el código “se imprime en la consola” siempre. La web y el móvil
+  muestran `data.error` con cualquier respuesta que no sea ok, así que el 503 nuevo no exigió tocarlos.
+  Prueba de regresión: `tests/test_logs.py` (6 pruebas, sin BD, sin correos, sin DNS; correo inventado
+  `persona.prueba@ejemplo.test`; el correo simulado falla con un mensaje que trae la dirección, como uno real de SMTP).
+  Comprueba con `redirect_stdout` y `assertLogs` que, sin `APP_ENV` y con `""`, `produccion` y `dev`, ni la consola ni
+  los logs traen el código ni el correo, la respuesta es 503 y el pendiente ya no existe; que con `desarrollo` y
+  `"  Desarrollo  "` la consola trae el código y no el correo; y que la bienvenida fallida responde 201 sin el correo.
+  Contraprueba con el `api.py` anterior (`git stash` solo de ese archivo): **fallan 5 de 6** (14 subcasos), todas
+  porque la consola mostraba el correo (`[DEV] No se pudo enviar el correo (550 …: persona.prueba@ejemplo.test).
+  Codigo de inicio de sesion para persona.prueba@ejemplo.test: 740041`). Pasa con ambos, a propósito,
+  `test_correo_enviado_no_imprime_ni_registra` (si el correo sí sale, no se imprime ni se registra nada: el camino
+  normal no cambió). Suite: 77 pruebas, 67 OK y 10 omitidas que requieren MariaDB. Sin NC asociada (GA9 no cambia).
 
 #### A-11 · 🟠 Alta · Una sola conexión a la BD compartida entre hilos — NC-003 [A]
 - **Dónde:** `conexion/conexion_bd.py:17-31` (Singleton con una conexión). El equipo midió 56 % de errores con 500 usuarios.

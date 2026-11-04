@@ -141,6 +141,37 @@ def _modo_debug() -> bool:
     return os.getenv("FLASK_DEBUG", "").strip() == "1"
 
 
+def _es_desarrollo() -> bool:
+    """
+    A-10: solo con APP_ENV=desarrollo (sin importar mayusculas ni espacios) se
+    puede mostrar en la consola el codigo OTP cuando el correo falla. Vacia,
+    "produccion" o cualquier otro valor = no es desarrollo (lo seguro por defecto).
+    Es aparte de FLASK_DEBUG: ver los codigos no debe exigir encender el depurador.
+    """
+    return os.getenv("APP_ENV", "").strip().lower() == "desarrollo"
+
+
+def _avisar_fallo_envio(e, codigo=None) -> bool:
+    """
+    Registra que un correo no se pudo enviar, con la ruta y el tipo de error,
+    pero NUNCA el correo del usuario ni str(e): el mensaje de la excepcion puede
+    traer la direccion (Ley 1581), como en _registrar_error.
+
+    Si se pasa `codigo` y APP_ENV=desarrollo, imprime SOLO el codigo (sin el
+    correo) para poder probar sin correo real, y devuelve True. En cualquier
+    otro caso devuelve False: quien llama decide que responder al cliente.
+    """
+    ruta = request.url_rule.rule if request.url_rule else "(sin ruta)"
+    app.logger.warning("Fallo de envio de correo en %s: %s", ruta, type(e).__name__)
+    if codigo is not None and _es_desarrollo():
+        print(f"[DEV] Codigo de verificacion (el correo no se envio): {codigo}")
+        return True
+    return False
+
+
+_MENSAJE_FALLO_CORREO = "No pudimos enviar el código a tu correo. Intenta de nuevo en unos minutos"
+
+
 def _get_conn():
     """Conexion a la BD; si no responde lanza BDNoDisponible (la API contesta 503)."""
     conn = _conexion_bd.obtener_conexion()
@@ -426,7 +457,11 @@ def login():
             proposito="Usa este codigo para confirmar que eres tu e iniciar sesion:",
         )
     except Exception as e:
-        print(f"[DEV] No se pudo enviar el correo ({e}). Codigo de inicio de sesion para {email}: {code}")
+        # A-10: fuera de desarrollo no se muestra el codigo; se borra para que
+        # no quede un codigo valido que nadie recibio, y se pide reintentar.
+        if not _avisar_fallo_envio(e, code):
+            _otp_login.descartar(email)
+            return jsonify({"error": _MENSAJE_FALLO_CORREO}), 503
 
     return jsonify({"message": "Codigo enviado", "email": email})
 
@@ -506,10 +541,12 @@ def register():
             proposito="Usa este codigo para verificar tu correo y completar tu registro:",
         )
     except Exception as e:
-        # Si el envio de correo falla (Mailtrap no configurado/no disponible),
-        # el registro continua igual y el codigo queda visible en la consola
-        # del servidor para poder completar la verificacion sin depender del correo.
-        print(f"[DEV] No se pudo enviar el correo ({e}). Codigo para {email}: {code}")
+        # A-10: solo con APP_ENV=desarrollo se imprime el codigo (nunca el correo).
+        # Fuera de desarrollo se borra el registro pendiente y se pide reintentar.
+        # No revela cuentas: el 409 de arriba ya se respondio antes (A-14).
+        if not _avisar_fallo_envio(e, code):
+            _otp_registro.descartar(email)
+            return jsonify({"error": _MENSAJE_FALLO_CORREO}), 503
 
     return jsonify({"message": "Codigo enviado", "email": email})
 
@@ -557,7 +594,8 @@ def verify():
     try:
         enviar_bienvenida(email, nombres)
     except Exception as e:
-        print(f"[DEV] No se pudo enviar el correo de bienvenida ({e}) a {email}")
+        # La cuenta ya se creo: la respuesta sigue siendo 201, solo se registra el fallo
+        _avisar_fallo_envio(e)
 
     token = generate_token(usuario.id_usuario, email)
     return jsonify({
@@ -598,5 +636,8 @@ if __name__ == "__main__":
     modo_debug = _modo_debug()
     if modo_debug:
         print("[AVISO] Modo debug activo (FLASK_DEBUG=1): usalo solo en tu computador.")
+    if _es_desarrollo():
+        print("[AVISO] APP_ENV=desarrollo: si el correo falla, el codigo OTP se muestra en esta consola. "
+              "Usalo solo en tu computador.")
     print("[OK] API PetConnect corriendo en http://localhost:5000")
     app.run(debug=modo_debug, port=5000)

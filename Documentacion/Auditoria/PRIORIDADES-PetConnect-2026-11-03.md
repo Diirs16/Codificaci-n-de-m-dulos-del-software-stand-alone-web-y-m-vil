@@ -43,7 +43,7 @@ Dentro de cada fase van primero los arreglos más rápidos.
 | [x] | 2.5 | A-04 | NC-006 | Máximo 5 intentos por OTP (luego se invalida) + `hmac.compare_digest` | 🟢 | El 6.º intento devuelve “código bloqueado” aunque sea el correcto — *Hecho el 04/11/2026: `otp/servicio.py` + `api.py` (429 “Demasiados intentos fallidos”); `tests/test_otp.py` (falla con el código viejo, pasa con el nuevo)* |
 | [x] | 2.6 | A-04, A-05 | NC-006 | Flask-Limiter (versión fijada) en `login`, `login/verify`, `register`, `verify`, `utils/validar-correo` (ej. 5/min por IP) | 🟡 | La 6.ª petición en un minuto → 429 — *Hecho el 04/11/2026: Flask-Limiter 4.1.1 + `limits` 5.8.0, 5/min por IP; `tests/test_limite.py` (falla con el código viejo, pasa con el nuevo). NC-006 cerrada* |
 | [ ] | 2.7 | A-09 | — | No sobrescribir un registro pendiente vigente — **⏸ Por actualizar** (ver [sección](#por-actualizar)): se hace junto con el botón web “Reenviar código” | 🟢 | Segundo `/register` con el mismo correo → no cambia el hash pendiente |
-| [ ] | 2.8 | A-10 | — | Imprimir el OTP solo si `APP_ENV=desarrollo`; nunca el correo en logs de producción | 🟢 | Con `APP_ENV` distinto, la salida no contiene el código |
+| [x] | 2.8 | A-10 | — | Imprimir el OTP solo si `APP_ENV=desarrollo`; nunca el correo en logs de producción | 🟢 | Con `APP_ENV` distinto, la salida no contiene el código — *Hecho el 04/11/2026: `api.py` (`_es_desarrollo`, `_avisar_fallo_envio`; fuera de desarrollo, 503 y se descarta el código) + `.env.example`; `tests/test_logs.py` (falla con el código viejo, pasa con el nuevo)* |
 | [ ] | 2.9 | A-07 | NC-002 | `/api/mascotas/<id>` solo devuelve `en_adopcion` (404 si no); ruta privada con `@require_auth` + dueño | 🟡 | Sin token y mascota no en adopción → 404 |
 
 > Al cerrar 2.2 + 2.3 se cierra **NC-007** · 2.5 + 2.6 cierran **NC-006** · 2.9 cierra **NC-002**.
@@ -181,8 +181,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 04/11/2026, ajustada después de poner en pausa el 2.7: salta los ítems de “Por actualizar”, agrega el
-contexto del 2.8 y pide actualizar este prompt al terminar cada ítem.*
+*Versión del 04/11/2026, actualizada al cerrar el 2.8: estado conocido al día y contexto del 2.9 (NC-002). Salta
+los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -193,64 +193,83 @@ Lee primero:
 - Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle del A-xx)
 - Documentacion/GA9-220501096-AA1-EV02-PetConnect.md (bitácora de NC)
 - git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
-  git status -sb si hay commits sin push)
+  git status -sb si hay commits sin push; al 04/11/2026 había 15 sin push)
 
 Estado conocido (4/11/2026; si el git log muestra más ítems hechos, manda el git log):
-- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6 (ver git log).
+- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.8 (ver git log).
 - En pausa: 2.7 (A-09), en la sección "Por actualizar" de PRIORIDADES. Se hará
   junto con un botón web "Reenviar código"; no lo tomes salvo que te lo pida.
-- Pruebas: 71 (61 OK + 10 omitidas que necesitan MariaDB).
+- Pruebas: 77 (67 OK + 10 omitidas que necesitan MariaDB).
 - NC-007 solo espera decrypt() (4.8). NC-006 cerrada el 04/11/2026.
 - OTP (2.5): AlmacenOTP cuenta fallos (MAX_INTENTOS = 5); el 6.º intento borra el
   código y devuelve "bloqueado"; las rutas de verificación responden 429
-  "Demasiados intentos fallidos..." (decisión del dueño). Compara con
-  hmac.compare_digest sobre bytes. Sin threading.Lock (decisión: lo más simple).
+  "Demasiados intentos fallidos...". Compara con hmac.compare_digest sobre bytes.
+  Sin threading.Lock (decisión: lo más simple). AlmacenOTP tiene crear(),
+  verificar(), descartar() y tiene_pendiente().
 - Limitador (2.6): api.limiter (Flask-Limiter 4.1.1), LIMITE_AUTH = "5 per minute"
   por IP en las 5 rutas de auth; 429 "Demasiadas peticiones. Espera un minuto...".
   _importar_api() lo deja APAGADO (limiter.enabled = False); una prueba que lo
   necesite lo enciende en setUp y lo reinicia (modelo: tests/test_limite.py).
+- Correo que falla (2.8): APP_ENV (nueva, vacía en .env.example) es aparte de
+  FLASK_DEBUG; _es_desarrollo() solo acepta "desarrollo" (.strip().lower()).
+  _avisar_fallo_envio(e, codigo=None) registra con app.logger.warning solo
+  "Fallo de envio de correo en <ruta>: <tipo>" (nunca el correo ni str(e)); en
+  desarrollo imprime SOLO el código y devuelve True. Fuera de desarrollo /login y
+  /register descartan el pendiente y responden 503 "No pudimos enviar el código a
+  tu correo..."; la bienvenida de /verify sigue en 201. La reutilizará la ruta de
+  reenvío del 2.7.
 - api.py ya tiene manejadores de error: 404/405 reales, 500 genérico con id_error
-  (registra tipo y pila, sin el mensaje), 503 si no hay BD (BDNoDisponible), y
-  _cuerpo_json()/_texto() para validar que los campos sean texto. Reutilízalos.
-  /register valida el nombre con _validar_nombre() antes del DNS y la BD (2.4).
+  (_registrar_error: registra con app.logger tipo y pila, sin el mensaje), 503 si
+  no hay BD (BDNoDisponible), y _cuerpo_json()/_texto() para validar que los
+  campos sean texto. Reutilízalos. /register valida el nombre con
+  _validar_nombre() antes del DNS y la BD (2.4). _modo_debug() lee FLASK_DEBUG.
+  require_auth deja request.current_user_id (int) y responde 401 sin token.
 - tests/test_errores.py es el modelo para probar rutas: test_client, BD simulada
-  apagada con mock, sin enviar correos (mock de api.enviar_codigo y, si hace falta,
+  con mock, sin enviar correos (mock de api.enviar_codigo y, si hace falta,
   de api._validar_correo para no consultar el DNS). Su función _importar_api()
-  importa api.py sin cargar el .env real (tests/test_otp.py la reutiliza con
-  from test_errores import _importar_api). tests/test_correo.py es el modelo
-  para el correo (mock de smtplib). Pendiente 4.14 para test_seguridad.py.
+  importa api.py sin cargar el .env real (tests/test_otp.py y tests/test_logs.py
+  la reutilizan con from test_errores import _importar_api; por eso se corren con
+  discover -s tests, no como tests.test_x). tests/test_logs.py es el modelo para
+  simular una BD "encendida" (obtener_conexion -> MagicMock) con UsuarioDAO falso.
+  tests/test_esquema.py tiene las pruebas con MariaDB real (PETCONNECT_PRUEBA_BD=1,
+  solo bases temporales). Pendiente 4.14 para test_seguridad.py.
 - Las rutas de prueba se registran al importar el archivo, no en setUpClass
   (Flask prohíbe registrar rutas después de la primera petición).
+- La web (src/services/api.js:20) y el móvil (src/services/api.js:34) muestran
+  data.error con cualquier respuesta que no sea ok.
 
-Contexto del próximo ítem (2.8, A-10, sin NC):
-- api.py tiene 3 print() que se ejecutan cuando falla el envío del correo:
-  /api/auth/login (~línea 429) imprime el código de inicio de sesión y el correo;
-  /api/auth/register (~512) imprime el código de registro y el correo;
-  /api/auth/verify (~560, bienvenida) imprime el correo. Los 3 incluyen además
-  ({e}), el mensaje de la excepción, que puede traer la dirección (Ley 1581).
-  Quien lea la consola o los logs ve códigos válidos y correos de usuarios.
-- Meta: el código solo se muestra si APP_ENV=desarrollo (variable nueva,
-  documentada en .env.example y vacía por defecto = no es desarrollo). Nunca
-  el correo ni str(e): registrar con app.logger solo "fallo de envío" + ruta +
-  type(e).__name__, como hace el manejador de 500.
-- Decidir (con pros/contras): (a) APP_ENV nueva o reutilizar FLASK_DEBUG=1;
-  (b) si en desarrollo se imprime también el correo o solo el código; (c) qué
-  responde la API al cliente si el correo falla fuera de desarrollo (hoy dice
-  "Codigo enviado" aunque no llegó nada: ¿503 "No pudimos enviar el código,
-  intenta de nuevo"?). En /login ese mensaje sale después de comprobar la
-  contraseña, así que no revela cuentas; en /register revisar A-14.
-- Una función común (ej. _avisar_fallo_envio) evita repetir la lógica 3 veces y
-  la reutilizará la ruta de reenvío del 2.7 cuando se haga.
-- Prueba (archivo nuevo, ej. tests/test_logs.py): mock de api.enviar_codigo /
-  api.enviar_bienvenida que lance una excepción cuyo mensaje traiga el correo;
-  mock.patch.dict(os.environ) para APP_ENV; capturar stdout con
-  contextlib.redirect_stdout y los logs con assertLogs. Sin APP_ENV (o con
-  "produccion") ni la salida ni los logs contienen el código ni el correo; con
-  APP_ENV=desarrollo aparece el código. /login necesita mock de UsuarioDAO con
-  un usuario inventado y de la comprobación de contraseña. Sin BD, sin
-  correos, sin DNS, limitador apagado (_importar_api).
-- Como no tiene NC, en GA9 no hay fila que cambiar: solo el "Estado" bajo A-10
-  en la AUDITORÍA.
+Contexto del próximo ítem (2.9, A-07, NC-002):
+- api.py, GET /api/mascotas/<int:id_mascota> (~línea 390, get_mascota): no tiene
+  @require_auth y _SQL_MASCOTA_BY_ID (~365) filtra solo por id, sin estado.
+  Cambiando el número en la URL se obtiene cualquier mascota registrada, con sus
+  observaciones (salen como "description"). GET /api/mascotas/adopcion (~381) sí
+  filtra estado = 'en_adopcion'.
+- sql/schema.sql: mascotas.id_usuario NOT NULL (FK a usuarios, el dueño);
+  estado enum('activa','en_adopcion','perdida','adoptada','fallecida'), por
+  defecto 'activa'.
+- Meta: la ruta pública solo devuelve mascotas en_adopcion; si no existe o no
+  está en adopción, el MISMO 404 "Mascota no encontrada" (no revelar que existe;
+  lo pide la bitácora GA9, fila NC-002). Mascotas privadas por una ruta con
+  @require_auth que compare id_usuario con request.current_user_id.
+- Quién la usa: web src/services/api.js:66 (getMascota, en PetDetail) y móvil
+  src/services/api.js:51; los dos solo abren mascotas de adopción, así que
+  deberían seguir funcionando sin tocarlos (comprobarlo).
+- Decidir (con pros/contras): (a) si la ruta privada se crea ya (hoy nadie la
+  consume; el carné de vacunas la reutilizará) o solo se corrige la pública;
+  si se crea, su nombre (ej. /api/usuarios/me/mascotas/<id>); (b) mascota
+  ajena con token: 404 (no revela, lo que pide GA9) o 403; (c) el SQL de
+  mascotas está en api.py y petconnect.Backend/CLAUDE.md dice "SQL solo en
+  dao/" (existe dao/mascota_dao.py): moverlo en este ítem o dejarlo para otro.
+- Prueba (archivo nuevo, ej. tests/test_mascotas.py): con BD simulada, una
+  mascota que no está en adopción → 404 sin token, sin datos en la respuesta y
+  con el mismo mensaje que una inexistente; una en adopción → 200. Un mock de
+  cursor no prueba el filtro del SQL: o la ruta también revisa el estado en
+  Python, o se agrega una prueba con MariaDB temporal (PETCONNECT_PRUEBA_BD=1,
+  modelo tests/test_esquema.py). Si hay ruta privada: sin token → 401, token
+  de otro usuario → 404, token del dueño → 200.
+- Con este ítem se cierra NC-002: en GA9 la fila NC-002 (~línea 704) pasa a
+  "Cerrada el dd/mm/2026" con la evidencia; revisar también CP-012 y la
+  "Ejecución 2" (~661), que es del endpoint de vacunas que todavía no existe.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -262,15 +281,15 @@ Luego:
    Espera mi aprobación.
 3. Implementa solo ese ítem respetando CLAUDE.md (secretos, SQL parametrizado,
    español, Ley 1581). No leas ni imprimas el .env. Si necesita una dependencia
-   nueva (ej. Flask-Limiter en 2.6), pídeme permiso y fija la versión en
-   requirements.txt.
+   nueva, pídeme permiso y fija la versión en requirements.txt.
 4. Agrega la prueba de regresión y corre:
    - Backend: ../.venv/Scripts/python -m unittest discover -s tests -v
      (deben seguir pasando todas las anteriores más las nuevas)
    - Si toca la BD: también con PETCONNECT_PRUEBA_BD=1 (solo bases temporales)
    - Web (si cambió): npm run lint y luego npm run build
    Comprueba que la prueba nueva FALLA con el código viejo (contraprueba con
-   git stash solo del archivo corregido) y dime cuántas fallan.
+   git stash solo del archivo corregido) y dime cuántas fallan y cuáles pasan
+   a propósito.
 5. Si hay que tocar mi BD real, arrancar la API con mi .env o algo con
    contraseña, NO lo hagas tú: dame los comandos para Windows PowerShell 5.1
    (sin &&, un comando por bloque, indicando desde qué carpeta; MySQL está en
@@ -287,5 +306,5 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 2.8** (el 2.7 está ⏸ por actualizar: se retoma junto con el botón web “Reenviar código”; ver
-[Por actualizar](#por-actualizar))
+**Próximo ítem: 2.9** (A-07, NC-002; el 2.7 sigue ⏸ por actualizar: se retoma junto con el botón web “Reenviar
+código”; ver [Por actualizar](#por-actualizar))
