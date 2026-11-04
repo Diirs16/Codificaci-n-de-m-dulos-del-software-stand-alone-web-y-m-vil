@@ -214,6 +214,12 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   víctima luego verifica con su código, la cuenta queda con la contraseña del atacante.
 - **Arreglo:** si ya hay un registro pendiente y vigente, no sobrescribirlo (responder 409 “revisa tu correo” o reenviar
   el mismo código).
+- **Estado: por actualizar (04/11/2026, ítem 2.7 de PRIORIDADES).** Revisado sin tocar código. Queda en pausa porque se
+  va a crear primero un botón web “Reenviar código” en la verificación del registro: con ese botón, `/register` solo
+  tiene que dejar intacto el pendiente vigente (hash, contador de intentos y vencimiento) y responder igual que
+  siempre (“Codigo enviado”, sin el 409 que revelaría el registro en curso, A-14). Plan, ruta de reenvío propuesta,
+  decisiones pendientes y riesgo que queda abierto (borrar el pendiente con 6 códigos falsos y registrarse después) en
+  la sección “Por actualizar” de [PRIORIDADES](PRIORIDADES-PetConnect-2026-11-03.md#por-actualizar).
 
 #### A-10 · 🟠 Alta · Códigos OTP y correos impresos en la consola [N]
 - **Dónde:** `api.py:305`, `:377`, `:421` → `print(f"[DEV] ... Codigo ... para {email}: {code}")`.

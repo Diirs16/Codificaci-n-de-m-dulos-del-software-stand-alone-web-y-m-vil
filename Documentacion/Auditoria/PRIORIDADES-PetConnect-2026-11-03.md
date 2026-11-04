@@ -42,11 +42,61 @@ Dentro de cada fase van primero los arreglos más rápidos.
 | [x] | 2.4 | A-05 | — | `html.escape()` de `name` (y todo dato del usuario) en `correo/servicio.py` | 🟢 | El HTML generado no contiene `<a href` cuando el nombre lo trae — *Hecho el 03/11/2026: escape en `correo/servicio.py` + nombre validado en `/register` (`api.py`); `tests/test_correo.py` y `tests/test_errores.py` (fallan con el código viejo, pasan con el nuevo)* |
 | [x] | 2.5 | A-04 | NC-006 | Máximo 5 intentos por OTP (luego se invalida) + `hmac.compare_digest` | 🟢 | El 6.º intento devuelve “código bloqueado” aunque sea el correcto — *Hecho el 04/11/2026: `otp/servicio.py` + `api.py` (429 “Demasiados intentos fallidos”); `tests/test_otp.py` (falla con el código viejo, pasa con el nuevo)* |
 | [x] | 2.6 | A-04, A-05 | NC-006 | Flask-Limiter (versión fijada) en `login`, `login/verify`, `register`, `verify`, `utils/validar-correo` (ej. 5/min por IP) | 🟡 | La 6.ª petición en un minuto → 429 — *Hecho el 04/11/2026: Flask-Limiter 4.1.1 + `limits` 5.8.0, 5/min por IP; `tests/test_limite.py` (falla con el código viejo, pasa con el nuevo). NC-006 cerrada* |
-| [ ] | 2.7 | A-09 | — | No sobrescribir un registro pendiente vigente | 🟢 | Segundo `/register` con el mismo correo → no cambia el hash pendiente |
+| [ ] | 2.7 | A-09 | — | No sobrescribir un registro pendiente vigente — **⏸ Por actualizar** (ver [sección](#por-actualizar)): se hace junto con el botón web “Reenviar código” | 🟢 | Segundo `/register` con el mismo correo → no cambia el hash pendiente |
 | [ ] | 2.8 | A-10 | — | Imprimir el OTP solo si `APP_ENV=desarrollo`; nunca el correo en logs de producción | 🟢 | Con `APP_ENV` distinto, la salida no contiene el código |
 | [ ] | 2.9 | A-07 | NC-002 | `/api/mascotas/<id>` solo devuelve `en_adopcion` (404 si no); ruta privada con `@require_auth` + dueño | 🟡 | Sin token y mascota no en adopción → 404 |
 
 > Al cerrar 2.2 + 2.3 se cierra **NC-007** · 2.5 + 2.6 cierran **NC-006** · 2.9 cierra **NC-002**.
+
+---
+
+## Por actualizar
+
+Ítems revisados pero en pausa porque su arreglo depende de algo que se va a construir primero. Cuando se retome,
+se borra de aquí y se marca `[x]` en su fase.
+
+### 2.7 · A-09 · Un segundo registro pisa la contraseña del primero — en pausa desde el 04/11/2026
+
+**Por qué está en pausa:** el dueño del proyecto decidió crear un **botón web “Reenviar código”** en la verificación
+del registro. Eso cambia la decisión del 2.7: si el reenvío tiene su propio botón, `/register` ya no necesita
+reenviar nada y basta con no tocar el pendiente (la opción más simple).
+
+**Lo que ya se revisó (sin tocar código):**
+- `api.py`, `/api/auth/register`: `_otp_registro.crear(email, {...})` reemplaza sin preguntar el nombre, el hash de la
+  contraseña, el código y el contador de intentos del registro pendiente. Si otra persona registra el correo de la
+  víctima después de ella, la cuenta se crea con la contraseña de esa persona cuando la víctima usa el código nuevo.
+  (El login pide código por correo, así que no entra sin el buzón de la víctima, pero ya tiene uno de los dos
+  factores y la víctima queda con una contraseña que no conoce.)
+- Arreglo propuesto: `AlmacenOTP.vigente(clave)` en `otp/servicio.py` (devuelve el pendiente si no venció; si venció,
+  lo borra para que se pueda reemplazar). En `/register`, si hay un pendiente vigente, no se toca: ni el hash, ni el
+  contador de intentos, ni el vencimiento. La respuesta es siempre la misma, `"Codigo enviado"`, para no revelar
+  que alguien se está registrando con ese correo (A-14). Si alguien se registra dos veces seguidas, vale la
+  **primera** contraseña.
+- Opciones descartadas: responder 409 “revisa tu correo” (revela el registro en curso) y borrar el pendiente para
+  crear uno nuevo (deja el problema igual).
+
+**Cómo encaja el botón “Reenviar código”:**
+- **Backend:** ruta nueva (nombre propuesto `POST /api/auth/register/resend`) que recibe solo `email`. Si hay pendiente
+  vigente, reenvía **el mismo código** con el nombre del primer registro, sin reiniciar el contador de intentos.
+  Si no hay pendiente, responde lo mismo (respuesta neutra). Con `@limiter.limit(LIMITE_AUTH)`.
+- **Web:** `src/components/RegisterModal.jsx`, en el paso de verificación, junto a “¿No recibiste el código?”. Hoy
+  ese enlace dice “Volver e intentar de nuevo” y manda a registrarse otra vez, cosa que con el 2.7 ya no cambiaría
+  los datos. Función nueva en `src/services/api.js`, espera entre clics (ej. 60 s) y aviso de “Te reenviamos el código”.
+- **Login:** `src/components/LoginModal.jsx` tiene el mismo enlace; decidir si el botón va también allí (otra parte).
+- **Móvil:** después, en su propia parte (regla 3 de `CLAUDE.md`).
+
+**Orden propuesto (una parte a la vez, con `/nueva-funcionalidad`):** (1) backend: 2.7 + ruta de reenvío + pruebas
+(`tests/test_registro.py`: dos `/register` con contraseñas distintas → queda el hash del primero; reenviar no da
+intentos nuevos; un pendiente vencido sí se reemplaza; el reenvío manda el mismo código); (2) web: el botón;
+(3) móvil, si se quiere.
+
+**Decisiones pendientes del dueño:** nombre de la ruta, cuánto esperar entre reenvíos, si reenviar alarga los
+10 minutos de vencimiento y si el botón va también en el login.
+
+**Riesgo que sigue abierto aunque se haga el 2.7:** otra persona puede mandar 6 códigos falsos a `/verify` con el
+correo de la víctima; el bloqueo del 2.5 borra el pendiente y entonces sí puede registrarse con su contraseña. Es
+más difícil (tiene que hacerlo en el par de minutos entre el registro y la verificación). Arreglo definitivo, sin
+ítem todavía: que `/verify` vuelva a pedir la contraseña y la compare con el hash pendiente (toca web y móvil).
 
 ---
 
@@ -131,9 +181,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 04/11/2026, ajustada después del ítem 2.6: agrega el estado conocido, reutiliza los manejadores de
-error y los modelos de prueba, exige la contraprueba con el código viejo, comandos para PowerShell 5.1 y el contexto
-del próximo ítem.*
+*Versión del 04/11/2026, ajustada después de poner en pausa el 2.7: salta los ítems de “Por actualizar”, agrega el
+contexto del 2.8 y pide actualizar este prompt al terminar cada ítem.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -148,6 +197,8 @@ Lee primero:
 
 Estado conocido (4/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6 (ver git log).
+- En pausa: 2.7 (A-09), en la sección "Por actualizar" de PRIORIDADES. Se hará
+  junto con un botón web "Reenviar código"; no lo tomes salvo que te lo pida.
 - Pruebas: 71 (61 OK + 10 omitidas que necesitan MariaDB).
 - NC-007 solo espera decrypt() (4.8). NC-006 cerrada el 04/11/2026.
 - OTP (2.5): AlmacenOTP cuenta fallos (MAX_INTENTOS = 5); el 6.º intento borra el
@@ -171,27 +222,40 @@ Estado conocido (4/11/2026; si el git log muestra más ítems hechos, manda el g
 - Las rutas de prueba se registran al importar el archivo, no en setUpClass
   (Flask prohíbe registrar rutas después de la primera petición).
 
-Contexto del próximo ítem (2.7, A-09, sin NC):
-- api.py, /api/auth/register: _otp_registro.crear(email, {...}) pisa sin preguntar
-  el registro pendiente (nombre + hash de la contraseña). Si alguien registra el
-  correo de otra persona después de ella, la cuenta queda con la contraseña del
-  segundo cuando la víctima verifique con su código.
-- Meta: si ya hay un registro pendiente y vigente para ese correo, no cambiar el
-  hash pendiente. Decidir: reenviar el mismo código, responder "revisa tu correo"
-  o descartar el pendiente; y qué pasa con el contador de intentos del 2.5
-  (crear() lo reinicia a 0: reenviar no debería dar 5 intentos nuevos).
-- Ojo con A-14 (4.10): un mensaje distinto para "ya hay registro pendiente"
-  revelaría que alguien se está registrando con ese correo. Preferir la misma
-  respuesta que un registro normal ("Codigo enviado").
-- AlmacenOTP ya tiene tiene_pendiente(); un pendiente vencido debe poder
-  reemplazarse (hoy solo se borra al verificar).
-- Prueba: dos /register con el mismo correo y contraseñas distintas → el hash
-  pendiente sigue siendo el del primero (sin BD ni correos: mocks de
-  _validar_correo, enviar_codigo y UsuarioDAO, limitador apagado).
+Contexto del próximo ítem (2.8, A-10, sin NC):
+- api.py tiene 3 print() que se ejecutan cuando falla el envío del correo:
+  /api/auth/login (~línea 429) imprime el código de inicio de sesión y el correo;
+  /api/auth/register (~512) imprime el código de registro y el correo;
+  /api/auth/verify (~560, bienvenida) imprime el correo. Los 3 incluyen además
+  ({e}), el mensaje de la excepción, que puede traer la dirección (Ley 1581).
+  Quien lea la consola o los logs ve códigos válidos y correos de usuarios.
+- Meta: el código solo se muestra si APP_ENV=desarrollo (variable nueva,
+  documentada en .env.example y vacía por defecto = no es desarrollo). Nunca
+  el correo ni str(e): registrar con app.logger solo "fallo de envío" + ruta +
+  type(e).__name__, como hace el manejador de 500.
+- Decidir (con pros/contras): (a) APP_ENV nueva o reutilizar FLASK_DEBUG=1;
+  (b) si en desarrollo se imprime también el correo o solo el código; (c) qué
+  responde la API al cliente si el correo falla fuera de desarrollo (hoy dice
+  "Codigo enviado" aunque no llegó nada: ¿503 "No pudimos enviar el código,
+  intenta de nuevo"?). En /login ese mensaje sale después de comprobar la
+  contraseña, así que no revela cuentas; en /register revisar A-14.
+- Una función común (ej. _avisar_fallo_envio) evita repetir la lógica 3 veces y
+  la reutilizará la ruta de reenvío del 2.7 cuando se haga.
+- Prueba (archivo nuevo, ej. tests/test_logs.py): mock de api.enviar_codigo /
+  api.enviar_bienvenida que lance una excepción cuyo mensaje traiga el correo;
+  mock.patch.dict(os.environ) para APP_ENV; capturar stdout con
+  contextlib.redirect_stdout y los logs con assertLogs. Sin APP_ENV (o con
+  "produccion") ni la salida ni los logs contienen el código ni el correo; con
+  APP_ENV=desarrollo aparece el código. /login necesita mock de UsuarioDAO con
+  un usuario inventado y de la comprobación de contraseña. Sin BD, sin
+  correos, sin DNS, limitador apagado (_importar_api).
+- Como no tiene NC, en GA9 no hay fila que cambiar: solo el "Estado" bajo A-10
+  en la AUDITORÍA.
 
 Luego:
-1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases. Si dos seguidos son
-   🟢 y tocan el mismo archivo, puedes agruparlos (dímelo).
+1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
+   estén en la sección "Por actualizar" (hoy el 2.7). Si dos seguidos son 🟢 y
+   tocan el mismo archivo, puedes agruparlos (dímelo).
 2. Antes de tocar código explícame en lenguaje sencillo qué está mal, el riesgo
    y tu plan (archivos, cambio, prueba de regresión), con opciones y pros/contras
    si hay varias. Si hay cambios sin commit relacionados, revísalos primero.
@@ -214,12 +278,14 @@ Luego:
 6. Actualiza la fila de la NC en la bitácora GA9 (fecha y evidencia, incluida la
    contraprueba) y el "Estado" bajo el A-xx en la AUDITORÍA. Si con este ítem se
    completa una NC, cambia su estado a "Cerrada el dd/mm/2026".
-7. Marca [x] en PRIORIDADES y actualiza "Próximo ítem".
+7. Marca [x] en PRIORIDADES, actualiza "Próximo ítem" y el prompt de PRIORIDADES
+   (estado conocido + contexto del siguiente ítem).
 8. Commit con /guardar-partida: un commit por ítem, agregando archivos por ruta.
    No incluyas .gitignore, CLAUDE.md ni archivos sin seguimiento ajenos al ítem.
    No hagas push.
 9. Explícame qué cambió (estilo /explicar), cómo verlo funcionando y déjame el
-   prompt listo para el siguiente ítem.
+   prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 2.7**
+**Próximo ítem: 2.8** (el 2.7 está ⏸ por actualizar: se retoma junto con el botón web “Reenviar código”; ver
+[Por actualizar](#por-actualizar))
