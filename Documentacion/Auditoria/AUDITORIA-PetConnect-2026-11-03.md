@@ -119,6 +119,9 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - **Impacto:** en una red insegura (wifi pública, SENA), alguien en el medio puede hacerse pasar por `smtp.gmail.com`
   y **robar `GMAIL_USER` y la contraseña de aplicación**.
 - **Arreglo (1 línea):** `s.starttls(context=ssl.create_default_context())`.
+- **Estado: resuelto el 03/11/2026 (ítem 2.1 de PRIORIDADES).** `starttls` recibe un contexto con
+  `verify_mode=CERT_REQUIRED` y `check_hostname=True`. Prueba de regresión: `tests/test_correo.py` (con *mock* de
+  `smtplib.SMTP`, sin enviar correos), que también comprueba que el cifrado se activa antes de `login`.
 
 #### A-07 · 🟠 Alta · Cualquiera ve cualquier mascota, incluidos datos de salud — NC-002 [A]
 - **Dónde:** `api.py:207-212` (consulta sin filtro de estado) y `api.py:235-246` (sin `@require_auth`).

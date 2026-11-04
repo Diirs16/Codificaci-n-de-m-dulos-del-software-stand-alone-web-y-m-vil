@@ -11,6 +11,7 @@ Aislado del resto de la API para poder agregar nuevos tipos de correo
 """
 
 import smtplib
+import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -42,7 +43,8 @@ def enviar_correo(to_email: str, asunto: str, texto: str, html: str):
         msg.attach(MIMEText(html, "html"))
         with smtplib.SMTP(host, port) as s:
             s.ehlo()
-            s.starttls()
+            # Sin contexto, starttls() no revisa el certificado del servidor (A-06)
+            s.starttls(context=ssl.create_default_context())
             s.login(user, password)
             s.sendmail(user, to_email, msg.as_string())
     else:
