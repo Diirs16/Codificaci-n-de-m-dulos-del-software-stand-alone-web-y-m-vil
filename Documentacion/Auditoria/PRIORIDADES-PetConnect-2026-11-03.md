@@ -126,30 +126,45 @@ Con eso quedan cerradas **NC-002, NC-004, NC-005, NC-006, NC-007, NC-009, NC-010
 ## Prompt para empezar a corregir
 
 Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada sesión**: siempre toma el siguiente
-ítem pendiente.
+ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
+una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
+
+*Versión del 03/11/2026, ajustada después del ítem 1.2: revisa el historial, compara opciones, deja al usuario los
+comandos sobre la BD real y explica cómo se solucionó.*
 
 ```text
-Vamos a corregir PetConnect siguiendo la auditoría del 3/11/2026.
+Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
 
 Lee primero:
 - Documentacion/Auditoria/PRIORIDADES-PetConnect-2026-11-03.md (lista con casillas)
-- Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle de cada hallazgo A-xx)
-- Documentacion/GA9-220501096-AA1-EV02-PetConnect.md (bitácora de no conformidades NC)
+- Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle de cada A-xx)
+- Documentacion/GA9-220501096-AA1-EV02-PetConnect.md (bitácora de NC)
+- git log --oneline -10 (para ver qué se hizo en sesiones anteriores)
 
 Luego:
-1. Toma el PRIMER ítem sin marcar ([ ]) de la lista de prioridades, en orden de fases.
-   Si dos ítems seguidos son 🟢 y tocan el mismo archivo, puedes agruparlos.
-2. Antes de tocar código, explícame en lenguaje sencillo qué está mal, qué riesgo tiene
-   y tu plan (archivos, cambio, prueba de regresión). Espera mi aprobación.
-3. Implementa solo ese ítem, respetando CLAUDE.md (secretos, SQL parametrizado, español).
-   No leas ni imprimas el .env; si un script importa api.py, desactiva load_dotenv y usa
-   valores de prueba.
-4. Agrega o actualiza la prueba de regresión en petconnect.Backend/tests/ (o la verificación
-   que corresponda en la web/móvil) y corre:
+1. Toma el PRIMER ítem sin marcar ([ ]), en orden de fases. Si dos ítems seguidos
+   son 🟢 y tocan el mismo archivo, puedes agruparlos (dímelo).
+2. Antes de tocar código explícame en lenguaje sencillo: qué está mal, qué riesgo
+   tiene, tu plan (archivos, cambio, prueba de regresión) y, si hay más de una forma,
+   las opciones con pros y contras. Si hay borradores sin commit relacionados,
+   revísalos primero. Espera mi aprobación.
+3. Implementa solo ese ítem respetando CLAUDE.md (secretos, SQL parametrizado,
+   español). No leas ni imprimas el .env; si un script importa api.py, desactiva
+   load_dotenv y usa valores de prueba.
+4. Agrega la prueba de regresión en petconnect.Backend/tests/ (o la verificación de
+   la web/móvil) y corre:
    - Backend: ../.venv/Scripts/python -m unittest discover -s tests -v
+   - Si toca la BD: también con PETCONNECT_PRUEBA_BD=1 (solo bases temporales)
    - Web (si cambió): npm run lint && npm run build
-5. Si el ítem cierra una NC, actualiza su fila en la bitácora del plan GA9 con la fecha y la evidencia.
-6. Marca la casilla [x] en PRIORIDADES y haz el commit con /guardar-partida
-   (mensaje en español, un commit por ítem).
-7. Explícame qué cambió (estilo /explicar) y pregúntame si seguimos con el siguiente ítem.
+5. Si hay que cambiar mi base real o hacer algo con contraseña, NO lo hagas tú:
+   dame los comandos exactos para PowerShell (MySQL está en C:\xampp\mysql\bin\),
+   primero un respaldo fuera del repo, y espera mi captura del resultado.
+6. Si el ítem cierra o avanza una NC, actualiza su fila en la bitácora GA9 con la
+   fecha y la evidencia.
+7. Marca [x] en PRIORIDADES y haz el commit con /guardar-partida: un commit por ítem,
+   agregando archivos por ruta. No incluyas .gitignore ni archivos sin seguimiento
+   que no sean de este ítem.
+8. Explícame qué cambió (estilo /explicar): qué estaba mal, cómo lo solucionaste
+   paso a paso, qué archivos tocaste y cómo verlo funcionando. Luego pregúntame si
+   seguimos con el siguiente ítem.
 ```
