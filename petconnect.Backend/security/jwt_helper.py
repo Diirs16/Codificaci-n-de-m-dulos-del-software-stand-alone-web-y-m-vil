@@ -6,7 +6,18 @@ import os
 import time
 import jwt
 
-_SECRET    = os.environ.get("JWT_SECRET", "dev-secret-inseguro")
+# Sin valor por defecto (NC-007): con un secreto conocido cualquiera puede firmar
+# tokens validos. HS256 pide una clave de al menos 32 bytes (RFC 7518, 3.2).
+# El mensaje de error nunca muestra el valor recibido.
+_MIN_BYTES = 32
+_SECRET    = os.environ.get("JWT_SECRET", "")
+if len(_SECRET.encode("utf-8")) < _MIN_BYTES:
+    raise RuntimeError(
+        f"JWT_SECRET falta en .env o tiene menos de {_MIN_BYTES} bytes. Genera uno con: "
+        'python -c "import secrets; print(secrets.token_hex(32))" '
+        "y pegalo a mano en la linea JWT_SECRET= de .env"
+    )
+
 _ALGORITHM = "HS256"
 _EXPIRE    = 24 * 3600  # 24 horas en segundos
 

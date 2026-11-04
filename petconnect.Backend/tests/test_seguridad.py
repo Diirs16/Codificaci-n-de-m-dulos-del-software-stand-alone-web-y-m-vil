@@ -1,12 +1,13 @@
 """
-Pruebas de regresion de NC-001 (contrasenas con bcrypt) y NC-008 (token JWT).
-No necesitan base de datos ni envian correos.
+Pruebas de regresion de NC-001 (contrasenas con bcrypt), NC-008 (token JWT)
+y NC-007 (JWT_SECRET obligatorio). No necesitan base de datos ni envian correos.
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -v
 """
 import hashlib
 import os
+import subprocess
 import sys
 import time
 import unittest
@@ -116,6 +117,50 @@ class PruebasEndpointProtegido(unittest.TestCase):
         token = jwt.encode({"sub": "abc", "exp": int(time.time()) + 60}, jwt_helper._SECRET, algorithm="HS256")
         r = self.cliente.get("/_prueba/protegida", headers={"Authorization": f"Bearer {token}"})
         self.assertEqual(r.status_code, 401)
+
+
+class PruebasSecretoObligatorio(unittest.TestCase):
+    """NC-007 (A-03): sin JWT_SECRET propio de al menos 32 bytes, jwt_helper no se importa.
+
+    El modulo revisa la clave una sola vez, al cargarse; por eso cada caso corre en un
+    Python aparte con un entorno minimo armado a mano (sin copiar os.environ ni leer .env).
+    """
+
+    CARPETA_BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def _importar_con(self, jwt_secret=None):
+        entorno = {
+            "PATH": os.environ.get("PATH", ""),
+            "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+            "FERNET_KEY": Fernet.generate_key().decode(),
+        }
+        if jwt_secret is not None:
+            entorno["JWT_SECRET"] = jwt_secret
+        return subprocess.run(
+            [sys.executable, "-c", "import security.jwt_helper"],
+            cwd=self.CARPETA_BACKEND, env=entorno,
+            capture_output=True, text=True, timeout=60,
+        )
+
+    def test_sin_jwt_secret_no_arranca(self):
+        r = self._importar_con(None)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("RuntimeError: JWT_SECRET", r.stderr)
+
+    def test_secreto_publico_de_ejemplo_no_arranca(self):
+        r = self._importar_con("dev-secret-inseguro")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("RuntimeError: JWT_SECRET", r.stderr)
+        self.assertNotIn("dev-secret-inseguro", r.stderr)   # el error no muestra el valor
+
+    def test_secreto_de_31_bytes_no_arranca(self):
+        r = self._importar_con("s" * 31)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("RuntimeError: JWT_SECRET", r.stderr)
+
+    def test_secreto_de_64_caracteres_importa_bien(self):
+        r = self._importar_con("a1b2c3d4" * 8)   # inventado, solo para la prueba
+        self.assertEqual(r.returncode, 0, r.stderr)
 
 
 if __name__ == "__main__":

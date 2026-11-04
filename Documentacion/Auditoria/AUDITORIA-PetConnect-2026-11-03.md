@@ -96,6 +96,17 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - **Dónde:** `security/jwt_helper.py:9` → `os.environ.get("JWT_SECRET", "dev-secret-inseguro")`.
 - **Evidencia dinámica:** sin `JWT_SECRET`, un token firmado con `"dev-secret-inseguro"` **es aceptado** por `verify_token()`.
 - **Arreglo:** igual que con `FERNET_KEY`: si falta (o tiene menos de 32 bytes), la API **no arranca**.
+- **Estado: resuelto el 03/11/2026 (ítem 2.2 de PRIORIDADES).** `jwt_helper.py` lanza `RuntimeError` al importarse
+  si `JWT_SECRET` falta o mide menos de 32 bytes (HS256, RFC 7518 §3.2), sin mostrar el valor; `.env.example` lo marca
+  como obligatorio. Prueba de regresión: `tests/test_seguridad.py` (`PruebasSecretoObligatorio`), cada caso en un
+  proceso aparte con entorno mínimo; falla con el código viejo y pasa con el nuevo. NC-007 sigue en corrección (2.3 y 4.8).
+- **Pendiente relacionado (ítem 4.13, sin implementar):** hoy `require_auth` acepta el token solo por su firma, sin
+  consultar la BD, así que una sesión no se puede cerrar antes de 24 h (ni al cambiar la contraseña). Además el token
+  lleva el **correo**, y el contenido de un JWT se puede leer (base64, no cifrado). Propuesta: columna
+  `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 cierra todas las sesiones) y
+  quitar el correo del token. Si algún día se guardan identificadores de sesión en la BD, guardar su hash SHA-256,
+  no el valor. Esto **no reemplaza** el secreto obligatorio: con el secreto público se podría falsificar también la
+  versión. Hacerlo después del pool de conexiones (4.5), porque suma una consulta por petición.
 
 #### A-04 · 🔴 Crítica · Códigos OTP atacables por fuerza bruta — NC-006 [A parcial]
 - **Dónde:** `otp/servicio.py:42-63` (no cuenta intentos), rutas `/api/auth/login/verify` y `/api/auth/verify` sin límite de tasa.
