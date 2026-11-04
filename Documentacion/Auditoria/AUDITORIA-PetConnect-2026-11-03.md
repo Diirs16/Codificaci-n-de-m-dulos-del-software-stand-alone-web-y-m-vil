@@ -118,6 +118,18 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   el riesgo mayor está en `/api/auth/verify` (registro).
 - **Arreglo:** máximo 5 intentos por código (luego se invalida) + Flask-Limiter por IP en `login`, `login/verify`,
   `register`, `verify` y `utils/validar-correo`; comparar con `hmac.compare_digest`.
+- **Estado: límite de intentos resuelto el 04/11/2026 (ítem 2.5 de PRIORIDADES); falta el limitador por IP (ítem 2.6).**
+  `otp/servicio.py`: `MAX_INTENTOS = 5`; cada código cuenta sus fallos y, tras 5, el 6.º intento **borra** el código y devuelve
+  `"bloqueado"` aunque traiga el correcto (después responde “no hay verificación pendiente”); pedir otro código reinicia el
+  contador. La comparación usa `hmac.compare_digest` sobre bytes (con `str` no ASCII, como `'１２３４５６'`, lanzaría `TypeError`).
+  `api.py`: `/api/auth/login/verify` y `/api/auth/verify` responden **429** “Demasiados intentos fallidos. Vuelve a … para recibir
+  otro codigo”, sin token ni usuario creado; los fallos 1 a 5 siguen en 400 “Codigo incorrecto” (sin decir cuántos quedan).
+  Decisiones del dueño del proyecto: 429 en lugar de 400; borrar la entrada completa en lugar de dejar una marca; sin
+  `threading.Lock` (con peticiones en paralelo el límite podría pasarse un poco; lo frena el limitador del 2.6). La web y el móvil
+  muestran `data.error` en cualquier código de error, así que no se tocaron. Prueba de regresión: `tests/test_otp.py` (9 pruebas,
+  sin BD ni correos). Contraprueba: con el `servicio.py` anterior fallan 5 y con el `api.py` anterior fallan 2 (las de rutas: 503 y
+  500 `TypeError`); 4 pasan con ambos a propósito (no bloquear de más, reiniciar el contador, ancho completo y expirado).
+  Suite: 66 pruebas, 56 OK y 10 omitidas que requieren MariaDB.
 
 #### A-05 · 🔴 Crítica · El correo de PetConnect se puede usar para phishing/spam [A]
 - **Dónde:** `correo/plantillas.py:42` y `:99` insertan `{name}` sin escapar; `correo/servicio.py:66,72` usa `.format(name=...)`.

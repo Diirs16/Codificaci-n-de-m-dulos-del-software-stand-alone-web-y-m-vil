@@ -424,6 +424,8 @@ def login_verify():
         return jsonify({"error": "No hay inicio de sesion pendiente para este correo"}), 400
     if error == "expirado":
         return jsonify({"error": "El codigo expiro. Vuelve a iniciar sesion"}), 400
+    if error == "bloqueado":   # 5 fallos: el codigo se borro (A-04, NC-006)
+        return jsonify({"error": "Demasiados intentos fallidos. Vuelve a iniciar sesion para recibir otro codigo"}), 429
     if error == "incorrecto":
         return jsonify({"error": "Codigo incorrecto"}), 400
 
@@ -503,6 +505,8 @@ def verify():
         return jsonify({"error": "No hay verificacion pendiente para este correo"}), 400
     if error == "expirado":
         return jsonify({"error": "El codigo expiro. Vuelve a registrarte"}), 400
+    if error == "bloqueado":   # 5 fallos: el codigo se borro (A-04, NC-006)
+        return jsonify({"error": "Demasiados intentos fallidos. Vuelve a registrarte para recibir otro codigo"}), 429
     if error == "incorrecto":
         return jsonify({"error": "Codigo incorrecto"}), 400
 
