@@ -26,21 +26,28 @@ def _importar_api():
     se desactiva load_dotenv para no cargar el .env real (como en test_correo.py).
     Si otra prueba ya lo importo, se reutiliza: estas pruebas no usan ningun valor
     del .env (pendiente 4.14: test_seguridad.py todavia lo carga).
+
+    El limite de peticiones por IP (item 2.6) queda apagado: estas pruebas mandan
+    muchas peticiones seguidas. Solo tests/test_limite.py lo enciende.
     """
     if "api" in sys.modules:
-        return sys.modules["api"]
+        api = sys.modules["api"]
+    else:
+        from cryptography.fernet import Fernet
+        import dotenv
 
-    from cryptography.fernet import Fernet
-    import dotenv
+        os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
+        os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
+        load_dotenv_original = dotenv.load_dotenv
+        dotenv.load_dotenv = lambda *a, **k: False
+        try:
+            api = importlib.import_module("api")
+        finally:
+            dotenv.load_dotenv = load_dotenv_original
 
-    os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
-    os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
-    load_dotenv_original = dotenv.load_dotenv
-    dotenv.load_dotenv = lambda *a, **k: False
-    try:
-        return importlib.import_module("api")
-    finally:
-        dotenv.load_dotenv = load_dotenv_original
+    if hasattr(api, "limiter"):
+        api.limiter.enabled = False
+    return api
 
 
 class PruebasRespuestasDeError(unittest.TestCase):

@@ -41,7 +41,7 @@ Dentro de cada fase van primero los arreglos más rápidos.
 | [x] | 2.3 | A-08 | NC-007 | `debug` por variable de entorno (falso por defecto); `HTTPException` con su código real; 500 con mensaje genérico; validar que `email`, `code`, `password`, `name` sean texto; 503 si no hay BD | 🟡 | `/api/no-existe` → 404; `code` numérico → 400; BD caída → 503 sin detalles internos — *Hecho el 03/11/2026: `tests/test_errores.py` (falla con el código viejo, pasa con el nuevo)* |
 | [x] | 2.4 | A-05 | — | `html.escape()` de `name` (y todo dato del usuario) en `correo/servicio.py` | 🟢 | El HTML generado no contiene `<a href` cuando el nombre lo trae — *Hecho el 03/11/2026: escape en `correo/servicio.py` + nombre validado en `/register` (`api.py`); `tests/test_correo.py` y `tests/test_errores.py` (fallan con el código viejo, pasan con el nuevo)* |
 | [x] | 2.5 | A-04 | NC-006 | Máximo 5 intentos por OTP (luego se invalida) + `hmac.compare_digest` | 🟢 | El 6.º intento devuelve “código bloqueado” aunque sea el correcto — *Hecho el 04/11/2026: `otp/servicio.py` + `api.py` (429 “Demasiados intentos fallidos”); `tests/test_otp.py` (falla con el código viejo, pasa con el nuevo)* |
-| [ ] | 2.6 | A-04, A-05 | NC-006 | Flask-Limiter (versión fijada) en `login`, `login/verify`, `register`, `verify`, `utils/validar-correo` (ej. 5/min por IP) | 🟡 | La 6.ª petición en un minuto → 429 |
+| [x] | 2.6 | A-04, A-05 | NC-006 | Flask-Limiter (versión fijada) en `login`, `login/verify`, `register`, `verify`, `utils/validar-correo` (ej. 5/min por IP) | 🟡 | La 6.ª petición en un minuto → 429 — *Hecho el 04/11/2026: Flask-Limiter 4.1.1 + `limits` 5.8.0, 5/min por IP; `tests/test_limite.py` (falla con el código viejo, pasa con el nuevo). NC-006 cerrada* |
 | [ ] | 2.7 | A-09 | — | No sobrescribir un registro pendiente vigente | 🟢 | Segundo `/register` con el mismo correo → no cambia el hash pendiente |
 | [ ] | 2.8 | A-10 | — | Imprimir el OTP solo si `APP_ENV=desarrollo`; nunca el correo en logs de producción | 🟢 | Con `APP_ENV` distinto, la salida no contiene el código |
 | [ ] | 2.9 | A-07 | NC-002 | `/api/mascotas/<id>` solo devuelve `en_adopcion` (404 si no); ruta privada con `@require_auth` + dueño | 🟡 | Sin token y mascota no en adopción → 404 |
@@ -131,7 +131,7 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 04/11/2026, ajustada después del ítem 2.5: agrega el estado conocido, reutiliza los manejadores de
+*Versión del 04/11/2026, ajustada después del ítem 2.6: agrega el estado conocido, reutiliza los manejadores de
 error y los modelos de prueba, exige la contraprueba con el código viejo, comandos para PowerShell 5.1 y el contexto
 del próximo ítem.*
 
@@ -147,13 +147,17 @@ Lee primero:
   git status -sb si hay commits sin push)
 
 Estado conocido (4/11/2026; si el git log muestra más ítems hechos, manda el git log):
-- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5 (ver git log).
-- Pruebas: 66 (56 OK + 10 omitidas que necesitan MariaDB).
-- NC-007 solo espera decrypt() (4.8). NC-006 espera el limitador (2.6).
+- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6 (ver git log).
+- Pruebas: 71 (61 OK + 10 omitidas que necesitan MariaDB).
+- NC-007 solo espera decrypt() (4.8). NC-006 cerrada el 04/11/2026.
 - OTP (2.5): AlmacenOTP cuenta fallos (MAX_INTENTOS = 5); el 6.º intento borra el
   código y devuelve "bloqueado"; las rutas de verificación responden 429
   "Demasiados intentos fallidos..." (decisión del dueño). Compara con
   hmac.compare_digest sobre bytes. Sin threading.Lock (decisión: lo más simple).
+- Limitador (2.6): api.limiter (Flask-Limiter 4.1.1), LIMITE_AUTH = "5 per minute"
+  por IP en las 5 rutas de auth; 429 "Demasiadas peticiones. Espera un minuto...".
+  _importar_api() lo deja APAGADO (limiter.enabled = False); una prueba que lo
+  necesite lo enciende en setUp y lo reinicia (modelo: tests/test_limite.py).
 - api.py ya tiene manejadores de error: 404/405 reales, 500 genérico con id_error
   (registra tipo y pila, sin el mensaje), 503 si no hay BD (BDNoDisponible), y
   _cuerpo_json()/_texto() para validar que los campos sean texto. Reutilízalos.
@@ -167,21 +171,23 @@ Estado conocido (4/11/2026; si el git log muestra más ítems hechos, manda el g
 - Las rutas de prueba se registran al importar el archivo, no en setUpClass
   (Flask prohíbe registrar rutas después de la primera petición).
 
-Contexto del próximo ítem (2.6, A-04 y A-05, NC-006):
-- Necesita una dependencia nueva (Flask-Limiter): pídeme permiso antes de
-  instalarla y fija la versión en requirements.txt (compatible con flask==3.1.3).
-- Rutas a limitar por IP: /api/auth/login, /api/auth/login/verify,
-  /api/auth/register, /api/auth/verify y /api/utils/validar-correo (ej. 5/min).
-- Ojo: el bloqueo de OTP (2.5) ya usa 429 con "Demasiados intentos fallidos".
-  El limitador también responde 429: que su mensaje sea distinto (ej. "Demasiadas
-  peticiones, espera un minuto") y en español, con el formato {"error": ...}
-  (manejador de 429 o el de HTTPException que ya existe en api.py).
-- Almacenamiento del limitador en memoria por ahora (como los OTP, hasta 4.6).
-  No hay ProxyFix: la IP es request.remote_addr (no confiar en X-Forwarded-For).
-- Prueba con test_client: la 6.ª petición en un minuto → 429; con otra IP
-  (environ_base={"REMOTE_ADDR": ...}) sigue pasando; las pruebas viejas no deben
-  chocar con el límite (desactivarlo o reiniciarlo en sus setUp).
-- Con 2.6 se cierra NC-006 ("Cerrada el dd/mm/2026" en GA9).
+Contexto del próximo ítem (2.7, A-09, sin NC):
+- api.py, /api/auth/register: _otp_registro.crear(email, {...}) pisa sin preguntar
+  el registro pendiente (nombre + hash de la contraseña). Si alguien registra el
+  correo de otra persona después de ella, la cuenta queda con la contraseña del
+  segundo cuando la víctima verifique con su código.
+- Meta: si ya hay un registro pendiente y vigente para ese correo, no cambiar el
+  hash pendiente. Decidir: reenviar el mismo código, responder "revisa tu correo"
+  o descartar el pendiente; y qué pasa con el contador de intentos del 2.5
+  (crear() lo reinicia a 0: reenviar no debería dar 5 intentos nuevos).
+- Ojo con A-14 (4.10): un mensaje distinto para "ya hay registro pendiente"
+  revelaría que alguien se está registrando con ese correo. Preferir la misma
+  respuesta que un registro normal ("Codigo enviado").
+- AlmacenOTP ya tiene tiene_pendiente(); un pendiente vencido debe poder
+  reemplazarse (hoy solo se borra al verificar).
+- Prueba: dos /register con el mismo correo y contraseñas distintas → el hash
+  pendiente sigue siendo el del primero (sin BD ni correos: mocks de
+  _validar_correo, enviar_codigo y UsuarioDAO, limitador apagado).
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases. Si dos seguidos son
@@ -216,4 +222,4 @@ Luego:
    prompt listo para el siguiente ítem.
 ```
 
-**Próximo ítem: 2.6**
+**Próximo ítem: 2.7**

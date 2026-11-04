@@ -118,7 +118,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   el riesgo mayor está en `/api/auth/verify` (registro).
 - **Arreglo:** máximo 5 intentos por código (luego se invalida) + Flask-Limiter por IP en `login`, `login/verify`,
   `register`, `verify` y `utils/validar-correo`; comparar con `hmac.compare_digest`.
-- **Estado: límite de intentos resuelto el 04/11/2026 (ítem 2.5 de PRIORIDADES); falta el limitador por IP (ítem 2.6).**
+- **Estado: resuelto el 04/11/2026 (ítems 2.5 y 2.6 de PRIORIDADES).** Límite de intentos (2.5):
   `otp/servicio.py`: `MAX_INTENTOS = 5`; cada código cuenta sus fallos y, tras 5, el 6.º intento **borra** el código y devuelve
   `"bloqueado"` aunque traiga el correcto (después responde “no hay verificación pendiente”); pedir otro código reinicia el
   contador. La comparación usa `hmac.compare_digest` sobre bytes (con `str` no ASCII, como `'１２３４５６'`, lanzaría `TypeError`).
@@ -129,7 +129,16 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   muestran `data.error` en cualquier código de error, así que no se tocaron. Prueba de regresión: `tests/test_otp.py` (9 pruebas,
   sin BD ni correos). Contraprueba: con el `servicio.py` anterior fallan 5 y con el `api.py` anterior fallan 2 (las de rutas: 503 y
   500 `TypeError`); 4 pasan con ambos a propósito (no bloquear de más, reiniciar el contador, ancho completo y expirado).
-  Suite: 66 pruebas, 56 OK y 10 omitidas que requieren MariaDB.
+  Limitador (2.6): Flask-Limiter 4.1.1 (`limits` 5.8.0, fijados en `requirements.txt`) con `LIMITE_AUTH = "5 per minute"` por
+  IP (`request.remote_addr`) en `login`, `login/verify`, `register`, `verify` y `utils/validar-correo`; la 6.ª petición responde 429
+  “Demasiadas peticiones. Espera un minuto e intenta de nuevo” con `Retry-After` (por el manejador de `HTTPException` del 2.3).
+  Cada ruta cuenta aparte; contador en memoria (como los OTP, 4.6); sin `ProxyFix` (si la API va detrás de un proxy, 5.2).
+  En `login/verify` actúan las dos capas: el limitador corta al 6.º intento dentro del minuto y el bloqueo del OTP corta al 6.º
+  intento aunque pasen varios minutos. Prueba de regresión: `tests/test_limite.py` (5 pruebas); las pruebas anteriores apagan el
+  limitador en `_importar_api()`. Contraprueba con el `api.py` anterior: fallan 3 de 5 (nunca respondía 429); pasan 2 a propósito
+  (cada ruta cuenta aparte y las rutas públicas no se limitan). Suite: 71 pruebas, 61 OK y 10 omitidas que requieren MariaDB.
+  Queda por mejorar, sin ítem propio: límite por cuenta (además de por IP) para la contraseña del login y registrar los intentos
+  fallidos en el log sin datos personales.
 
 #### A-05 · 🔴 Crítica · El correo de PetConnect se puede usar para phishing/spam [A]
 - **Dónde:** `correo/plantillas.py:42` y `:99` insertan `{name}` sin escapar; `correo/servicio.py:66,72` usa `.format(name=...)`.
@@ -137,7 +146,8 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   **contiene el enlace**. `/api/auth/register` lo envía a **cualquier** dirección y sin límite de peticiones.
 - **Impacto:** correos fraudulentos saliendo de la cuenta Gmail del proyecto → Google bloquea la cuenta.
 - **Arreglo:** `html.escape(name)` (y de cualquier dato del usuario) antes de la plantilla + limitador de A-04.
-- **Estado: resuelto el 03/11/2026 (ítem 2.4 de PRIORIDADES), salvo el limitador (ítem 2.6).** Dos capas:
+- **Estado: resuelto el 03/11/2026 (ítem 2.4 de PRIORIDADES); el limitador se agregó el 04/11/2026 (ítem 2.6: `/register`
+  acepta 5 peticiones por minuto por IP, ver A-04).** Dos capas:
   (1) `correo/servicio.py` aplica `html.escape()` a `name`, `code` y `proposito` antes de las dos plantillas, así que
   `<a href=...>` llega como texto (`&lt;a href=...`); el texto plano no se escapa (ahí no se dibujan etiquetas).
   (2) `/api/auth/register` valida el nombre **antes** del DNS y de la BD (`_validar_nombre` en `api.py`): de 2 a 60

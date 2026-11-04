@@ -21,6 +21,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dns.resolver
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from mysql.connector.errors import InterfaceError, OperationalError
 from werkzeug.exceptions import BadRequest, HTTPException
 
@@ -39,6 +41,19 @@ CORS(app, origins=[
     "http://localhost:8081",   # PetConnect.Mobile (Expo web)
     "http://localhost:19006",  # PetConnect.Mobile (Expo web, puerto legado)
 ])
+
+# NC-006 / A-04 y A-05: limite de peticiones por IP en las rutas de autenticacion.
+# Frena la fuerza bruta de contrasenas y codigos, y el envio de correos sin fin.
+# Se cuenta en memoria (se reinicia al reiniciar la API), como los OTP (ver 4.6).
+# La IP es request.remote_addr: si algun dia la API va detras de un proxy, hay
+# que agregar ProxyFix para leer la IP real (ver 5.2).
+LIMITE_AUTH = "5 per minute"
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    storage_uri="memory://",
+    headers_enabled=True,   # cabecera Retry-After: cuantos segundos esperar
+)
 
 _conexion_bd = ConexionBD()
 _otp_registro = AlmacenOTP()
@@ -63,6 +78,7 @@ _MENSAJES_HTTP = {
     405: "Metodo no permitido para esta ruta",
     413: "La peticion es demasiado grande",
     415: "Tipo de contenido no soportado",
+    429: "Demasiadas peticiones. Espera un minuto e intenta de nuevo",
 }
 
 
@@ -356,6 +372,7 @@ def get_mascota(id_mascota):
 # ---------------------------------------------------------------------------
 
 @app.route("/api/utils/validar-correo", methods=["POST"])
+@limiter.limit(LIMITE_AUTH)
 def validar_correo():
     """
     Valida formato + dominio (registros MX) de un correo, sin crear nada.
@@ -373,6 +390,7 @@ def validar_correo():
 # ---------------------------------------------------------------------------
 
 @app.route("/api/auth/login", methods=["POST"])
+@limiter.limit(LIMITE_AUTH)
 def login():
     data = _cuerpo_json()
     email = _texto(data, "email").strip()
@@ -414,6 +432,7 @@ def login():
 
 
 @app.route("/api/auth/login/verify", methods=["POST"])
+@limiter.limit(LIMITE_AUTH)
 def login_verify():
     data  = _cuerpo_json()
     email = _texto(data, "email").strip()
@@ -447,6 +466,7 @@ def login_verify():
 
 
 @app.route("/api/auth/register", methods=["POST"])
+@limiter.limit(LIMITE_AUTH)
 def register():
     data = _cuerpo_json()
     name     = _texto(data, "name").strip()
@@ -495,6 +515,7 @@ def register():
 
 
 @app.route("/api/auth/verify", methods=["POST"])
+@limiter.limit(LIMITE_AUTH)
 def verify():
     data  = _cuerpo_json()
     email = _texto(data, "email").strip()
