@@ -153,6 +153,11 @@ class PruebasLogsSinDatosPersonales(unittest.TestCase):
     def _en_desarrollo(self, pedir, almacen):
         for valor in EN_DESARROLLO:
             with self.subTest(APP_ENV=valor):
+                # En desarrollo el pendiente queda guardado; desde el 2.7 (A-09) un
+                # segundo /register no lo reemplaza ni reenvia, asi que cada caso
+                # empieza sin pendiente para que de verdad se intente enviar.
+                almacen.descartar(CORREO_PRUEBA)
+                self.codigo_enviado = None
                 r, salida, logs = pedir(valor)
 
                 self.assertEqual(r.status_code, 200)

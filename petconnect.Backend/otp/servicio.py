@@ -14,6 +14,8 @@ import time
 
 EXPIRACION_SEGUNDOS = 600  # 10 minutos
 MAX_INTENTOS = 5           # fallos permitidos por codigo (A-04, NC-006)
+ESPERA_REENVIO_SEGUNDOS = 60   # minimo entre dos correos del mismo codigo (A-09, item 2.7)
+MAX_REENVIOS = 3               # reenvios por codigo: como mucho 4 correos en total
 
 
 def generar_codigo() -> str:
@@ -34,13 +36,53 @@ class AlmacenOTP:
     def crear(self, clave: str, datos: dict | None = None) -> str:
         """Genera un codigo nuevo para `clave` (normalmente un correo) y lo guarda."""
         codigo = generar_codigo()
+        ahora = time.time()
         self._pendientes[clave] = {
             **(datos or {}),
             "code": codigo,
-            "expires": time.time() + EXPIRACION_SEGUNDOS,
-            "intentos": 0,   # pedir un codigo nuevo reinicia el contador
+            "expires": ahora + EXPIRACION_SEGUNDOS,
+            "intentos": 0,        # pedir un codigo nuevo reinicia el contador
+            "ultimo_envio": ahora,
+            "reenvios": 0,
         }
         return codigo
+
+    def vigente(self, clave: str) -> dict | None:
+        """
+        Devuelve el pendiente de `clave` si todavia no vencio. Si ya vencio lo
+        borra y devuelve None, para que se pueda crear uno nuevo (A-09).
+        No cambia nada del pendiente vigente (ni contador ni vencimiento).
+        """
+        pendiente = self._pendientes.get(clave)
+        if not pendiente:
+            return None
+        if time.time() > pendiente["expires"]:
+            del self._pendientes[clave]
+            return None
+        return pendiente
+
+    def para_reenviar(self, clave: str) -> dict | None:
+        """
+        Devuelve el pendiente si se puede reenviar SU MISMO codigo y anota el
+        reenvio; si no, None. Quien llama responde lo mismo en ambos casos
+        (no revela si hay un registro en curso, A-14). No se reenvia si:
+          - no hay pendiente o ya vencio (reenviar no alarga los 10 minutos);
+          - ya lleva MAX_INTENTOS fallos (el codigo ya no sirve, esta bloqueado);
+          - no han pasado ESPERA_REENVIO_SEGUNDOS desde el ultimo correo;
+          - ya se reenvio MAX_REENVIOS veces (para no llenar el buzon de nadie).
+        El contador de intentos no se toca: reenviar no da intentos nuevos.
+        """
+        pendiente = self.vigente(clave)
+        if pendiente is None or pendiente["intentos"] >= MAX_INTENTOS:
+            return None
+        ahora = time.time()
+        if ahora - pendiente["ultimo_envio"] < ESPERA_REENVIO_SEGUNDOS:
+            return None
+        if pendiente["reenvios"] >= MAX_REENVIOS:
+            return None
+        pendiente["ultimo_envio"] = ahora
+        pendiente["reenvios"] += 1
+        return pendiente
 
     def verificar(self, clave: str, codigo: str) -> tuple[dict | None, str | None]:
         """

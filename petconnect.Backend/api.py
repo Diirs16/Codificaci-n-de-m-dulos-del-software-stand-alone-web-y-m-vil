@@ -570,6 +570,14 @@ def register():
     if dao.consultar_por_correo(email) is not None:
         return jsonify({"error": "El correo ya esta registrado"}), 409
 
+    # A-09 (item 2.7): si ya hay un registro pendiente y vigente para este correo,
+    # NO se toca (ni nombre, ni hash, ni codigo, ni intentos, ni vencimiento) y no
+    # se envia nada: vale la primera contrasena. Se responde igual que siempre para
+    # no revelar que alguien se esta registrando (A-14). Para recibir otra vez el
+    # codigo esta /api/auth/register/resend.
+    if _otp_registro.vigente(email) is not None:
+        return jsonify({"message": "Codigo enviado", "email": email})
+
     code = _otp_registro.crear(email, {
         "name":          name,
         "password_hash": hash_password(password),
@@ -590,6 +598,40 @@ def register():
             return jsonify({"error": _MENSAJE_FALLO_CORREO}), 503
 
     return jsonify({"message": "Codigo enviado", "email": email})
+
+
+_MENSAJE_REENVIO = "Si hay un registro pendiente para este correo, te reenviamos el codigo"
+
+
+@app.route("/api/auth/register/resend", methods=["POST"])
+@limiter.limit(LIMITE_AUTH)
+def register_resend():
+    """
+    A-09 (item 2.7): reenvia EL MISMO codigo de un registro pendiente, con el nombre
+    del primer registro y sin reiniciar el contador de intentos ni alargar el
+    vencimiento. Las reglas (60 s entre correos, maximo 3 reenvios, no reenviar un
+    codigo bloqueado) estan en AlmacenOTP.para_reenviar(). Haya o no pendiente, la
+    respuesta es la misma (A-14). No consulta la BD ni el DNS.
+    """
+    email = _texto(_cuerpo_json(), "email").strip()
+    if not email:
+        return jsonify({"error": "El correo es requerido"}), 400
+
+    pendiente = _otp_registro.para_reenviar(email)
+    if pendiente is not None:
+        try:
+            enviar_codigo(
+                email, pendiente["name"].split()[0], pendiente["code"],
+                asunto="PetConnect - Codigo de verificacion",
+                proposito="Usa este codigo para verificar tu correo y completar tu registro:",
+            )
+        except Exception as e:
+            # A-10: nunca el correo ni str(e) en los logs; en desarrollo, solo el codigo.
+            # El pendiente NO se borra: el primer correo pudo llegar y sigue sirviendo.
+            if not _avisar_fallo_envio(e, pendiente["code"]):
+                return jsonify({"error": _MENSAJE_FALLO_CORREO}), 503
+
+    return jsonify({"message": _MENSAJE_REENVIO})
 
 
 @app.route("/api/auth/verify", methods=["POST"])

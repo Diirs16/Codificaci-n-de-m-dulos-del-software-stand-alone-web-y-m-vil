@@ -231,12 +231,42 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   víctima luego verifica con su código, la cuenta queda con la contraseña del atacante.
 - **Arreglo:** si ya hay un registro pendiente y vigente, no sobrescribirlo (responder 409 “revisa tu correo” o reenviar
   el mismo código).
-- **Estado: por actualizar (04/11/2026, ítem 2.7 de PRIORIDADES).** Revisado sin tocar código. Queda en pausa porque se
-  va a crear primero un botón web “Reenviar código” en la verificación del registro: con ese botón, `/register` solo
-  tiene que dejar intacto el pendiente vigente (hash, contador de intentos y vencimiento) y responder igual que
-  siempre (“Codigo enviado”, sin el 409 que revelaría el registro en curso, A-14). Plan, ruta de reenvío propuesta,
-  decisiones pendientes y riesgo que queda abierto (borrar el pendiente con 6 códigos falsos y registrarse después) en
-  la sección “Por actualizar” de [PRIORIDADES](PRIORIDADES-PetConnect-2026-11-03.md#por-actualizar).
+- **Estado: resuelto el 05/11/2026 (ítem 2.7 de PRIORIDADES).** Estuvo en pausa desde el 04/11/2026 hasta crear el
+  botón web “Reenviar código”. `otp/servicio.py`: `AlmacenOTP.vigente(clave)` devuelve el pendiente si no venció (si
+  venció lo borra y devuelve `None`) y `para_reenviar(clave)` aplica las reglas del reenvío. `api.py`: si hay un
+  pendiente vigente, `/api/auth/register` **no lo toca** (ni nombre, ni hash, ni código, ni intentos, ni vencimiento),
+  no envía nada y responde lo mismo de siempre (“Codigo enviado”, sin un 409 que revele el registro en curso, A-14):
+  vale la **primera** contraseña. Ruta nueva `POST /api/auth/register/resend` (solo `email`, con
+  `@limiter.limit(LIMITE_AUTH)`, sin consultar la BD ni el DNS): reenvía **el mismo código** con el nombre del primer
+  registro y responde siempre “Si hay un registro pendiente para este correo, te reenviamos el codigo”, haya o no
+  pendiente. Si el envío falla, usa `_avisar_fallo_envio` del 2.8 (en el log solo la ruta y el tipo de error; en
+  desarrollo imprime solo el código) y fuera de desarrollo responde 503 **sin borrar** el pendiente, porque el primer
+  correo pudo llegar.
+  Decisiones del dueño del proyecto (05/11/2026): (a) nombre `/api/auth/register/resend`; (b) 60 s entre correos del
+  mismo código, controlados también en el servidor (`ultimo_envio`), con la misma respuesta neutra si se pide antes;
+  (c) máximo 3 reenvíos por código (4 correos en total); (d) reenviar **no** alarga los 10 minutos; (e) un código con
+  5 fallos no se reenvía (ya no sirve); (f) si falla el envío del reenvío, 503 sin borrar el pendiente (solo revela
+  un registro en curso cuando falla Gmail, cosa que el atacante no controla). Ni registrarse otra vez ni reenviar
+  reinician el contador de intentos del 2.5.
+  Prueba de regresión: `tests/test_registro.py` (18 pruebas, sin BD, sin correos, sin DNS, con el reloj de
+  `otp/servicio.py` simulado; correos inventados `@ejemplo.test`). Cubre: dos registros con contraseñas distintas
+  (queda el hash del primero y `/verify` crea la cuenta con él; respuestas idénticas); 5 fallos + reenvío + registro
+  + código correcto → 429; 4 fallos + reenvío + 1 fallo → 429; pendiente vencido sí se reemplaza; el reenvío manda el
+  mismo código; sin pendiente, misma respuesta y nada enviado; `vigente()` solo; 6.ª petición de reenvío en un
+  minuto → 429; reglas (b) a (f). `tests/test_logs.py` se ajustó: su prueba de desarrollo registraba dos veces el
+  mismo correo y esperaba un segundo envío, que ahora ya no ocurre (A-09). Contraprueba con `git stash` de un archivo
+  a la vez: con el `api.py` anterior **fallan 13 de 18** (16 fallos con los subcasos; pasan a propósito las 4 de
+  `vigente()`, que solo usan `servicio.py`, y `test_pendiente_vencido_se_reemplaza`, porque el código viejo también
+  reemplazaba un pendiente vencido); con el `servicio.py` anterior **fallan 17 de 18** (pasa a propósito
+  `test_reenviar_sin_correo_o_con_numero_responde_400`, porque el 400 sale antes de tocar el almacén; en la suite
+  completa fallan además otras 6 pruebas de registro porque el `api.py` nuevo llama a `vigente()`, que no existe en
+  el viejo). Suite: 107 pruebas, 96 OK y 11 omitidas que requieren MariaDB.
+  **Riesgos que siguen abiertos:** (1) otra persona puede mandar 6 códigos falsos a `/verify` con el correo de la
+  víctima; el bloqueo del 2.5 borra el pendiente y entonces sí puede registrarse con su contraseña (más difícil:
+  tiene que hacerlo en los minutos entre el registro y la verificación). Arreglo definitivo: que `/verify` vuelva a
+  pedir la contraseña y la compare con el hash pendiente. (2) Un `/register` con pendiente vigente responde más
+  rápido (no calcula bcrypt ni envía correo): midiendo el tiempo se podría saber que hay un registro en curso. Taparlo
+  exige enviar los correos en segundo plano; el 409 de A-14 (4.10) revela aún más.
 
 #### A-10 · 🟠 Alta · Códigos OTP y correos impresos en la consola [N]
 - **Dónde:** `api.py:305`, `:377`, `:421` → `print(f"[DEV] ... Codigo ... para {email}: {code}")`.

@@ -42,7 +42,7 @@ Dentro de cada fase van primero los arreglos más rápidos.
 | [x] | 2.4 | A-05 | — | `html.escape()` de `name` (y todo dato del usuario) en `correo/servicio.py` | 🟢 | El HTML generado no contiene `<a href` cuando el nombre lo trae — *Hecho el 03/11/2026: escape en `correo/servicio.py` + nombre validado en `/register` (`api.py`); `tests/test_correo.py` y `tests/test_errores.py` (fallan con el código viejo, pasan con el nuevo)* |
 | [x] | 2.5 | A-04 | NC-006 | Máximo 5 intentos por OTP (luego se invalida) + `hmac.compare_digest` | 🟢 | El 6.º intento devuelve “código bloqueado” aunque sea el correcto — *Hecho el 04/11/2026: `otp/servicio.py` + `api.py` (429 “Demasiados intentos fallidos”); `tests/test_otp.py` (falla con el código viejo, pasa con el nuevo)* |
 | [x] | 2.6 | A-04, A-05 | NC-006 | Flask-Limiter (versión fijada) en `login`, `login/verify`, `register`, `verify`, `utils/validar-correo` (ej. 5/min por IP) | 🟡 | La 6.ª petición en un minuto → 429 — *Hecho el 04/11/2026: Flask-Limiter 4.1.1 + `limits` 5.8.0, 5/min por IP; `tests/test_limite.py` (falla con el código viejo, pasa con el nuevo). NC-006 cerrada* |
-| [ ] | 2.7 | A-09 | — | No sobrescribir un registro pendiente vigente — **⏸ Por actualizar** (ver [sección](#por-actualizar)): se hace junto con el botón web “Reenviar código” | 🟢 | Segundo `/register` con el mismo correo → no cambia el hash pendiente |
+| [x] | 2.7 | A-09 | — | No sobrescribir un registro pendiente vigente + ruta de reenvío del mismo código (junto con el botón web “Reenviar código”) | 🟢 | Segundo `/register` con el mismo correo → no cambia el hash pendiente — *Hecho el 05/11/2026: `otp/servicio.py` (`vigente`, `para_reenviar`) + `api.py` (`/register` no toca el pendiente vigente; `POST /api/auth/register/resend`: mismo código, 60 s entre correos, máx. 3 reenvíos, sin alargar el vencimiento, respuesta neutra); `tests/test_registro.py` (falla con el código viejo, pasa con el nuevo). Botón web en `RegisterModal.jsx`* |
 | [x] | 2.8 | A-10 | — | Imprimir el OTP solo si `APP_ENV=desarrollo`; nunca el correo en logs de producción | 🟢 | Con `APP_ENV` distinto, la salida no contiene el código — *Hecho el 04/11/2026: `api.py` (`_es_desarrollo`, `_avisar_fallo_envio`; fuera de desarrollo, 503 y se descarta el código) + `.env.example`; `tests/test_logs.py` (falla con el código viejo, pasa con el nuevo)* |
 | [x] | 2.9 | A-07 | NC-002 | `/api/mascotas/<id>` solo devuelve `en_adopcion` (404 si no); ruta privada con `@require_auth` + dueño | 🟡 | Sin token y mascota no en adopción → 404 — *Hecho el 05/11/2026: `api.py` (filtro en SQL + revisión en Python; ruta privada `GET /api/usuarios/me/mascotas/<id>`, ajena → mismo 404); `tests/test_mascotas.py` (falla con el código viejo, pasa con el nuevo) + `test_esquema.py` con MariaDB temporal. NC-002 cerrada* |
 
@@ -55,48 +55,9 @@ Dentro de cada fase van primero los arreglos más rápidos.
 Ítems revisados pero en pausa porque su arreglo depende de algo que se va a construir primero. Cuando se retome,
 se borra de aquí y se marca `[x]` en su fase.
 
-### 2.7 · A-09 · Un segundo registro pisa la contraseña del primero — en pausa desde el 04/11/2026
-
-**Por qué está en pausa:** el dueño del proyecto decidió crear un **botón web “Reenviar código”** en la verificación
-del registro. Eso cambia la decisión del 2.7: si el reenvío tiene su propio botón, `/register` ya no necesita
-reenviar nada y basta con no tocar el pendiente (la opción más simple).
-
-**Lo que ya se revisó (sin tocar código):**
-- `api.py`, `/api/auth/register`: `_otp_registro.crear(email, {...})` reemplaza sin preguntar el nombre, el hash de la
-  contraseña, el código y el contador de intentos del registro pendiente. Si otra persona registra el correo de la
-  víctima después de ella, la cuenta se crea con la contraseña de esa persona cuando la víctima usa el código nuevo.
-  (El login pide código por correo, así que no entra sin el buzón de la víctima, pero ya tiene uno de los dos
-  factores y la víctima queda con una contraseña que no conoce.)
-- Arreglo propuesto: `AlmacenOTP.vigente(clave)` en `otp/servicio.py` (devuelve el pendiente si no venció; si venció,
-  lo borra para que se pueda reemplazar). En `/register`, si hay un pendiente vigente, no se toca: ni el hash, ni el
-  contador de intentos, ni el vencimiento. La respuesta es siempre la misma, `"Codigo enviado"`, para no revelar
-  que alguien se está registrando con ese correo (A-14). Si alguien se registra dos veces seguidas, vale la
-  **primera** contraseña.
-- Opciones descartadas: responder 409 “revisa tu correo” (revela el registro en curso) y borrar el pendiente para
-  crear uno nuevo (deja el problema igual).
-
-**Cómo encaja el botón “Reenviar código”:**
-- **Backend:** ruta nueva (nombre propuesto `POST /api/auth/register/resend`) que recibe solo `email`. Si hay pendiente
-  vigente, reenvía **el mismo código** con el nombre del primer registro, sin reiniciar el contador de intentos.
-  Si no hay pendiente, responde lo mismo (respuesta neutra). Con `@limiter.limit(LIMITE_AUTH)`.
-- **Web:** `src/components/RegisterModal.jsx`, en el paso de verificación, junto a “¿No recibiste el código?”. Hoy
-  ese enlace dice “Volver e intentar de nuevo” y manda a registrarse otra vez, cosa que con el 2.7 ya no cambiaría
-  los datos. Función nueva en `src/services/api.js`, espera entre clics (ej. 60 s) y aviso de “Te reenviamos el código”.
-- **Login:** `src/components/LoginModal.jsx` tiene el mismo enlace; decidir si el botón va también allí (otra parte).
-- **Móvil:** después, en su propia parte (regla 3 de `CLAUDE.md`).
-
-**Orden propuesto (una parte a la vez, con `/nueva-funcionalidad`):** (1) backend: 2.7 + ruta de reenvío + pruebas
-(`tests/test_registro.py`: dos `/register` con contraseñas distintas → queda el hash del primero; reenviar no da
-intentos nuevos; un pendiente vencido sí se reemplaza; el reenvío manda el mismo código); (2) web: el botón;
-(3) móvil, si se quiere.
-
-**Decisiones pendientes del dueño:** nombre de la ruta, cuánto esperar entre reenvíos, si reenviar alarga los
-10 minutos de vencimiento y si el botón va también en el login.
-
-**Riesgo que sigue abierto aunque se haga el 2.7:** otra persona puede mandar 6 códigos falsos a `/verify` con el
-correo de la víctima; el bloqueo del 2.5 borra el pendiente y entonces sí puede registrarse con su contraseña. Es
-más difícil (tiene que hacerlo en el par de minutos entre el registro y la verificación). Arreglo definitivo, sin
-ítem todavía: que `/verify` vuelva a pedir la contraseña y la compare con el hash pendiente (toca web y móvil).
+*Ninguno por ahora.* El 2.7 (A-09) estuvo aquí del 04/11 al 05/11/2026 y quedó hecho junto con el botón web
+“Reenviar código” (decisiones, evidencia y riesgos que siguen abiertos en el “Estado” de A-09 de la
+[AUDITORÍA](AUDITORIA-PetConnect-2026-11-03.md)).
 
 ---
 
@@ -194,7 +155,8 @@ Lee primero:
 - Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle del A-xx)
 - Documentacion/GA9-220501096-AA1-EV02-PetConnect.md (bitácora de NC)
 - git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
-  git status -sb si hay commits sin push; al 05/11/2026 había 16 sin push)
+  git status -sb si hay commits sin push; el 05/11/2026 se subieron las fases
+  0 a 2 hasta 5a42214 y no quedó nada sin push)
 
 Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.8, 2.9 (ver git log).
@@ -330,5 +292,5 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.1** (A-20, NC-005; grande: plan primero y por partes, backend → web → móvil. El 2.7 sigue ⏸ por
-actualizar: se retoma junto con el botón web “Reenviar código”; ver [Por actualizar](#por-actualizar))
+**Próximo ítem: 3.1** (A-20, NC-005; grande: plan primero y por partes, backend → web → móvil). La fase 2 quedó
+completa con el 2.7 (05/11/2026); el botón web “Reenviar código” del registro es su parte 2.
