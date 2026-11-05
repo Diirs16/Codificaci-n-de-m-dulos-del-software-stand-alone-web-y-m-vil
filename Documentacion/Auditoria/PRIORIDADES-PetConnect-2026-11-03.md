@@ -143,8 +143,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 05/11/2026, actualizada al cerrar el 2.9: estado conocido al día y contexto del 3.1 (NC-005). Salta
-los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem.*
+*Versión del 05/11/2026, actualizada al cerrar el 2.7 (con el botón web “Reenviar código”): estado conocido al día y
+contexto del 3.1 (NC-005). Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -155,15 +155,28 @@ Lee primero:
 - Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle del A-xx)
 - Documentacion/GA9-220501096-AA1-EV02-PetConnect.md (bitácora de NC)
 - git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
-  git status -sb si hay commits sin push; el 05/11/2026 se subieron las fases
-  0 a 2 hasta 5a42214 y no quedó nada sin push)
+  git status -sb si hay commits sin push; el 05/11/2026 se subió todo hasta el
+  commit del botón web del 2.7 y no quedó nada sin push)
 
 Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el git log):
-- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.8, 2.9 (ver git log).
-  La fase 2 quedó completa salvo el 2.7. Sigue la fase 3.
-- En pausa: 2.7 (A-09), en la sección "Por actualizar" de PRIORIDADES. Se hará
-  junto con un botón web "Reenviar código"; no lo tomes salvo que te lo pida.
-- Pruebas: 89 (78 OK + 11 omitidas que necesitan MariaDB).
+- Hechos: 0.1, 1.1, 1.2 y toda la fase 2 (2.1 a 2.9; ver git log). Sigue la fase 3.
+- "Por actualizar" está vacía.
+- Pruebas: 107 (96 OK + 11 omitidas que necesitan MariaDB).
+- Registro (2.7, A-09): AlmacenOTP tiene vigente(clave) (borra el pendiente si
+  venció) y para_reenviar(clave) (60 s entre correos, máximo 3 reenvíos, no
+  alarga los 10 minutos, no reenvía un código con 5 fallos). /register NO toca
+  un pendiente vigente (vale la primera contraseña) y responde igual que
+  siempre. POST /api/auth/register/resend reenvía el MISMO código, con respuesta
+  neutra haya o no pendiente; si falla el correo, 503 sin borrar el pendiente.
+  Web: RegisterModal.jsx tiene el botón "Reenviar código" (cuenta regresiva,
+  aria-live, aria-disabled) y "Cambiar correo"; api.js tiene resendRegisterCode.
+  Prueba modelo para registro: tests/test_registro.py (reloj de otp/servicio.py
+  simulado con mock.patch.object(servicio, "time", ...)).
+- Pendientes que dejó el 2.7 (sin ítem todavía, preguntar al dueño): botón igual
+  en LoginModal.jsx y en el móvil; que /verify vuelva a pedir la contraseña
+  (otra persona puede borrar el pendiente con 6 códigos falsos y registrarse);
+  la caja del código sin aria-label/autoComplete="one-time-code" y los modales
+  sin role="dialog" (/impeccable audit, 17/20).
 - NC-007 solo espera decrypt() (4.8). NC-006 cerrada el 04/11/2026. NC-002
   cerrada el 05/11/2026.
 - Mascotas (2.9): GET /api/mascotas/<id> pública solo devuelve en_adopcion (SQL
@@ -221,16 +234,19 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
 
 Contexto del próximo ítem (3.1, A-20, NC-005): es GRANDE (API, BD, web y móvil),
 así que va con plan y por partes (regla 3 de CLAUDE.md).
-- Qué está mal: api.py, POST /api/auth/verify (~línea 615) crea el Usuario con
+- Qué está mal: api.py, POST /api/auth/verify (~línea 639) crea el Usuario con
   acepta_datos=True fijo; modelo/usuario.py:10 también trae acepta_datos=True por
   defecto; sql/schema.sql: usuarios.acepta_datos tinyint(1) DEFAULT 1, sin
   columnas de fecha ni de versión de la política. seed.py:128 inserta
   acepta_datos. Nadie le pregunta al titular (Ley 1581, art. 9).
-- Flujo actual: /register (~545) valida nombre, correo y contraseña y guarda un
+- Flujo actual: /register (~546) valida nombre, correo y contraseña y guarda un
   pendiente con _otp_registro.crear(email, {...}); /verify lo lee y crea el
   usuario. La autorización tendría que viajar en /register, guardarse en el
-  pendiente y escribirse al crear el usuario (con fecha y versión).
-- Web: src/components/RegisterModal.jsx (estado del formulario ~línea 27) y
+  pendiente y escribirse al crear el usuario (con fecha y versión). Ojo (2.7):
+  si ya hay un pendiente vigente, /register no lo cambia, así que la
+  autorización del primer registro es la que vale; validar acepta_datos ANTES
+  de esa revisión para que un registro sin casilla siempre responda 400.
+- Web: src/components/RegisterModal.jsx (estado del formulario ~línea 32) y
   src/services/api.js:32 registerUser(name, email, password). Móvil:
   src/screens/RegisterScreen.js y src/services/api.js:61. Ni la web ni el móvil
   tienen casilla ni una página de política de tratamiento de datos.
@@ -249,8 +265,7 @@ así que va con plan y por partes (regla 3 de CLAUDE.md).
   borrador, pero lo valida el dueño o el instructor antes de publicarlo
   (/revision-contenido-mascotas para la parte de datos personales).
 - No mezclar: la consola (vista/menu_usuarios.py) también crea usuarios sin
-  autorización, pero eso es el 4.11. /register todavía pisa el pendiente (2.7,
-  en pausa): no cambiarlo aquí.
+  autorización, pero eso es el 4.11. No cambiar las reglas del reenvío del 2.7.
 - Prueba (parte 1, ej. tests/test_registro_datos.py, modelo tests/test_logs.py
   con UsuarioDAO falso y sin correos ni DNS): /register sin acepta_datos, con
   false, con "true" o con 1 → 400 y no se envía correo ni se crea pendiente; con
@@ -259,7 +274,7 @@ así que va con plan y por partes (regla 3 de CLAUDE.md).
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
-   estén en la sección "Por actualizar" (hoy el 2.7). Si dos seguidos son 🟢 y
+   estén en la sección "Por actualizar" (hoy ninguno). Si dos seguidos son 🟢 y
    tocan el mismo archivo, puedes agruparlos (dímelo).
 2. Antes de tocar código explícame en lenguaje sencillo qué está mal, el riesgo
    y tu plan (archivos, cambio, prueba de regresión), con opciones y pros/contras

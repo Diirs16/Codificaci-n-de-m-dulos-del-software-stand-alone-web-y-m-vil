@@ -261,6 +261,17 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `test_reenviar_sin_correo_o_con_numero_responde_400`, porque el 400 sale antes de tocar el almacén; en la suite
   completa fallan además otras 6 pruebas de registro porque el `api.py` nuevo llama a `vigente()`, que no existe en
   el viejo). Suite: 107 pruebas, 96 OK y 11 omitidas que requieren MariaDB.
+  **Web (parte 2):** `src/services/api.js` tiene `resendRegisterCode(email)`. En `RegisterModal.jsx`, el paso “Verificar
+  correo” tiene un botón “Reenviar código” con cuenta regresiva (“Reenviar en 60 s”), que arranca también con el
+  primer código, y que se queda sin reenvíos tras 3, como el servidor. Muestra el aviso neutro “Si hay un registro
+  pendiente, te reenviamos el código…” en una zona `role="status"`/`aria-live="polite"` y los errores de la API (429,
+  503) en el cuadro rojo, ahora con `role="alert"`. Usa `aria-disabled` en lugar de `disabled` para no perder el foco
+  del teclado y mide 44 px de alto. “Volver e intentar de nuevo” pasó a “¿Escribiste mal tu correo? Cambiar correo”.
+  `npm run lint` sin errores (solo los 2 avisos de los contextos) y `npm run build` OK. Revisado a 375 px con
+  respuestas simuladas y probado por el dueño del proyecto con la API real (el correo del primer registro llegó; un
+  segundo registro no envió otro). `/impeccable audit`: 17/20. Lo que encontró ya existía antes del 2.7: la caja del
+  código sin etiqueta (`aria-label`, `autoComplete="one-time-code"`) y los modales sin `role="dialog"`, sin Esc y sin
+  retener el foco.
   **Riesgos que siguen abiertos:** (1) otra persona puede mandar 6 códigos falsos a `/verify` con el correo de la
   víctima; el bloqueo del 2.5 borra el pendiente y entonces sí puede registrarse con su contraseña (más difícil:
   tiene que hacerlo en los minutos entre el registro y la verificación). Arreglo definitivo: que `/verify` vuelva a

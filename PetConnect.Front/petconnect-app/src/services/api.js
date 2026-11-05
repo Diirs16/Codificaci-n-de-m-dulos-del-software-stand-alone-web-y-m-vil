@@ -43,6 +43,15 @@ export function verifyCode(email, code) {
   });
 }
 
+// Reenvía el MISMO código del registro pendiente (ítem 2.7). La respuesta es
+// siempre neutra: no dice si ese correo tiene un registro en curso.
+export function resendRegisterCode(email) {
+  return apiFetch("/auth/register/resend", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
 export function verifyLoginCode(email, code) {
   return apiFetch("/auth/login/verify", {
     method: "POST",

@@ -1,8 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
-import { X, Check, AlertCircle, Loader2 } from "lucide-react";
+import { X, Check, AlertCircle, Loader2, RotateCw, MailCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { esFormatoCorreoValido } from "../utils/validarCorreo";
-import { validarCorreo } from "../services/api";
+import { validarCorreo, resendRegisterCode } from "../services/api";
+
+// Mismas reglas que el servidor (otp/servicio.py, ítem 2.7): 60 s entre correos
+// y máximo 3 reenvíos por código. El servidor las aplica igual aunque esto se salte.
+const ESPERA_REENVIO_MS = 60_000;
+const MAX_REENVIOS = 3;
 
 const RULES = [
   { id: "len",     label: "Mínimo 8 caracteres",               test: (p) => p.length >= 8 },
@@ -72,7 +77,39 @@ export default function RegisterModal() {
 
   const emailBloqueaEnvio = emailStatus.estado === "formato_invalido" || emailStatus.estado === "invalido";
 
+  // --- Reenviar código (ítem 2.7) ---
+  // reenviarDesde: hora (ms) a partir de la cual se puede volver a pedir el código.
+  // ahora: se actualiza cada segundo solo mientras dura la espera (cuenta regresiva).
+  const [reenviarDesde, setReenviarDesde] = useState(0);
+  const [ahora, setAhora] = useState(0);
+  const [reenvios, setReenvios] = useState(0);
+  const [reenviando, setReenviando] = useState(false);
+  const [avisoReenvio, setAvisoReenvio] = useState("");
+
+  useEffect(() => {
+    if (reenviarDesde <= ahora) return;
+    const id = setTimeout(() => setAhora(Date.now()), 1000);
+    return () => clearTimeout(id);
+  }, [reenviarDesde, ahora]);
+
+  const segundosRestantes = Math.max(0, Math.ceil((reenviarDesde - ahora) / 1000));
+  const sinReenvios = reenvios >= MAX_REENVIOS;
+  const reenvioBloqueado = reenviando || segundosRestantes > 0 || sinReenvios;
+
   if (!showRegister) return null;
+
+  const iniciarEspera = () => {
+    const t = Date.now();
+    setAhora(t);
+    setReenviarDesde(t + ESPERA_REENVIO_MS);
+  };
+
+  const reiniciarReenvio = () => {
+    setReenviarDesde(0);
+    setAhora(0);
+    setReenvios(0);
+    setAvisoReenvio("");
+  };
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -96,6 +133,8 @@ export default function RegisterModal() {
     try {
       await register(form.name, form.email, form.password);
       setForm({ name: "", email: "", password: "", confirmPassword: "" });
+      reiniciarReenvio();
+      iniciarEspera();   // la espera arranca también con el primer código
     } catch (err) {
       setAuthError(err.message);
     } finally {
@@ -115,10 +154,36 @@ export default function RegisterModal() {
     }
   };
 
+  const handleResend = async () => {
+    if (reenvioBloqueado) return;   // aria-disabled no bloquea el clic por sí solo
+    setReenviando(true);
+    setAuthError(null);
+    setAvisoReenvio("");
+    try {
+      await resendRegisterCode(pendingEmail);
+      setReenvios((n) => n + 1);
+      // Aviso neutro: no confirma que el correo tenga un registro en curso
+      setAvisoReenvio("Si hay un registro pendiente, te reenviamos el código. Revisa también la carpeta de spam.");
+      iniciarEspera();
+    } catch (err) {
+      setAuthError(err.message);   // 429, 503 u otro error de la API, como en el resto del modal
+    } finally {
+      setReenviando(false);
+    }
+  };
+
+  const handleChangeEmail = () => {
+    setAuthError(null);
+    setPendingEmail(null);
+    setCode("");
+    reiniciarReenvio();
+  };
+
   const handleClose = () => {
     setShowRegister(false);
     setCode("");
     setForm({ name: "", email: "", password: "", confirmPassword: "" });
+    reiniciarReenvio();
   };
 
   return (
@@ -278,7 +343,7 @@ export default function RegisterModal() {
             </p>
 
             {authError && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4 text-center">
+              <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4 text-center">
                 {authError}
               </p>
             )}
@@ -305,15 +370,50 @@ export default function RegisterModal() {
               </button>
             </form>
 
-            <p className="text-center text-sm text-gray-500 mt-4">
-              ¿No recibiste el código?{" "}
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <p className="text-center text-sm text-gray-500 mb-2">¿No recibiste el código?</p>
               <button
-                onClick={() => { setAuthError(null); setPendingEmail(null); setCode(""); }}
-                className="text-black font-medium hover:underline"
+                type="button"
+                onClick={handleResend}
+                aria-disabled={reenvioBloqueado}
+                className="w-full min-h-11 inline-flex items-center justify-center gap-2 border border-gray-300 bg-white text-black py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black aria-disabled:bg-gray-50 aria-disabled:text-gray-600 aria-disabled:cursor-not-allowed"
               >
-                Volver e intentar de nuevo
+                <RotateCw className={`w-4 h-4 shrink-0 ${reenviando ? "animate-spin" : ""}`} aria-hidden="true" />
+                <span className="tabular-nums">
+                  {reenviando
+                    ? "Reenviando..."
+                    : sinReenvios
+                    ? "Ya no se puede reenviar más"
+                    : segundosRestantes > 0
+                    ? `Reenviar en ${segundosRestantes} s`
+                    : "Reenviar código"}
+                </span>
               </button>
-            </p>
+
+              {/* Siempre en el DOM para que los lectores de pantalla anuncien el cambio */}
+              <div role="status" aria-live="polite">
+                {avisoReenvio && (
+                  <p className="mt-3 flex items-start gap-2 text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <MailCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span>
+                      {avisoReenvio}
+                      {sinReenvios && " Ya usaste los reenvíos de este código; si no llega, revisa que el correo esté bien escrito."}
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              <p className="text-center text-sm text-gray-500 mt-4">
+                ¿Escribiste mal tu correo?{" "}
+                <button
+                  type="button"
+                  onClick={handleChangeEmail}
+                  className="text-black font-medium underline-offset-2 hover:underline focus-visible:underline"
+                >
+                  Cambiar correo
+                </button>
+              </p>
+            </div>
           </>
         )}
       </div>
