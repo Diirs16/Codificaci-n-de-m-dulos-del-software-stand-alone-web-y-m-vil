@@ -183,6 +183,22 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   Confirmado por el equipo el 5/10 (AA2, CP-006).
 - **Arreglo:** la ruta pública solo devuelve `estado = 'en_adopcion'` (404 si no); las mascotas privadas van por una
   ruta con `@require_auth` que compare `id_usuario` con el del token. Prueba de regresión: sin token → 404.
+- **Estado: resuelto el 05/11/2026 (ítem 2.9 de PRIORIDADES). NC-002 cerrada.** `api.py`: la ruta pública
+  `GET /api/mascotas/<id>` filtra `estado = 'en_adopcion'` en el SQL y lo vuelve a revisar en Python (doble barrera);
+  cualquier otro estado o una mascota inexistente responde el **mismo** 404 “Mascota no encontrada”, sin datos.
+  Ruta privada nueva `GET /api/usuarios/me/mascotas/<id>` con `@require_auth`: SQL filtrado por `id_mascota` e
+  `id_usuario` del token y comparación del dueño en Python; sin token o con un token inválido → 401 (sin consultar la BD);
+  mascota ajena → el mismo 404 (no 403: no revela que existe); el dueño la ve en cualquier estado y la respuesta no trae
+  `id_usuario`. Hoy no la consume nadie; es el patrón para el carné de vacunas. Web y móvil no cambiaron (solo abren
+  mascotas en adopción). Decisiones del dueño del proyecto: crear ya la ruta privada (la pide la acción correctiva de
+  NC-002), 404 en lugar de 403 y dejar el SQL en `api.py` por ahora: `MascotaDAO` se traga los errores de la BD y
+  devuelve `None`, así que usarlo convertiría el 503 del 2.3 en un 404; moverlo queda como ítem 4.15, junto con el pool (4.5).
+  Prueba de regresión: `tests/test_mascotas.py` (11 pruebas; BD simulada que devuelve la fila sin aplicar el `WHERE`,
+  así que también prueba la segunda barrera). Contraprueba con el `api.py` anterior: fallan 9 de 11 (16 casos con los
+  subcasos); pasan con ambos, a propósito, la mascota en adopción (200) y la inexistente (404). Suite: 89 pruebas, 78 OK y
+  11 omitidas que requieren MariaDB. Con MariaDB temporal (`PETCONNECT_PRUEBA_BD=1`, ejecutada por el dueño del proyecto
+  con respaldo previo): `test_esquema.PruebasEsquemaEnBD` 6 de 6 OK, incluida `test_mascota_privada_solo_la_ve_su_dueno`
+  (una mascota `activa` → 404 en la ruta pública y con el token de otro usuario, 200 con el del dueño, con el SQL real).
 
 #### A-08 · 🟠 Alta · Configuración insegura y errores internos expuestos — NC-007 [A + N]
 - `api.py:458` → `app.run(debug=True)`: el depurador de Werkzeug permite ejecutar código si se expone. [A]

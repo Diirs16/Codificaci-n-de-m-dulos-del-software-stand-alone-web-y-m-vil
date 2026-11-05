@@ -6,6 +6,8 @@ y modo estricto) y NC-010 (fechas de vacunas).
   No necesitan base de datos.
 - PruebasEsquemaEnBD: solo corren con PETCONNECT_PRUEBA_BD=1. Crean una base
   temporal "petconnect_prueba", cargan schema.sql y seed.py, y al final la borran.
+  Tambien prueban el filtro real de NC-002 (item 2.9): una mascota "activa"
+  no sale por la ruta publica ni para otro usuario, solo para su dueno.
 - PruebasMigracionEnBD: tambien con PETCONNECT_PRUEBA_BD=1. Crean la tabla vieja
   en "petconnect_prueba_migracion", reproducen el estado vacio y aplican la
   migracion de PRIORIDADES 1.2. Al final borran esa base.
@@ -189,6 +191,52 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         mascotas = respuesta.get_json()
         self.assertEqual(len(mascotas), 6)
         self.assertTrue(all(m["estado"] == "en_adopcion" for m in mascotas))
+
+    def test_mascota_privada_solo_la_ve_su_dueno(self):
+        """NC-002 (item 2.9) con el SQL real: la ruta publica no la encuentra."""
+        from cryptography.fernet import Fernet
+        os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
+        os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
+        import api
+
+        # Mascota "activa" (privada) del dueno ficticio de la semilla
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id_usuario FROM mascotas WHERE estado = 'en_adopcion' LIMIT 1")
+        id_dueno = cursor.fetchone()[0]
+        cursor.execute(
+            "INSERT INTO mascotas (id_usuario, nombre, especie, observaciones, estado) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (id_dueno, "Privada", "Gato", "Observacion privada de prueba", "activa"),
+        )
+        id_privada = cursor.lastrowid
+        self.conn.commit()
+        cursor.close()
+
+        def borrar():
+            c = self.conn.cursor()
+            c.execute("DELETE FROM mascotas WHERE id_mascota = %s", (id_privada,))
+            self.conn.commit()
+            c.close()
+        self.addCleanup(borrar)
+
+        def token(id_usuario):
+            # Correo inventado; el token se firma en este proceso y nunca se imprime
+            return {"Authorization": f"Bearer {api.generate_token(id_usuario, 'dueno@ejemplo.test')}"}
+
+        # Igual que arriba: se llama la funcion sin test_client()
+        with api.app.test_request_context(f"/api/mascotas/{id_privada}"):
+            r_publica, codigo_publica = api.get_mascota(id_privada)
+        with api.app.test_request_context(f"/api/usuarios/me/mascotas/{id_privada}",
+                                          headers=token(id_dueno + 1000)):
+            r_ajena, codigo_ajena = api.get_mi_mascota(id_privada)
+        with api.app.test_request_context(f"/api/usuarios/me/mascotas/{id_privada}",
+                                          headers=token(id_dueno)):
+            r_dueno = api.get_mi_mascota(id_privada)
+
+        self.assertEqual((codigo_publica, r_publica.get_json()), (404, {"error": "Mascota no encontrada"}))
+        self.assertEqual((codigo_ajena, r_ajena.get_json()), (404, {"error": "Mascota no encontrada"}))
+        self.assertEqual(r_dueno.status_code, 200)
+        self.assertEqual(r_dueno.get_json()["name"], "Privada")
 
     def test_seed_no_duplica_al_repetirse(self):
         self._cargar_seed()

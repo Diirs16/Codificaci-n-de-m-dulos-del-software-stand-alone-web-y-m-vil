@@ -362,12 +362,26 @@ _SQL_MASCOTAS_ADOPCION = """
     FROM mascotas WHERE estado = 'en_adopcion' ORDER BY id_mascota
 """
 
-_SQL_MASCOTA_BY_ID = """
+# NC-002 (item 2.9): la ruta publica solo encuentra mascotas en adopcion. Las demas
+# (activas, perdidas, adoptadas...) son privadas de su dueno.
+_SQL_MASCOTA_ADOPCION_BY_ID = """
     SELECT id_mascota AS id, nombre AS name, especie AS species, raza AS breed,
            sexo AS gender, edad_aprox AS age, foto AS image,
            observaciones AS description, estado
-    FROM mascotas WHERE id_mascota = %s
+    FROM mascotas WHERE id_mascota = %s AND estado = 'en_adopcion'
 """
+
+# Mascota de un usuario: solo la encuentra su dueno (id_usuario del token)
+_SQL_MASCOTA_DEL_USUARIO = """
+    SELECT id_mascota AS id, nombre AS name, especie AS species, raza AS breed,
+           sexo AS gender, edad_aprox AS age, foto AS image,
+           observaciones AS description, estado, id_usuario
+    FROM mascotas WHERE id_mascota = %s AND id_usuario = %s
+"""
+
+# Mismo mensaje si no existe, si no esta en adopcion o si es de otro usuario:
+# asi la respuesta no revela que la mascota existe (NC-002)
+_MENSAJE_MASCOTA_NO_ENCONTRADA = "Mascota no encontrada"
 
 
 def _mascota_to_dict(row):
@@ -387,14 +401,41 @@ def get_mascotas_adopcion():
     return jsonify([_mascota_to_dict(r) for r in rows])
 
 
-@app.route("/api/mascotas/<int:id_mascota>", methods=["GET"])
-def get_mascota(id_mascota):
+def _consultar_mascota(sql, params):
+    """Devuelve la fila de la mascota (o None) con la consulta parametrizada dada."""
     cursor = _get_conn().cursor(dictionary=True)
-    cursor.execute(_SQL_MASCOTA_BY_ID, (id_mascota,))
+    cursor.execute(sql, params)
     row = cursor.fetchone()
     cursor.close()
-    if row is None:
-        return jsonify({"error": "Mascota no encontrada"}), 404
+    return row
+
+
+def _mascota_no_encontrada():
+    return jsonify({"error": _MENSAJE_MASCOTA_NO_ENCONTRADA}), 404
+
+
+@app.route("/api/mascotas/<int:id_mascota>", methods=["GET"])
+def get_mascota(id_mascota):
+    row = _consultar_mascota(_SQL_MASCOTA_ADOPCION_BY_ID, (id_mascota,))
+    # Doble barrera: el SQL ya filtra por estado y aqui se vuelve a revisar, por si
+    # alguien cambia la consulta. Cualquier otro estado responde como si no existiera.
+    if row is None or row.get("estado") != "en_adopcion":
+        return _mascota_no_encontrada()
+    return jsonify(_mascota_to_dict(row))
+
+
+# ---------------------------------------------------------------------------
+# Mascotas del usuario  (privado - solo el dueno)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/usuarios/me/mascotas/<int:id_mascota>", methods=["GET"])
+@require_auth
+def get_mi_mascota(id_mascota):
+    row = _consultar_mascota(_SQL_MASCOTA_DEL_USUARIO, (id_mascota, request.current_user_id))
+    # Doble barrera: el SQL filtra por dueno y aqui se compara otra vez. Una mascota
+    # ajena responde 404, igual que una inexistente (no 403: no se revela que existe).
+    if row is None or row.pop("id_usuario", None) != request.current_user_id:
+        return _mascota_no_encontrada()
     return jsonify(_mascota_to_dict(row))
 
 

@@ -44,7 +44,7 @@ Dentro de cada fase van primero los arreglos más rápidos.
 | [x] | 2.6 | A-04, A-05 | NC-006 | Flask-Limiter (versión fijada) en `login`, `login/verify`, `register`, `verify`, `utils/validar-correo` (ej. 5/min por IP) | 🟡 | La 6.ª petición en un minuto → 429 — *Hecho el 04/11/2026: Flask-Limiter 4.1.1 + `limits` 5.8.0, 5/min por IP; `tests/test_limite.py` (falla con el código viejo, pasa con el nuevo). NC-006 cerrada* |
 | [ ] | 2.7 | A-09 | — | No sobrescribir un registro pendiente vigente — **⏸ Por actualizar** (ver [sección](#por-actualizar)): se hace junto con el botón web “Reenviar código” | 🟢 | Segundo `/register` con el mismo correo → no cambia el hash pendiente |
 | [x] | 2.8 | A-10 | — | Imprimir el OTP solo si `APP_ENV=desarrollo`; nunca el correo en logs de producción | 🟢 | Con `APP_ENV` distinto, la salida no contiene el código — *Hecho el 04/11/2026: `api.py` (`_es_desarrollo`, `_avisar_fallo_envio`; fuera de desarrollo, 503 y se descarta el código) + `.env.example`; `tests/test_logs.py` (falla con el código viejo, pasa con el nuevo)* |
-| [ ] | 2.9 | A-07 | NC-002 | `/api/mascotas/<id>` solo devuelve `en_adopcion` (404 si no); ruta privada con `@require_auth` + dueño | 🟡 | Sin token y mascota no en adopción → 404 |
+| [x] | 2.9 | A-07 | NC-002 | `/api/mascotas/<id>` solo devuelve `en_adopcion` (404 si no); ruta privada con `@require_auth` + dueño | 🟡 | Sin token y mascota no en adopción → 404 — *Hecho el 05/11/2026: `api.py` (filtro en SQL + revisión en Python; ruta privada `GET /api/usuarios/me/mascotas/<id>`, ajena → mismo 404); `tests/test_mascotas.py` (falla con el código viejo, pasa con el nuevo) + `test_esquema.py` con MariaDB temporal. NC-002 cerrada* |
 
 > Al cerrar 2.2 + 2.3 se cierra **NC-007** · 2.5 + 2.6 cierran **NC-006** · 2.9 cierra **NC-002**.
 
@@ -129,6 +129,7 @@ más difícil (tiene que hacerlo en el par de minutos entre el registro y la ver
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5 y 4.6 | 🟡 |
 | [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5.** No reemplaza 2.2 | 🟡 |
 | [ ] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` | 🟢 |
+| [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Hacerlo junto con 4.5 (pool y `try/finally`). Surgió en el 2.9 | 🟡 |
 
 ---
 
@@ -181,7 +182,7 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 04/11/2026, actualizada al cerrar el 2.8: estado conocido al día y contexto del 2.9 (NC-002). Salta
+*Versión del 05/11/2026, actualizada al cerrar el 2.9: estado conocido al día y contexto del 3.1 (NC-005). Salta
 los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem.*
 
 ```text
@@ -193,14 +194,32 @@ Lee primero:
 - Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle del A-xx)
 - Documentacion/GA9-220501096-AA1-EV02-PetConnect.md (bitácora de NC)
 - git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
-  git status -sb si hay commits sin push; al 04/11/2026 había 15 sin push)
+  git status -sb si hay commits sin push; al 05/11/2026 había 16 sin push)
 
-Estado conocido (4/11/2026; si el git log muestra más ítems hechos, manda el git log):
-- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.8 (ver git log).
+Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- Hechos: 0.1, 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.8, 2.9 (ver git log).
+  La fase 2 quedó completa salvo el 2.7. Sigue la fase 3.
 - En pausa: 2.7 (A-09), en la sección "Por actualizar" de PRIORIDADES. Se hará
   junto con un botón web "Reenviar código"; no lo tomes salvo que te lo pida.
-- Pruebas: 77 (67 OK + 10 omitidas que necesitan MariaDB).
-- NC-007 solo espera decrypt() (4.8). NC-006 cerrada el 04/11/2026.
+- Pruebas: 89 (78 OK + 11 omitidas que necesitan MariaDB).
+- NC-007 solo espera decrypt() (4.8). NC-006 cerrada el 04/11/2026. NC-002
+  cerrada el 05/11/2026.
+- Mascotas (2.9): GET /api/mascotas/<id> pública solo devuelve en_adopcion (SQL
+  + revisión en Python); si no, 404 "Mascota no encontrada". Ruta privada
+  GET /api/usuarios/me/mascotas/<id> con @require_auth (ajena → mismo 404). En
+  api.py: _consultar_mascota(sql, params) y _mascota_no_encontrada(). El SQL de
+  productos y mascotas sigue en api.py: moverlo a dao/ es el 4.15 (MascotaDAO
+  se traga los errores de la BD; hacerlo con el pool, 4.5).
+- tests/test_mascotas.py es el modelo para rutas con @require_auth: tokens con
+  api.generate_token(id, correo_inventado) dentro de la prueba (nunca impresos)
+  y una BD simulada cuyo cursor devuelve la fila que la prueba elige.
+- Pruebas con MariaDB (PETCONNECT_PRUEBA_BD=1) las corre el DUEÑO, porque usan
+  las credenciales del .env. El MySQL de XAMPP es el servicio de Windows "mysql"
+  (puerto 3310); si está apagado da error 2002 (10061) y se enciende con
+  Start-Service mysql en una PowerShell de administrador. Los comandos van desde
+  petconnect.Backend (..\.venv\Scripts\python solo funciona ahí). Para que el
+  resultado quepa en una captura, correr solo la clase:
+  tests.test_esquema.PruebasEsquemaEnBD. Respaldo: C:\Users\goku8\Respaldos\.
 - OTP (2.5): AlmacenOTP cuenta fallos (MAX_INTENTOS = 5); el 6.º intento borra el
   código y devuelve "bloqueado"; las rutas de verificación responden 429
   "Demasiados intentos fallidos...". Compara con hmac.compare_digest sobre bytes.
@@ -238,38 +257,43 @@ Estado conocido (4/11/2026; si el git log muestra más ítems hechos, manda el g
 - La web (src/services/api.js:20) y el móvil (src/services/api.js:34) muestran
   data.error con cualquier respuesta que no sea ok.
 
-Contexto del próximo ítem (2.9, A-07, NC-002):
-- api.py, GET /api/mascotas/<int:id_mascota> (~línea 390, get_mascota): no tiene
-  @require_auth y _SQL_MASCOTA_BY_ID (~365) filtra solo por id, sin estado.
-  Cambiando el número en la URL se obtiene cualquier mascota registrada, con sus
-  observaciones (salen como "description"). GET /api/mascotas/adopcion (~381) sí
-  filtra estado = 'en_adopcion'.
-- sql/schema.sql: mascotas.id_usuario NOT NULL (FK a usuarios, el dueño);
-  estado enum('activa','en_adopcion','perdida','adoptada','fallecida'), por
-  defecto 'activa'.
-- Meta: la ruta pública solo devuelve mascotas en_adopcion; si no existe o no
-  está en adopción, el MISMO 404 "Mascota no encontrada" (no revelar que existe;
-  lo pide la bitácora GA9, fila NC-002). Mascotas privadas por una ruta con
-  @require_auth que compare id_usuario con request.current_user_id.
-- Quién la usa: web src/services/api.js:66 (getMascota, en PetDetail) y móvil
-  src/services/api.js:51; los dos solo abren mascotas de adopción, así que
-  deberían seguir funcionando sin tocarlos (comprobarlo).
-- Decidir (con pros/contras): (a) si la ruta privada se crea ya (hoy nadie la
-  consume; el carné de vacunas la reutilizará) o solo se corrige la pública;
-  si se crea, su nombre (ej. /api/usuarios/me/mascotas/<id>); (b) mascota
-  ajena con token: 404 (no revela, lo que pide GA9) o 403; (c) el SQL de
-  mascotas está en api.py y petconnect.Backend/CLAUDE.md dice "SQL solo en
-  dao/" (existe dao/mascota_dao.py): moverlo en este ítem o dejarlo para otro.
-- Prueba (archivo nuevo, ej. tests/test_mascotas.py): con BD simulada, una
-  mascota que no está en adopción → 404 sin token, sin datos en la respuesta y
-  con el mismo mensaje que una inexistente; una en adopción → 200. Un mock de
-  cursor no prueba el filtro del SQL: o la ruta también revisa el estado en
-  Python, o se agrega una prueba con MariaDB temporal (PETCONNECT_PRUEBA_BD=1,
-  modelo tests/test_esquema.py). Si hay ruta privada: sin token → 401, token
-  de otro usuario → 404, token del dueño → 200.
-- Con este ítem se cierra NC-002: en GA9 la fila NC-002 (~línea 704) pasa a
-  "Cerrada el dd/mm/2026" con la evidencia; revisar también CP-012 y la
-  "Ejecución 2" (~661), que es del endpoint de vacunas que todavía no existe.
+Contexto del próximo ítem (3.1, A-20, NC-005): es GRANDE (API, BD, web y móvil),
+así que va con plan y por partes (regla 3 de CLAUDE.md).
+- Qué está mal: api.py, POST /api/auth/verify (~línea 615) crea el Usuario con
+  acepta_datos=True fijo; modelo/usuario.py:10 también trae acepta_datos=True por
+  defecto; sql/schema.sql: usuarios.acepta_datos tinyint(1) DEFAULT 1, sin
+  columnas de fecha ni de versión de la política. seed.py:128 inserta
+  acepta_datos. Nadie le pregunta al titular (Ley 1581, art. 9).
+- Flujo actual: /register (~545) valida nombre, correo y contraseña y guarda un
+  pendiente con _otp_registro.crear(email, {...}); /verify lo lee y crea el
+  usuario. La autorización tendría que viajar en /register, guardarse en el
+  pendiente y escribirse al crear el usuario (con fecha y versión).
+- Web: src/components/RegisterModal.jsx (estado del formulario ~línea 27) y
+  src/services/api.js:32 registerUser(name, email, password). Móvil:
+  src/screens/RegisterScreen.js y src/services/api.js:61. Ni la web ni el móvil
+  tienen casilla ni una página de política de tratamiento de datos.
+- GA9: fila NC-005 (~708, acción: casilla no premarcada con enlace a la
+  política, persistir fecha y versión, rechazar el registro sin autorización),
+  H-08 (~167) y CP-001 (~672, "Fallido por inspección (NC-005)").
+- Decidir (con pros/contras): (a) partes: propongo (1) backend + BD, (2) web,
+  (3) móvil; NC-005 se cierra al terminar las tres; (b) columnas nuevas (ej.
+  fecha_autorizacion DATETIME y version_politica VARCHAR) y acepta_datos sin
+  DEFAULT 1: cambia schema.sql y necesita migración en sql/migraciones/ (modelo
+  el 1.2) que corre el DUEÑO con respaldo previo, y prueba en test_esquema.py;
+  (c) qué manda el cliente: solo acepta_datos (booleano estricto: true, no
+  "true" ni 1) y la versión la fija el servidor en una constante, o también la
+  versión; (d) qué pasa con los usuarios que ya existen (acepta_datos=1 sin
+  fecha); (e) el texto de la política es contenido legal: Claude puede hacer un
+  borrador, pero lo valida el dueño o el instructor antes de publicarlo
+  (/revision-contenido-mascotas para la parte de datos personales).
+- No mezclar: la consola (vista/menu_usuarios.py) también crea usuarios sin
+  autorización, pero eso es el 4.11. /register todavía pisa el pendiente (2.7,
+  en pausa): no cambiarlo aquí.
+- Prueba (parte 1, ej. tests/test_registro_datos.py, modelo tests/test_logs.py
+  con UsuarioDAO falso y sin correos ni DNS): /register sin acepta_datos, con
+  false, con "true" o con 1 → 400 y no se envía correo ni se crea pendiente; con
+  true → /verify crea el usuario con acepta_datos=True, fecha y versión.
+  Contraprueba con git stash del api.py.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -306,5 +330,5 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 2.9** (A-07, NC-002; el 2.7 sigue ⏸ por actualizar: se retoma junto con el botón web “Reenviar
-código”; ver [Por actualizar](#por-actualizar))
+**Próximo ítem: 3.1** (A-20, NC-005; grande: plan primero y por partes, backend → web → móvil. El 2.7 sigue ⏸ por
+actualizar: se retoma junto con el botón web “Reenviar código”; ver [Por actualizar](#por-actualizar))
