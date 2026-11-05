@@ -134,7 +134,8 @@ class PruebasRegistroYReenvio(_ConReloj):
 
     def _registrar(self, nombre=NOMBRE_PRIMERO, clave=CLAVE_PRIMERA, correo=CORREO):
         return self.cliente.post("/api/auth/register",
-                                 json={"name": nombre, "email": correo, "password": clave})
+                                 json={"name": nombre, "email": correo, "password": clave,
+                                       "acepta_datos": True})   # NC-005 (item 3.1)
 
     def _reenviar(self, correo=CORREO):
         return self.cliente.post(RESEND, json={"email": correo})

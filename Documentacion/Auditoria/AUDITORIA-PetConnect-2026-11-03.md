@@ -363,6 +363,26 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - `api.py:409` crea el usuario con `acepta_datos=True` fijo; `modelo/usuario.py:10` también lo trae en `True` por
   defecto. Ni la web ni el móvil tienen casilla.
 - **Arreglo:** casilla **sin marcar** con enlace a la política; la API rechaza el registro sin ella; guardar fecha y versión.
+- **Estado: en corrección desde el 05/11/2026 (ítem 3.1 de PRIORIDADES, parte 1 de 3: API + BD; faltan web y móvil).**
+  Borrador de la política v1.0: [POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md](../Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md)
+  (texto para publicar, textos de la casilla y del aviso, especificación y decisiones pendientes: responsable, correo
+  de contacto, alojamiento y mayoría de edad). Lo deben validar el dueño y el instructor antes de publicarlo.
+  `api.py`: `/register` exige `"acepta_datos": true` (solo el booleano JSON) antes del DNS, la BD y el correo; si no,
+  400 “Debes autorizar el tratamiento de tus datos personales para registrarte” sin código ni pendiente. La versión la
+  fija el servidor (`VERSION_POLITICA_DATOS = "1.0"`); la fecha (la de `/register`) y la versión viajan en el pendiente
+  y `/verify` las escribe; un pendiente sin ellas no se vuelve cuenta (doble barrera). Como `/register` no toca un
+  pendiente vigente (2.7), la validación va antes de esa revisión. `modelo/usuario.py`: `acepta_datos=False` por
+  defecto. `dao/usuario_dao.py`: el `INSERT` guarda la prueba. `sql/schema.sql`: `acepta_datos NOT NULL DEFAULT 0`,
+  `fecha_autorizacion_datos`, `version_politica_datos` y regla `chk_autorizacion_datos`. Migración
+  `sql/migraciones/2026-11-05_autorizacion_datos.sql` (aplicada por el dueño con respaldo previo: los 10 usuarios de
+  la BD de desarrollo quedaron en `acepta_datos = 0` sin fecha; no se inventó ninguna autorización).
+  Decisiones del dueño: tres partes (API + BD, web, móvil), el cliente manda solo el booleano, los usuarios existentes
+  quedan en 0 y pedirles la autorización queda para después (contingencia del R05 del plan GA9). Prueba de regresión:
+  `tests/test_registro_datos.py` (7) y `tests/test_esquema.py` (7 sin BD, 4 con MariaDB). Contraprueba: con el `api.py`
+  anterior fallan 5 de 7 (9 casos); con el modelo y el DAO anteriores, 3 de 7; con el `schema.sql` anterior, 4 (6 casos);
+  pasan a propósito las que dependen de otro archivo y las 3 que solo leen la migración. Con MariaDB temporal: 10 de 10
+  OK. Suite: 125 pruebas, 110 OK y 15 omitidas que requieren MariaDB. Hasta la parte 2, el formulario web viejo recibe
+  ese 400 (no manda la casilla).
 
 #### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
 - **Solicitud de adopción** (`PetDetail.jsx:56-60`) y **Contacto** (`Contact.jsx:15-17`) piden nombre, correo, teléfono y

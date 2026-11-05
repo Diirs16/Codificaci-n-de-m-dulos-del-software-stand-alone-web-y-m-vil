@@ -12,10 +12,14 @@ from modelo.usuario import Usuario
 class UsuarioDAO:
     """Acceso a datos para la tabla usuarios."""
 
+    # NC-005 (item 3.1): la fecha y la version de la politica aceptada son la prueba
+    # de la autorizacion. Solo se escriben al crear el usuario (los SELECT no las leen
+    # porque hoy nadie las usa).
     _INSERTAR = """
         INSERT INTO usuarios (nombres, apellidos, correo, telefono,
-                            password_hash, foto_perfil, estado, verificado, acepta_datos)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            password_hash, foto_perfil, estado, verificado, acepta_datos,
+                            fecha_autorizacion_datos, version_politica_datos)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     _CONSULTAR_TODOS = """
@@ -92,7 +96,8 @@ class UsuarioDAO:
             valores = (
                 usuario.nombres, usuario.apellidos, usuario.correo,
                 usuario.telefono, usuario.password_hash, usuario.foto_perfil,
-                usuario.estado, usuario.verificado, usuario.acepta_datos
+                usuario.estado, usuario.verificado, usuario.acepta_datos,
+                usuario.fecha_autorizacion_datos, usuario.version_politica_datos
             )
             cursor.execute(self._INSERTAR, valores)
             self._conexion_bd.commit()

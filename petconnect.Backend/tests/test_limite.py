@@ -84,7 +84,8 @@ class PruebasLimiteDePeticiones(unittest.TestCase):
 
     def test_el_correo_que_se_envia_queda_limitado(self):
         # A-05: no se pueden pedir codigos (correos) sin fin a la misma direccion
-        cuerpo = {"name": "Laura Gomez", "email": CORREO_PRUEBA, "password": "Firulais2026!"}
+        cuerpo = {"name": "Laura Gomez", "email": CORREO_PRUEBA, "password": "Firulais2026!",
+                  "acepta_datos": True}   # NC-005 (item 3.1)
         codigos = [self.cliente.post("/api/auth/register", json=cuerpo,
                                      environ_base={"REMOTE_ADDR": IP_ATACANTE}).status_code
                    for _ in range(LIMITE + 3)]

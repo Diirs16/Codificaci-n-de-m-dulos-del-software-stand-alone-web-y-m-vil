@@ -55,6 +55,13 @@ limiter = Limiter(
     headers_enabled=True,   # cabecera Retry-After: cuantos segundos esperar
 )
 
+# NC-005 / A-20 (item 3.1): version de la politica de tratamiento de datos personales
+# que acepta quien se registra (Ley 1581 de 2012, art. 9). La fija el servidor, no
+# el cliente. Texto: Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md.
+# Si el texto cambia, se sube esta version (Decreto 1377 de 2013, art. 13).
+VERSION_POLITICA_DATOS = "1.0"
+_MENSAJE_SIN_AUTORIZACION = "Debes autorizar el tratamiento de tus datos personales para registrarte"
+
 _conexion_bd = ConexionBD()
 _otp_registro = AlmacenOTP()
 _otp_login = AlmacenOTP()
@@ -552,6 +559,12 @@ def register():
     if not name or not email or not password:
         return jsonify({"error": "Nombre, correo y contrasena son requeridos"}), 400
 
+    # NC-005 (item 3.1): autorizacion previa y expresa (Ley 1581, art. 9). Solo vale
+    # el booleano JSON true: "true", 1, "si", null o la ausencia del campo no son
+    # una conducta inequivoca. Va antes del DNS, de la BD y del correo.
+    if data.get("acepta_datos") is not True:
+        return jsonify({"error": _MENSAJE_SIN_AUTORIZACION}), 400
+
     # Antes del DNS y de la BD: el nombre viaja en el correo que se envia (A-05)
     error_nombre = _validar_nombre(name)
     if error_nombre:
@@ -578,9 +591,13 @@ def register():
     if _otp_registro.vigente(email) is not None:
         return jsonify({"message": "Codigo enviado", "email": email})
 
+    # Prueba de la autorizacion (Decreto 1377, art. 8): la hora en que la persona la
+    # dio y la version que acepto. /verify las escribe al crear el usuario.
     code = _otp_registro.crear(email, {
         "name":          name,
         "password_hash": hash_password(password),
+        "fecha_autorizacion_datos": datetime.now().replace(microsecond=0),
+        "version_politica_datos":   VERSION_POLITICA_DATOS,
     })
 
     try:
@@ -651,6 +668,14 @@ def verify():
     if error == "incorrecto":
         return jsonify({"error": "Codigo incorrecto"}), 400
 
+    # NC-005 (item 3.1), doble barrera: sin la prueba de la autorizacion guardada en
+    # /register no se crea la cuenta (nunca un acepta_datos=True sin fecha ni version)
+    fecha_autorizacion = pending.get("fecha_autorizacion_datos")
+    version_politica = pending.get("version_politica_datos")
+    if fecha_autorizacion is None or not version_politica:
+        _otp_registro.descartar(email)
+        return jsonify({"error": _MENSAJE_SIN_AUTORIZACION}), 400
+
     parts    = pending["name"].split(" ", 1)
     nombres  = parts[0]
     apellidos = parts[1] if len(parts) > 1 else ""
@@ -665,6 +690,8 @@ def verify():
         estado="activo",
         verificado=True,
         acepta_datos=True,
+        fecha_autorizacion_datos=fecha_autorizacion,
+        version_politica_datos=version_politica,
     )
 
     _get_conn()

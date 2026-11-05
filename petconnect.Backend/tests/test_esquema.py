@@ -11,12 +11,17 @@ y modo estricto) y NC-010 (fechas de vacunas).
 - PruebasMigracionEnBD: tambien con PETCONNECT_PRUEBA_BD=1. Crean la tabla vieja
   en "petconnect_prueba_migracion", reproducen el estado vacio y aplican la
   migracion de PRIORIDADES 1.2. Al final borran esa base.
+- NC-005 (item 3.1): PruebasEsquemaSinBD y PruebasMigracionDatosSinBD revisan que
+  acepta_datos no valga 1 por defecto y la regla chk_autorizacion_datos.
+  PruebasMigracionDatosEnBD (PETCONNECT_PRUEBA_BD=1) aplica la migracion del
+  05/11/2026 a una tabla vieja en "petconnect_prueba_autorizacion" y la borra al final.
   Ninguna toca la base "petconnect".
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -v
 """
 import contextlib
+import datetime
 import glob
 import io
 import os
@@ -29,8 +34,10 @@ sys.path.insert(0, RAIZ)
 
 RUTA_ESQUEMA = os.path.join(RAIZ, "sql", "schema.sql")
 RUTA_MIGRACION = os.path.join(RAIZ, "sql", "migraciones", "2026-11-03_estado_en_adopcion.sql")
+RUTA_MIGRACION_DATOS = os.path.join(RAIZ, "sql", "migraciones", "2026-11-05_autorizacion_datos.sql")
 BD_PRUEBA = "petconnect_prueba"
 BD_PRUEBA_MIGRACION = "petconnect_prueba_migracion"
+BD_PRUEBA_AUTORIZACION = "petconnect_prueba_autorizacion"
 
 
 def _leer(ruta):
@@ -93,6 +100,22 @@ class PruebasEsquemaSinBD(unittest.TestCase):
             usadas |= set(re.findall(r"(?<!KEY )\b(?:FROM|INTO|UPDATE|JOIN)\s+`?(\w+)", _leer(ruta)))
         faltantes = usadas - _tablas_del_esquema(self.sql)
         self.assertEqual(faltantes, set(), f"Tablas usadas en el codigo y ausentes en schema.sql: {faltantes}")
+
+    def test_usuarios_no_autorizan_datos_por_defecto(self):
+        """NC-005: antes acepta_datos valia 1 por defecto (autorizacion que nadie dio)."""
+        bloque = _bloque_tabla(self.sql, "usuarios")
+        self.assertIn("`acepta_datos` tinyint(1) NOT NULL DEFAULT 0", bloque)
+        self.assertNotRegex(bloque, r"`acepta_datos`[^,]*DEFAULT 1")
+        self.assertIn("`fecha_autorizacion_datos` datetime DEFAULT NULL", bloque)
+        self.assertIn("`version_politica_datos` varchar(20) DEFAULT NULL", bloque)
+
+    def test_autorizacion_exige_fecha_y_version(self):
+        """NC-005: regla chk_autorizacion_datos (prueba de la autorizacion)."""
+        self.assertEqual(
+            _regla_autorizacion(_bloque_tabla(self.sql, "usuarios")),
+            "(`acepta_datos` = 0 OR (`fecha_autorizacion_datos` IS NOT NULL "
+            "AND `version_politica_datos` IS NOT NULL))",
+        )
 
     def test_tiene_las_32_tablas(self):
         self.assertEqual(len(_tablas_del_esquema(self.sql)), 32)
@@ -274,6 +297,54 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         self.assertEqual(self._contar("SELECT COUNT(*) FROM aplicaciones_vacuna"), 2)
         cursor.close()
 
+    def test_autorizacion_de_datos_solo_con_fecha_y_version(self):
+        """NC-005 (item 3.1) con la base real: regla chk_autorizacion_datos y UsuarioDAO."""
+        from dao.usuario_dao import UsuarioDAO
+        from modelo.usuario import Usuario
+
+        # Correos inventados (Ley 1581)
+        correos = ["sin.fecha@ejemplo.test", "sin.version@ejemplo.test",
+                   "por.defecto@ejemplo.test", "con.prueba@ejemplo.test", "consola@ejemplo.test"]
+
+        def borrar():
+            c = self.conn.cursor()
+            c.execute("DELETE FROM usuarios WHERE correo IN (%s, %s, %s, %s, %s)", tuple(correos))
+            self.conn.commit()
+            c.close()
+        self.addCleanup(borrar)
+
+        cursor = self.conn.cursor()
+        sql = ("INSERT INTO usuarios (nombres, correo, password_hash, acepta_datos, "
+               "fecha_autorizacion_datos, version_politica_datos) VALUES (%s, %s, %s, %s, %s, %s)")
+        for correo, fecha, version in ((correos[0], None, "1.0"),
+                                       (correos[1], "2026-11-05 10:00:00", None)):
+            with self.subTest(correo=correo), self.assertRaises(self.Error):
+                cursor.execute(sql, ("Prueba", correo, "hash-falso", 1, fecha, version))
+
+        cursor.execute("INSERT INTO usuarios (nombres, correo, password_hash) VALUES (%s, %s, %s)",
+                       ("Prueba", correos[2], "hash-falso"))
+        self.conn.commit()
+
+        # La API crea el usuario con la prueba; la consola, con el valor por defecto
+        fecha = datetime.datetime(2026, 11, 5, 10, 30, 0)
+        dao = UsuarioDAO()
+        self.assertTrue(dao.insertar(Usuario(
+            nombres="Prueba", correo=correos[3], password_hash="hash-falso", verificado=True,
+            acepta_datos=True, fecha_autorizacion_datos=fecha, version_politica_datos="1.0")))
+        self.assertTrue(dao.insertar(Usuario(nombres="Prueba", correo=correos[4],
+                                             password_hash="hash-falso")))
+
+        cursor.execute(
+            "SELECT correo, acepta_datos, fecha_autorizacion_datos, version_politica_datos "
+            "FROM usuarios WHERE correo IN (%s, %s, %s) ORDER BY correo",
+            (correos[2], correos[3], correos[4]),
+        )
+        filas = {f[0]: f[1:] for f in cursor.fetchall()}
+        cursor.close()
+        self.assertEqual(filas[correos[2]], (0, None, None))
+        self.assertEqual(filas[correos[3]], (1, fecha, "1.0"))
+        self.assertEqual(filas[correos[4]], (0, None, None))
+
 
 def _lista_estados(sql):
     """Devuelve la ultima lista enum de `estado` que aparece en el texto."""
@@ -282,6 +353,19 @@ def _lista_estados(sql):
 
 def _regla_fechas(sql):
     return re.search(r"`chk_aplicacion_fechas` CHECK (\(.*\))", sql).group(1)
+
+
+def _regla_autorizacion(sql):
+    encontrada = re.search(r"`chk_autorizacion_datos` CHECK (\(.*\))", sql)
+    return encontrada.group(1) if encontrada else None
+
+
+def _columna(sql, nombre):
+    """Tipo y opciones de una columna (ej. 'datetime DEFAULT NULL'), sin el AFTER.
+    Exige un tipo para no confundirla con un SET o una regla CHECK."""
+    encontrada = re.search(
+        r"`%s` ((?:tinyint|datetime|varchar)[^,;\n]*?)(?: AFTER `\w+`)?\s*(?:,|;|\n|$)" % nombre, sql)
+    return encontrada.group(1).strip() if encontrada else None
 
 
 class PruebasMigracionSinBD(unittest.TestCase):
@@ -426,6 +510,150 @@ class PruebasMigracionEnBD(unittest.TestCase):
         )
         with self.assertRaises(self.Error):
             self._migrar()
+
+
+class PruebasMigracionDatosSinBD(unittest.TestCase):
+    """NC-005 (item 3.1): la migracion del 05/11/2026 sigue igual a schema.sql."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sql = _leer(RUTA_MIGRACION_DATOS)
+        cls.usuarios = _bloque_tabla(_leer(RUTA_ESQUEMA), "usuarios")
+        cls.sentencias = _sentencias(cls.sql)
+
+    def test_usa_la_misma_regla_que_el_esquema(self):
+        self.assertIsNotNone(_regla_autorizacion(self.sql))
+        self.assertEqual(_regla_autorizacion(self.sql), _regla_autorizacion(self.usuarios))
+
+    def test_usa_las_mismas_columnas_que_el_esquema(self):
+        for columna in ("acepta_datos", "fecha_autorizacion_datos", "version_politica_datos"):
+            with self.subTest(columna=columna):
+                self.assertIsNotNone(_columna(self.sql, columna))
+                self.assertEqual(_columna(self.sql, columna), _columna(self.usuarios, columna))
+
+    def test_nunca_apaga_el_modo_estricto(self):
+        self.assertTrue(self.sentencias[0].startswith("SET SESSION sql_mode"))
+        for modo in (s for s in self.sentencias if "sql_mode" in s):
+            self.assertIn("STRICT_TRANS_TABLES", modo)
+
+    def test_quita_las_autorizaciones_sin_prueba_antes_de_la_regla(self):
+        """Si la regla fuera antes, los usuarios viejos (1 sin fecha) la harian fallar."""
+        def posicion(patron):
+            return next(i for i, s in enumerate(self.sentencias) if re.search(patron, s))
+
+        columnas = posicion(r"ADD COLUMN IF NOT EXISTS `fecha_autorizacion_datos`")
+        correccion = posicion(r"UPDATE `usuarios` SET `acepta_datos` = 0")
+        sin_nulos = posicion(r"MODIFY `acepta_datos` tinyint\(1\) NOT NULL DEFAULT 0")
+        regla = posicion(r"ADD CONSTRAINT `chk_autorizacion_datos`")
+        self.assertLess(columnas, correccion)
+        self.assertLess(correccion, sin_nulos)
+        self.assertLess(sin_nulos, regla)
+
+    def test_no_inventa_fechas_de_autorizacion(self):
+        """Ley 1581: no se puede fabricar la prueba de una autorizacion que nadie dio."""
+        for sentencia in self.sentencias:
+            self.assertNotRegex(sentencia, r"SET[^;]*`(fecha_autorizacion_datos|version_politica_datos)`\s*=")
+
+
+@unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",
+                     "Prueba con MariaDB real: activar con PETCONNECT_PRUEBA_BD=1")
+class PruebasMigracionDatosEnBD(unittest.TestCase):
+    """NC-005 (item 3.1): los usuarios viejos quedan sin autorizacion y la regla se aplica."""
+
+    @classmethod
+    def setUpClass(cls):
+        import mysql.connector
+        from config.db_config import DB_CONFIG
+
+        cls.Error = mysql.connector.Error
+        servidor = {k: v for k, v in DB_CONFIG.items() if k not in ("database", "sql_mode")}
+        try:
+            cls.conn = mysql.connector.connect(**servidor)
+        except mysql.connector.Error:
+            raise unittest.SkipTest("No hay conexion con MariaDB")
+        cls.conn.autocommit = True
+
+        cursor = cls.conn.cursor()
+        # Nombre constante del archivo: los identificadores no van como parametro.
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_AUTORIZACION}`")
+        cursor.execute(f"CREATE DATABASE `{BD_PRUEBA_AUTORIZACION}` "
+                       "CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci")
+        cls.addClassCleanup(cls._borrar_bd_prueba)
+        cursor.execute(f"USE `{BD_PRUEBA_AUTORIZACION}`")
+        cursor.close()
+
+    @classmethod
+    def _borrar_bd_prueba(cls):
+        cursor = cls.conn.cursor()
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_AUTORIZACION}`")
+        cursor.close()
+        cls.conn.close()
+
+    def setUp(self):
+        self.cursor = self.conn.cursor()
+        # Tabla como la de antes del 05/11/2026 (acepta_datos con DEFAULT 1)
+        self.cursor.execute("DROP TABLE IF EXISTS usuarios")
+        self.cursor.execute(
+            "CREATE TABLE usuarios (id_usuario int AUTO_INCREMENT PRIMARY KEY, "
+            "correo varchar(120) NOT NULL, acepta_datos tinyint(1) DEFAULT 1) ENGINE=InnoDB"
+        )
+
+    def tearDown(self):
+        self.cursor.close()
+
+    def _insertar_viejo(self, correo, acepta_datos=None):
+        if acepta_datos is None:
+            self.cursor.execute("INSERT INTO usuarios (correo) VALUES (%s)", (correo,))
+        else:
+            self.cursor.execute("INSERT INTO usuarios (correo, acepta_datos) VALUES (%s, %s)",
+                                (correo, acepta_datos))
+
+    def _usuarios(self):
+        self.cursor.execute("SELECT correo, acepta_datos, fecha_autorizacion_datos, "
+                            "version_politica_datos FROM usuarios")
+        return {f[0]: f[1:] for f in self.cursor.fetchall()}
+
+    def _migrar(self):
+        for sentencia in _sentencias(_leer(RUTA_MIGRACION_DATOS)):
+            self.cursor.execute(sentencia)
+
+    def test_los_usuarios_viejos_quedan_sin_autorizacion(self):
+        self._insertar_viejo("por.defecto@ejemplo.test")          # DEFAULT 1 viejo
+        self._insertar_viejo("con.uno@ejemplo.test", 1)
+        self._insertar_viejo("con.cero@ejemplo.test", 0)
+        self.cursor.execute("INSERT INTO usuarios (correo, acepta_datos) VALUES (%s, NULL)",
+                            ("con.nulo@ejemplo.test",))
+
+        self._migrar()
+
+        self.assertEqual(self._usuarios(), {
+            "por.defecto@ejemplo.test": (0, None, None),
+            "con.uno@ejemplo.test": (0, None, None),
+            "con.cero@ejemplo.test": (0, None, None),
+            "con.nulo@ejemplo.test": (0, None, None),
+        })
+
+    def test_se_puede_ejecutar_dos_veces_sin_quitar_autorizaciones_reales(self):
+        self._insertar_viejo("viejo@ejemplo.test", 1)
+        self._migrar()
+        fecha = datetime.datetime(2026, 11, 5, 10, 30, 0)
+        self.cursor.execute(
+            "INSERT INTO usuarios (correo, acepta_datos, fecha_autorizacion_datos, version_politica_datos) "
+            "VALUES (%s, %s, %s, %s)", ("nuevo@ejemplo.test", 1, fecha, "1.0"))
+
+        self._migrar()
+
+        self.assertEqual(self._usuarios(), {
+            "viejo@ejemplo.test": (0, None, None),
+            "nuevo@ejemplo.test": (1, fecha, "1.0"),
+        })
+
+    def test_despues_de_migrar_un_si_sin_fecha_da_error(self):
+        self._migrar()
+        with self.assertRaises(self.Error):
+            self._insertar_viejo("sin.fecha@ejemplo.test", 1)
+        self._insertar_viejo("por.defecto@ejemplo.test")
+        self.assertEqual(self._usuarios(), {"por.defecto@ejemplo.test": (0, None, None)})
 
 
 if __name__ == "__main__":

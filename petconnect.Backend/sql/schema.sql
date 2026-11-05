@@ -25,6 +25,10 @@ SET NAMES utf8mb4;
 -- Usuarios y roles
 -- ----------------------------------------------------------------
 
+-- NC-005 (item 3.1, 05/11/2026): nadie autoriza el tratamiento de sus
+-- datos por defecto (Ley 1581 art. 9). acepta_datos = 1 exige la fecha
+-- y la version de la politica aceptada (regla chk_autorizacion_datos).
+
 CREATE TABLE IF NOT EXISTS `roles` (
   `id_rol` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(50) NOT NULL,
@@ -43,11 +47,14 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
   `foto_perfil` varchar(255) DEFAULT NULL,
   `estado` enum('activo','inactivo','bloqueado') DEFAULT 'activo',
   `verificado` tinyint(1) DEFAULT 0,
-  `acepta_datos` tinyint(1) DEFAULT 1,
+  `acepta_datos` tinyint(1) NOT NULL DEFAULT 0,
+  `fecha_autorizacion_datos` datetime DEFAULT NULL,
+  `version_politica_datos` varchar(20) DEFAULT NULL,
   `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp(),
   `fecha_actualizacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id_usuario`),
-  UNIQUE KEY `correo` (`correo`)
+  UNIQUE KEY `correo` (`correo`),
+  CONSTRAINT `chk_autorizacion_datos` CHECK (`acepta_datos` = 0 OR (`fecha_autorizacion_datos` IS NOT NULL AND `version_politica_datos` IS NOT NULL))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 CREATE TABLE IF NOT EXISTS `usuarios_roles` (

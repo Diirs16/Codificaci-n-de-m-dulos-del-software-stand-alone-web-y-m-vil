@@ -45,6 +45,8 @@ pasos no borra nada.
 - **`mascotas.estado`** acepta: `activa`, `en_adopcion`, `perdida`, `adoptada`, `fallecida`.
 - **`aplicaciones_vacuna`**: la regla `chk_aplicacion_fechas` exige que `fecha_proxima` sea posterior a
   `fecha_aplicacion` (NC-010).
+- **`usuarios`**: `acepta_datos` vale 0 por defecto y la regla `chk_autorizacion_datos` exige que un 1 tenga
+  `fecha_autorizacion_datos` y `version_politica_datos` (NC-005, Ley 1581).
 
 ## ¿Ya tenías la base creada antes del 03/11/2026?
 
@@ -82,6 +84,33 @@ La migración trabaja siempre en modo estricto y se puede ejecutar varias veces.
   **no se pierde** (la columna queda como texto mientras tanto). Cámbialo por uno válido y vuelve a ejecutar el paso 2.
 - **`CONSTRAINT chk_aplicacion_fechas failed`**: hay vacunas con la próxima dosis igual o anterior a la aplicación.
   Corrige esas fechas y vuelve a ejecutar el paso 2.
+
+## ¿Ya tenías la base creada antes del 05/11/2026? (autorización de datos, NC-005)
+
+Antes, `usuarios.acepta_datos` valía 1 por defecto y la API lo ponía en 1 fijo, sin preguntar (Ley 1581, art. 9).
+Ahora quien se registra marca una casilla y la base guarda **cuándo** autorizó y **qué versión** de la política
+aceptó. La migración `migraciones/2026-11-05_autorizacion_datos.sql`:
+
+- agrega `fecha_autorizacion_datos` y `version_politica_datos`;
+- deja en `acepta_datos = 0` a los usuarios que no tienen esa prueba, es decir, a todos los que se registraron antes.
+  Pueden seguir entrando, y no se les inventa una fecha;
+- cambia el valor por defecto a 0 y agrega la regla `chk_autorizacion_datos` (un 1 sin fecha ni versión da error).
+
+**Hazlo antes de arrancar la API nueva:** sin las columnas nuevas, crear una cuenta falla con 500. Desde la carpeta
+`petconnect.Backend`, con un respaldo nuevo como el del paso 1 de arriba (cambia la fecha del nombre del archivo):
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "source sql/migraciones/2026-11-05_autorizacion_datos.sql"
+```
+
+**Comprobar** (solo muestra conteos, no datos personales):
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SELECT acepta_datos, COUNT(*) AS total, COUNT(fecha_autorizacion_datos) AS con_fecha FROM usuarios GROUP BY acepta_datos"
+```
+
+Antes de la primera cuenta nueva, todas las filas deben estar en `acepta_datos = 0` con `con_fecha = 0`. La
+migración se puede ejecutar varias veces: quien autorizó después conserva su 1.
 
 ## Prueba automática
 

@@ -15,6 +15,7 @@ import io
 import os
 import sys
 import unittest
+from datetime import datetime
 from types import SimpleNamespace
 from unittest import mock
 
@@ -116,7 +117,8 @@ class PruebasLogsSinDatosPersonales(unittest.TestCase):
     def _registro(self, app_env):
         self.UsuarioDAO.return_value.consultar_por_correo.return_value = None   # correo libre
         return self._pedir("/api/auth/register",
-                           {"name": NOMBRE, "email": CORREO_PRUEBA, "password": CONTRASENA}, app_env)
+                           {"name": NOMBRE, "email": CORREO_PRUEBA, "password": CONTRASENA,
+                            "acepta_datos": True}, app_env)   # NC-005 (item 3.1)
 
     def _log_correcto(self, logs):
         self.assertIn("Fallo de envio", logs)
@@ -182,7 +184,10 @@ class PruebasLogsSinDatosPersonales(unittest.TestCase):
             with self.subTest(APP_ENV=valor):
                 self.api._otp_registro.descartar(CORREO_PRUEBA)
                 codigo = self.api._otp_registro.crear(
-                    CORREO_PRUEBA, {"name": NOMBRE, "password_hash": "hash-falso"})
+                    CORREO_PRUEBA, {"name": NOMBRE, "password_hash": "hash-falso",
+                                    # NC-005 (item 3.1): la prueba de la autorizacion
+                                    "fecha_autorizacion_datos": datetime(2026, 11, 5, 10, 0, 0),
+                                    "version_politica_datos": "1.0"})
                 r, salida, logs = self._pedir(
                     "/api/auth/verify", {"email": CORREO_PRUEBA, "code": codigo}, valor)
 

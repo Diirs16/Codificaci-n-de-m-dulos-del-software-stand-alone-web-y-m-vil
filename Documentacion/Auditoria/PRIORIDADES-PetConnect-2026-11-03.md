@@ -65,7 +65,7 @@ se borra de aquí y se marca `[x]` en su fase.
 
 | ✔ | # | ID | NC | Qué | Esfuerzo | Listo cuando |
 |---|---|---|---|---|---|---|
-| [ ] | 3.1 | A-20 | NC-005 | Casilla de autorización **sin marcar** + enlace a política en web y móvil; la API rechaza sin ella; guardar fecha y versión; quitar `acepta_datos=True` por defecto | 🟡 | Registro sin casilla → 400; con casilla → `acepta_datos=1` y fecha guardada |
+| [ ] | 3.1 | A-20 | NC-005 | Casilla de autorización **sin marcar** + enlace a política en web y móvil; la API rechaza sin ella; guardar fecha y versión; quitar `acepta_datos=True` por defecto | 🟡 | Registro sin casilla → 400; con casilla → `acepta_datos=1` y fecha guardada — *Parte 1 de 3 (API + BD) hecha el 05/11/2026: `api.py` (`VERSION_POLITICA_DATOS = "1.0"`, 400 sin `"acepta_datos": true`, fecha y versión en el pendiente y en el usuario), modelo y DAO, `schema.sql` + migración `2026-11-05_autorizacion_datos.sql` (aplicada por el dueño); `tests/test_registro_datos.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Borrador de la política en `Documentacion/Legal/`. Faltan la parte 2 (web) y la 3 (móvil); NC-005 se cierra con la 3* |
 | [ ] | 3.2 | A-21 | — | Formularios de adopción, contacto y checkout: implementar el envío **o** rotular “Demo — no se envía” y deshabilitar | 🟢 (rotular) / 🔴 (implementar) | Ningún formulario dice “enviado” si no envió nada |
 | [ ] | 3.3 | A-23 | NC-009 | Web: estados de carga/vacío/error en Catálogo, Adopción, detalles y Home; `data/*.js` solo para pruebas | 🟡 | Con la API apagada, la web muestra un error, no perritos falsos |
 | [ ] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` |
@@ -143,8 +143,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 05/11/2026, actualizada al cerrar el 2.7 (con el botón web “Reenviar código”): estado conocido al día y
-contexto del 3.1 (NC-005). Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem.*
+*Versión del 05/11/2026, actualizada al terminar la parte 1 del 3.1 (API + BD): estado conocido al día y contexto de
+la parte 2 (web) del 3.1 (NC-005). Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada
+ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -154,14 +155,38 @@ Lee primero:
   y "Próximo ítem")
 - Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md (detalle del A-xx)
 - Documentacion/GA9-220501096-AA1-EV02-PetConnect.md (bitácora de NC)
+- Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md (borrador de la
+  política: Parte B = textos de la casilla, el aviso y los mensajes; Parte C =
+  especificación; Parte D = decisiones pendientes)
 - git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
   git status -sb si hay commits sin push; el 05/11/2026 se subió todo hasta el
-  commit del botón web del 2.7 y no quedó nada sin push)
+  botón web del 2.7, 6e0bbc5; el commit de la parte 1 del 3.1 quedó sin push)
 
 Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el git log):
-- Hechos: 0.1, 1.1, 1.2 y toda la fase 2 (2.1 a 2.9; ver git log). Sigue la fase 3.
+- Hechos: 0.1, 1.1, 1.2 y toda la fase 2 (2.1 a 2.9; ver git log). Fase 3: el
+  3.1 va por partes y la parte 1 (API + BD) está hecha; sigue la parte 2 (web).
 - "Por actualizar" está vacía.
-- Pruebas: 107 (96 OK + 11 omitidas que necesitan MariaDB).
+- Pruebas: 125 (110 OK + 15 omitidas que necesitan MariaDB).
+- Autorización de datos (3.1 parte 1, NC-005 en corrección): api.py tiene
+  VERSION_POLITICA_DATOS = "1.0" y _MENSAJE_SIN_AUTORIZACION. /register exige
+  "acepta_datos": true (solo el booleano JSON, con `is True`) justo después de
+  revisar los campos obligatorios, antes del nombre, el DNS, la BD, la revisión
+  del pendiente vigente (2.7) y el correo; si no, 400 "Debes autorizar el
+  tratamiento de tus datos personales para registrarte". El pendiente guarda
+  fecha_autorizacion_datos (datetime de /register, sin microsegundos) y
+  version_politica_datos; /verify las pasa al Usuario y, si faltan, responde ese
+  400 y descarta el pendiente (doble barrera). Usuario(acepta_datos=False por
+  defecto, fecha_autorizacion_datos, version_politica_datos); el INSERT de
+  UsuarioDAO las escribe (los SELECT no las leen). BD: acepta_datos NOT NULL
+  DEFAULT 0, regla chk_autorizacion_datos; migración
+  sql/migraciones/2026-11-05_autorizacion_datos.sql YA aplicada a la BD del
+  dueño (10 usuarios en 0, sin fecha). Toda prueba que se registre debe mandar
+  "acepta_datos": true. Pruebas: tests/test_registro_datos.py y test_esquema.py
+  (PruebasMigracionDatosSinBD / PruebasMigracionDatosEnBD).
+- Pendientes que dejó la parte 1 (sin ítem, preguntar al dueño): pedir la
+  autorización a los usuarios existentes al iniciar sesión (R05 del plan GA9),
+  volver a pedirla cuando cambie VERSION_POLITICA_DATOS, botón "borrar mi
+  cuenta" (supresión) y llenar las decisiones D.1 a D.6 de la política.
 - Registro (2.7, A-09): AlmacenOTP tiene vigente(clave) (borra el pendiente si
   venció) y para_reenviar(clave) (60 s entre correos, máximo 3 reenvíos, no
   alarga los 10 minutos, no reenvía un código con 5 fallos). /register NO toca
@@ -193,8 +218,9 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
   (puerto 3310); si está apagado da error 2002 (10061) y se enciende con
   Start-Service mysql en una PowerShell de administrador. Los comandos van desde
   petconnect.Backend (..\.venv\Scripts\python solo funciona ahí). Para que el
-  resultado quepa en una captura, correr solo la clase:
-  tests.test_esquema.PruebasEsquemaEnBD. Respaldo: C:\Users\goku8\Respaldos\.
+  resultado quepa en una captura, correr solo las clases que tocan el ítem (ej.
+  tests.test_esquema.PruebasEsquemaEnBD tests.test_esquema.PruebasMigracionDatosEnBD).
+  Respaldo: C:\Users\goku8\Respaldos\.
 - OTP (2.5): AlmacenOTP cuenta fallos (MAX_INTENTOS = 5); el 6.º intento borra el
   código y devuelve "bloqueado"; las rutas de verificación responden 429
   "Demasiados intentos fallidos...". Compara con hmac.compare_digest sobre bytes.
@@ -232,50 +258,45 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
 - La web (src/services/api.js:20) y el móvil (src/services/api.js:34) muestran
   data.error con cualquier respuesta que no sea ok.
 
-Contexto del próximo ítem (3.1, A-20, NC-005): es GRANDE (API, BD, web y móvil),
-así que va con plan y por partes (regla 3 de CLAUDE.md).
-- Qué está mal: api.py, POST /api/auth/verify (~línea 639) crea el Usuario con
-  acepta_datos=True fijo; modelo/usuario.py:10 también trae acepta_datos=True por
-  defecto; sql/schema.sql: usuarios.acepta_datos tinyint(1) DEFAULT 1, sin
-  columnas de fecha ni de versión de la política. seed.py:128 inserta
-  acepta_datos. Nadie le pregunta al titular (Ley 1581, art. 9).
-- Flujo actual: /register (~546) valida nombre, correo y contraseña y guarda un
-  pendiente con _otp_registro.crear(email, {...}); /verify lo lee y crea el
-  usuario. La autorización tendría que viajar en /register, guardarse en el
-  pendiente y escribirse al crear el usuario (con fecha y versión). Ojo (2.7):
-  si ya hay un pendiente vigente, /register no lo cambia, así que la
-  autorización del primer registro es la que vale; validar acepta_datos ANTES
-  de esa revisión para que un registro sin casilla siempre responda 400.
-- Web: src/components/RegisterModal.jsx (estado del formulario ~línea 32) y
-  src/services/api.js:32 registerUser(name, email, password). Móvil:
-  src/screens/RegisterScreen.js y src/services/api.js:61. Ni la web ni el móvil
-  tienen casilla ni una página de política de tratamiento de datos.
-- GA9: fila NC-005 (~708, acción: casilla no premarcada con enlace a la
-  política, persistir fecha y versión, rechazar el registro sin autorización),
-  H-08 (~167) y CP-001 (~672, "Fallido por inspección (NC-005)").
-- Decidir (con pros/contras): (a) partes: propongo (1) backend + BD, (2) web,
-  (3) móvil; NC-005 se cierra al terminar las tres; (b) columnas nuevas (ej.
-  fecha_autorizacion DATETIME y version_politica VARCHAR) y acepta_datos sin
-  DEFAULT 1: cambia schema.sql y necesita migración en sql/migraciones/ (modelo
-  el 1.2) que corre el DUEÑO con respaldo previo, y prueba en test_esquema.py;
-  (c) qué manda el cliente: solo acepta_datos (booleano estricto: true, no
-  "true" ni 1) y la versión la fija el servidor en una constante, o también la
-  versión; (d) qué pasa con los usuarios que ya existen (acepta_datos=1 sin
-  fecha); (e) el texto de la política es contenido legal: Claude puede hacer un
-  borrador, pero lo valida el dueño o el instructor antes de publicarlo
-  (/revision-contenido-mascotas para la parte de datos personales).
-- No mezclar: la consola (vista/menu_usuarios.py) también crea usuarios sin
-  autorización, pero eso es el 4.11. No cambiar las reglas del reenvío del 2.7.
-- Prueba (parte 1, ej. tests/test_registro_datos.py, modelo tests/test_logs.py
-  con UsuarioDAO falso y sin correos ni DNS): /register sin acepta_datos, con
-  false, con "true" o con 1 → 400 y no se envía correo ni se crea pendiente; con
-  true → /verify crea el usuario con acepta_datos=True, fecha y versión.
-  Contraprueba con git stash del api.py.
+Contexto del próximo paso (3.1 parte 2 de 3: WEB, A-20, NC-005). Solo
+PetConnect.Front/petconnect-app; no tocar backend ni móvil (regla 3).
+- Hoy el formulario web de registro recibe 400 "Debes autorizar..." porque no
+  manda la casilla: la API ya la exige (parte 1).
+- Web: src/components/RegisterModal.jsx (estado del formulario ~línea 32,
+  handleSubmit ~117, <form> ~214, botón submit ~319) y src/services/api.js:32
+  registerUser(name, email, password), que debe mandar también
+  "acepta_datos": true SOLO si la casilla está marcada (booleano, nunca texto).
+  Rutas en src/App.jsx; pie de página en src/components/Footer.jsx.
+- Qué hacer (Parte B y C del borrador de la política): casilla SIN marcar al
+  abrir, obligatoria, antes del botón, con el texto de B.1 y un enlace a la
+  política que se abra en una pestaña nueva (no perder lo escrito); aviso corto
+  B.2 debajo; si se envía sin marcar, mensaje B.3 sin llamar a la API; página
+  nueva /politica-de-datos con el texto de la Parte A, marcada como BORRADOR
+  mientras no la valide el instructor, y enlace "Política de datos personales"
+  en el pie de página. Accesibilidad B.4: <label htmlFor>, área de 44 px,
+  contraste, error con role="alert" (como el del 2.7). Debe verse bien a 375 px.
+- Decidir (con pros/contras): cómo mostrar la política (página propia con el
+  texto en JSX, o leer el .md: ojo, Vite no lo convierte solo y una librería
+  nueva necesita permiso); qué hacer con los [PENDIENTE] de la Parte A mientras
+  no estén las decisiones D.1 a D.6 (dejarlos visibles como "por definir" o
+  esperar); si la casilla también dice "Soy mayor de 18 años" (D.4).
+- Usar frontend-design para la página nueva y /impeccable audit al final.
+- Prueba: npm run lint y npm run build; revisión a 375 px con respuestas
+  simuladas; el dueño prueba con la API real: sin marcar → mensaje sin petición;
+  marcada → "Codigo enviado" y, al verificar, la cuenta se crea (comprobar con
+  el conteo: SELECT acepta_datos, COUNT(*), COUNT(fecha_autorizacion_datos)
+  FROM usuarios GROUP BY acepta_datos → aparece una fila con 1 y fecha).
+- Parte 3 (móvil, después y aparte): src/screens/RegisterScreen.js
+  (handleRegister, registerUser en la línea 27) y src/services/api.js:61; abrir
+  la política web con Linking. NC-005 se cierra al terminar la parte 3.
+- GA9: fila NC-005 (~708, "En corrección desde el 05/11/2026"), H-08 (~167) y
+  CP-001 (~672). AUDITORÍA: "Estado" de A-20.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
-   estén en la sección "Por actualizar" (hoy ninguno). Si dos seguidos son 🟢 y
-   tocan el mismo archivo, puedes agruparlos (dímelo).
+   estén en la sección "Por actualizar" (hoy ninguno). Si el ítem va por partes,
+   sigue con la parte pendiente. Si dos seguidos son 🟢 y tocan el mismo
+   archivo, puedes agruparlos (dímelo).
 2. Antes de tocar código explícame en lenguaje sencillo qué está mal, el riesgo
    y tu plan (archivos, cambio, prueba de regresión), con opciones y pros/contras
    si hay varias. Si hay cambios sin commit relacionados, revísalos primero.
@@ -298,8 +319,9 @@ Luego:
 6. Actualiza la fila de la NC en la bitácora GA9 (fecha y evidencia, incluida la
    contraprueba) y el "Estado" bajo el A-xx en la AUDITORÍA. Si con este ítem se
    completa una NC, cambia su estado a "Cerrada el dd/mm/2026".
-7. Marca [x] en PRIORIDADES, actualiza "Próximo ítem" y el prompt de PRIORIDADES
-   (estado conocido + contexto del siguiente ítem).
+7. Marca [x] en PRIORIDADES (si el ítem va por partes, solo al terminar la
+   última; mientras tanto anota el avance en su fila), actualiza "Próximo ítem"
+   y el prompt de PRIORIDADES (estado conocido + contexto del siguiente paso).
 8. Commit con /guardar-partida: un commit por ítem, agregando archivos por ruta.
    No incluyas .gitignore, CLAUDE.md ni archivos sin seguimiento ajenos al ítem.
    No hagas push.
@@ -307,5 +329,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.1** (A-20, NC-005; grande: plan primero y por partes, backend → web → móvil). La fase 2 quedó
-completa con el 2.7 (05/11/2026); el botón web “Reenviar código” del registro es su parte 2.
+**Próximo ítem: 3.1, parte 2 de 3 (web)** (A-20, NC-005). La parte 1 (API + BD) quedó hecha el 05/11/2026 y la
+migración ya se aplicó a la BD de desarrollo. Hasta terminar la parte 2, el registro web responde 400 porque todavía
+no manda la casilla. Después sigue la parte 3 (móvil), que cierra NC-005.

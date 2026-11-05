@@ -179,7 +179,8 @@ class PruebasNombreRegistro(unittest.TestCase):
 
     def _registrar(self, nombre):
         return self.cliente.post("/api/auth/register",
-                                 json={"name": nombre, "email": CORREO_PRUEBA, "password": CONTRASENA})
+                                 json={"name": nombre, "email": CORREO_PRUEBA, "password": CONTRASENA,
+                                       "acepta_datos": True})   # NC-005 (item 3.1)
 
     def test_nombre_con_html_o_url_responde_400_sin_enviar_correo(self):
         for nombre in self.INVALIDOS:
