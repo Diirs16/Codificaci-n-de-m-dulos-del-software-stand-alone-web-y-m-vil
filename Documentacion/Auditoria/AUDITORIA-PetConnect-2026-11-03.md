@@ -467,8 +467,15 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `"acepta_datos": true` y paso al código; 403 en `/login/verify` → vuelve a la casilla sin marcar; “Cancelar” deja la
   contraseña vacía; el registro conserva su casilla sin marcar; sin desborde horizontal. `/impeccable audit` 16/20
   (detector sin hallazgos; pulido opcional: al cambiar de paso el foco queda en `body` y los modales no tienen
-  `role="dialog"`, como ya se anotó en el 2.7; colores fijos sin modo oscuro, como toda la web). Prueba con la API
-  real: pendiente del dueño. Falta el móvil (parte 3).
+  `role="dialog"`, como ya se anotó en el 2.7; colores fijos sin modo oscuro, como toda la web). Arreglo de una
+  revisión del 06/11/2026: “Cancelar” queda desactivado mientras se envía la petición (si se cancelaba a mitad, al
+  llegar la respuesta salía igual la pantalla del código). Prueba con la API real, ejecutada por el dueño el 06/11/2026
+  con una API recién arrancada (la que ocupaba el puerto 5000 era un proceso viejo, anterior al cambio de `api.py`): la
+  cuenta 18 (`acepta_datos = 0`) inició sesión en la web, vio “Autoriza el uso de tus datos”, marcó la casilla, escribió
+  el código y quedó con `acepta_datos = 1` y su fecha; la cuenta 19, creada desde el registro web con la casilla, quedó
+  autorizada; la 17 sigue en 0. Conteo esperado `0 | 6 | 0` y `1 | 3 | 3` (deducido, no se corrió la consulta final).
+  El caso “sin marcar” no se capturó con la API real: lo cubren las pruebas automáticas y la API simulada. Falta el
+  móvil (parte 3).
 
 #### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
 - **Solicitud de adopción** (`PetDetail.jsx:56-60`) y **Contacto** (`Contact.jsx:15-17`) piden nombre, correo, teléfono y

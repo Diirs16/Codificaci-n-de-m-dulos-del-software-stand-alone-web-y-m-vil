@@ -223,10 +223,13 @@ export default function LoginModal() {
               >
                 {loading ? "Enviando código..." : "Autorizar y continuar"}
               </button>
+              {/* Desactivado mientras se envía: si se cancelara a mitad de la petición,
+                  al llegar la respuesta igual saldría la pantalla del código. */}
               <button
                 type="button"
                 onClick={salirDeAutorizacion}
-                className="w-full min-h-11 border border-gray-300 bg-white text-black py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+                disabled={loading}
+                className="w-full min-h-11 border border-gray-300 bg-white text-black py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
