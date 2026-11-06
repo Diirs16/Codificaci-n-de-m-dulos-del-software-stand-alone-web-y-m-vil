@@ -178,8 +178,9 @@ export default function RegisterScreen({ navigation }) {
 
             <Text style={styles.aviso}>
               Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación.
-              En la política te explicamos cómo conocer, actualizar, corregir o borrar tus datos y cómo
-              retirar este permiso.
+              Puedes conocer, actualizar, rectificar o borrar tus datos y revocar este permiso escribiendo a{" "}
+              {/* Correo de atención del proyecto (D.1, 06/11/2026); el mismo de la web (RegisterModal.jsx y PoliticaDatos.jsx) */}
+              <Text style={styles.avisoCorreo}>proyectopetconnect+atencion@gmail.com.</Text>
             </Text>
           </View>
 
@@ -244,6 +245,7 @@ const styles = StyleSheet.create({
   enlaceFila: { minHeight: 44, justifyContent: "center", paddingLeft: 36 },
   enlace: { color: "#0f766e", fontSize: 14, fontWeight: "600", textDecorationLine: "underline", lineHeight: 20 },
   aviso: { fontSize: 12, lineHeight: 18, color: "#475569", paddingLeft: 36 },
+  avisoCorreo: { fontWeight: "600", color: "#1e293b" },
   error: { color: "#b91c1c", marginBottom: 12, textAlign: "center" },
   button: { backgroundColor: "#0f766e", borderRadius: 10, padding: 14, alignItems: "center", marginTop: 8, minHeight: 48 },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 15 },

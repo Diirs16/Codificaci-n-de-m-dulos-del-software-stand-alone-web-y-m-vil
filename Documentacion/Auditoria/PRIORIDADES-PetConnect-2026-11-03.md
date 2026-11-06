@@ -205,9 +205,10 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   porque react-native-web no traduce accessibilityState), el enlace en su propia
   línea "Leer los términos y condiciones que aceptas: Política de tratamiento
   de datos personales" (decisión del dueño; Linking.openURL(POLITICA_URL)), el
-  aviso B.2 (PENDIENTE: todavía con la redacción sin correo; el 06/11/2026 la web
-  pasó al B.2 con proyectopetconnect+atencion@gmail.com y el móvil debe igualarlo
-  en RegisterScreen.js ~180) y el error en una zona aria-live="polite". Sin marcar: mensaje B.3
+  aviso B.2 (desde el 06/11/2026 con el correo de atención
+  proyectopetconnect+atencion@gmail.com, igual que la web; si cambia, cambiarlo
+  en RegisterScreen.js, RegisterModal.jsx, PoliticaDatos.jsx y el borrador .md)
+  y el error en una zona aria-live="polite". Sin marcar: mensaje B.3
   y ninguna petición. ScrollView + KeyboardAvoidingView (behavior="padding",
   offset con measureInWindow: en Expo 57 Android no encoge la ventana con el
   teclado). api.js: registerUser(..., aceptaDatos) manda acepta_datos:
