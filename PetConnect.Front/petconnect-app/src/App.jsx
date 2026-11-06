@@ -8,7 +8,6 @@ import Home from "./pages/Home";
 import Catalog from "./pages/Catalog";
 import ProductDetail from "./pages/ProductDetail";
 import Checkout from "./pages/Checkout";
-import Confirmation from "./pages/Confirmation";
 import Adoption from "./pages/Adoption";
 import PetDetail from "./pages/PetDetail";
 import Contact from "./pages/Contact";
@@ -24,7 +23,6 @@ export default function App() {
           <Route path="/catalogo" element={<Catalog />} />
           <Route path="/producto/:id" element={<ProductDetail />} />
           <Route path="/checkout" element={<Checkout />} />
-          <Route path="/confirmacion" element={<Confirmation />} />
           <Route path="/adopcion" element={<Adoption />} />
           <Route path="/adopcion/:id" element={<PetDetail />} />
           <Route path="/contacto" element={<Contact />} />

@@ -66,10 +66,11 @@ se borra de aquí y se marca `[x]` en su fase.
 | ✔ | # | ID | NC | Qué | Esfuerzo | Listo cuando |
 |---|---|---|---|---|---|---|
 | [x] | 3.1 | A-20 | NC-005 | Casilla de autorización **sin marcar** + enlace a política en web y móvil; la API rechaza sin ella; guardar fecha y versión; quitar `acepta_datos=True` por defecto | 🟡 | Registro sin casilla → 400; con casilla → `acepta_datos=1` y fecha guardada — *Parte 1 de 3 (API + BD) hecha el 05/11/2026: `api.py` (`VERSION_POLITICA_DATOS = "1.0"`, 400 sin `"acepta_datos": true`, fecha y versión en el pendiente y en el usuario), modelo y DAO, `schema.sql` + migración `2026-11-05_autorizacion_datos.sql` (aplicada por el dueño); `tests/test_registro_datos.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Borrador de la política en `Documentacion/Legal/`. Parte 2 de 3 (web) hecha el 05/11/2026: casilla sin marcar con +18 y enlace a la política en pestaña nueva, aviso corto, mensaje sin llamar a la API (`RegisterModal.jsx`), `acepta_datos` booleano (`api.js`), página `/politica-de-datos` (`PoliticaDatos.jsx`, borrador con “Por definir”) y enlace en el pie; probada por el dueño con la API real (conteo `0 \| 10 \| 0` y `1 \| 1 \| 1`). Parte 3 de 3 (móvil) hecha el 06/11/2026: casilla sin marcar con +18, enlace aparte “Leer los términos y condiciones que aceptas: Política…” (`Linking.openURL`), aviso corto y mensaje sin llamar a la API (`RegisterScreen.js`), `acepta_datos` booleano y `POLITICA_URL` (`api.js`); `npx expo export --platform web` OK y revisión a 375 px con la API simulada; probada por el dueño en el emulador con la API real (conteo `0 \| 5 \| 0` y `1 \| 1 \| 1`). NC-005 cerrada el 06/11/2026* |
-| [ ] | 3.2 | A-21 | — | Formularios de adopción, contacto y checkout: implementar el envío **o** rotular “Demo — no se envía” y deshabilitar | 🟢 (rotular) / 🔴 (implementar) | Ningún formulario dice “enviado” si no envió nada |
+| [x] | 3.2 | A-21 | — | Formularios de adopción, contacto y checkout: implementar el envío **o** rotular “Demo — no se envía” y deshabilitar | 🟢 (rotular) / 🔴 (implementar) | Ningún formulario dice “enviado” si no envió nada — *Hecho el 06/11/2026 (camino “rotular”, solo web): componente `AvisoDemo.jsx`; en `PetDetail.jsx`, `Contact.jsx` y `Checkout.jsx` aviso “Demo — …”, campos en `<fieldset disabled>`, botón deshabilitado y sin pantallas de “enviado”; el checkout ya no vacía el carrito; `Confirmation.jsx` y la ruta `/confirmacion` borradas; Contacto muestra el correo de atención y Armenia (D.1) en lugar de datos inventados. Lint 0 errores, build OK, 375 px sin desbordes y 0 `POST` a `/api`; búsqueda de textos engañosos: 7 con el código viejo, 0 con el nuevo; `/impeccable audit` 16/20. El envío real es el 3.6* |
 | [ ] | 3.3 | A-23 | NC-009 | Web: estados de carga/vacío/error en Catálogo, Adopción, detalles y Home; `data/*.js` solo para pruebas | 🟡 | Con la API apagada, la web muestra un error, no perritos falsos |
 | [ ] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` |
 | [ ] | 3.5 | A-20 | — (R05) | Pedir la autorización de datos a las cuentas existentes (`acepta_datos = 0`) y a quienes aceptaron una versión vieja de la política, al iniciar sesión (API + web + móvil); si no autorizan, ofrecer borrar la cuenta. **Nunca** con un `UPDATE` que la invente. Después de la parte 3 del 3.1. Surgió el 05/11/2026 | 🔴 | Una cuenta en 0 que inicia sesión ve la casilla y, al marcarla, queda con fecha y versión; sin marcarla no entra |
+| [ ] | 3.6 | A-21 | — | Envío real de la solicitud de adopción y del mensaje de contacto: endpoint con `@require_auth` (y limitador), tabla nueva (migración + `schema.sql`), consentimiento para esa finalidad y **política v1.1** (Parte C, “Fuera del 3.1”; subir `VERSION_POLITICA_DATOS`), web y, si se decide, móvil. Quitar el `AvisoDemo` solo del formulario que ya envíe. El checkout real va aparte (A-26). Surgió en el 3.2 (06/11/2026) | 🔴 | Una solicitud enviada queda en la BD con el usuario, la fecha y la versión de la política, y la web dice “enviada” solo si la API respondió 201 |
 
 ---
 
@@ -144,8 +145,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 06/11/2026, actualizada al terminar el 3.1 (parte 3, móvil; NC-005 cerrada), la D.1 de la política y
-el correo en el aviso del móvil: estado conocido al día y contexto del 3.2. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 06/11/2026, actualizada al terminar el 3.2 (formularios rotulados como demo; envío real anotado como
+3.6): estado conocido al día y contexto del 3.3. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -158,16 +159,31 @@ Lee primero:
 - Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md (borrador de la
   política: Parte B = textos de la casilla, el aviso y los mensajes; Parte C =
   especificación; Parte D = decisiones pendientes)
-- git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
-  git status -sb si hay commits sin push; el 05/11/2026 se subió todo hasta el
-  botón web del 2.7, 6e0bbc5; al cerrar el 06/11/2026 quedaron 5 commits sin
-  push: los 3 del 3.1 (31f005c API + BD, fa1dda3 web, 6f0bdc9 móvil), 0a5e1dd
-  (D.1: responsable y correo de atención en la política) y b8d5ec2 (ese correo
-  en el aviso del móvil). Pregunta al dueño si quiere hacer push antes de seguir)
+- git log --oneline -12 y git status -sb (qué se hizo en sesiones anteriores y
+  si hay commits sin push; el 05/11/2026 se subió todo hasta el botón web del
+  2.7, 6e0bbc5; al cerrar el 06/11/2026 quedaron 7 commits sin push: los 3 del
+  3.1 (31f005c API + BD, fa1dda3 web, 6f0bdc9 móvil), 0a5e1dd (D.1), b8d5ec2
+  (correo en el aviso del móvil), f40af07 (prompt) y el del 3.2. Pregunta al
+  dueño si quiere hacer push antes de seguir)
 
 Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el git log):
-- Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9) y el 3.1 (3 partes: API +
-  BD, web y móvil; ver git log). NC-005 cerrada el 06/11/2026.
+- Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9), el 3.1 (3 partes: API +
+  BD, web y móvil; ver git log) y el 3.2. NC-005 cerrada el 06/11/2026.
+- Formularios demo (3.2, A-21, hecho el 06/11/2026, solo web): componente
+  src/components/AvisoDemo.jsx (props id, titulo, children, invitacion; recuadro
+  ámbar role="note"; con invitacion agrega el mailto al correo de atención).
+  PetDetail.jsx, Contact.jsx y Checkout.jsx: aviso "Demo — ...", campos en
+  <fieldset disabled aria-describedby>, botón submit deshabilitado y
+  onSubmit={(e) => e.preventDefault()}; sin estado del formulario ni pantallas
+  de "enviado". Checkout ya no vacía el carrito. Confirmation.jsx y la ruta
+  /confirmacion se BORRARON (App.jsx). Contact.jsx muestra el correo de
+  atención (mailto) y Armenia, Quindío (D.1), sin teléfono (el dueño puede
+  decidir agregar 324 368 2078); el horario de atención sigue inventado. El
+  envío real es el 3.6 (API + tabla + consentimiento + política v1.1); el
+  checkout real va con A-26. /impeccable audit 16/20 (foco a body al abrir el
+  formulario de adopción, sin modo oscuro ni tokens: pulido opcional).
+  El correo de atención está ahora en AvisoDemo.jsx, Contact.jsx,
+  PoliticaDatos.jsx, RegisterModal.jsx, RegisterScreen.js y el borrador .md.
 - "Por actualizar" está vacía.
 - Pruebas: 125 (110 OK + 15 omitidas que necesitan MariaDB).
 - Autorización de datos (3.1 parte 1, NC-005 cerrada): api.py tiene
@@ -317,24 +333,33 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
 - La web (src/services/api.js:20) y el móvil (src/services/api.js:34) muestran
   data.error con cualquier respuesta que no sea ok.
 
-Contexto del próximo paso (3.2, A-21, sin NC): formularios que dicen "enviado"
-sin enviar nada y recogen datos personales (Ley 1581). Solo web
+Contexto del próximo paso (3.3, A-23, NC-009): la web esconde los fallos de la
+API con datos falsos de src/data/pets.js y src/data/products.js. Solo web
 (PetConnect.Front/petconnect-app), salvo que el plan aprobado diga otra cosa.
-- PetDetail.jsx: solicitud de adopción (estado submitted ~13, handleSubmit ~56,
-  "Solicitud Enviada ... Nos pondremos en contacto contigo pronto" ~66-69,
-  formulario ~144). Contact.jsx: contacto (submitted ~5, handleSubmit ~15,
-  "Mensaje Enviado" ~24, formulario ~52). Checkout.jsx: compra (handleSubmit
-  ~41, formulario ~60; lleva a Confirmation.jsx). Ninguno llama a la API.
-- Dos caminos (preguntar al dueño): rotular "Demo — no se envía" y deshabilitar
-  el envío (🟢, solo web, sin recoger datos) o implementar el envío (🔴: endpoint
-  con @require_auth, tabla, consentimiento y nueva versión de la política, que
-  hoy no cubre solicitudes de adopción ni contacto; ver Parte C, "Fuera del
-  3.1"). Lo simple primero: rotular, y anotar el envío real como ítem futuro.
-- Revisar que ningún texto diga "enviado", "recibimos" o "nos pondremos en
-  contacto" si no se envió nada; no guardar lo escrito en localStorage.
+- Adoption.jsx: useState(staticPets) ~9; si la API devuelve 0 mascotas NO
+  cambia la lista (if (data.length > 0)) y .catch(() => {}) ~18, así que con la
+  API caída o vacía muestra las 6 mascotas falsas (así se ocultó NC-009).
+  Catalog.jsx: useState(staticProducts) ~11 y .catch(() => {}) ~25.
+  PetDetail.jsx ~21-28 y ProductDetail.jsx ~27-30: si la API falla, buscan la
+  ficha en data/*.js. Home.jsx ~4 y ~8-9: SIEMPRE usa data/products.js, con
+  campos discount/isNew que la BD no tiene.
+- Arreglo (A-23): estados de carga / vacío / error como en el móvil (que ya
+  muestra los errores de la API en pantalla); data/*.js solo para pruebas.
+  Ojo: la API devuelve 404 "Mascota no encontrada" para mascotas que no están
+  en adopción (2.9) y 503 si la BD está caída (2.3): en la ficha, distinguir
+  "no encontrada" de "no pudimos cargar" (api.js lanza Error con data.error).
+  Decidir con el dueño qué hace Home (productos de la API sin descuento/nuevo,
+  u ocultar esas secciones) y si se borran data/*.js o se dejan sin importar.
+- Con la API caída, PetDetail hoy cae a la mascota falsa y abre el formulario
+  demo del 3.2: tras el 3.3 debe mostrar el error, no la ficha.
+- Al terminar, NC-009 queda completa (el schema, la migración y el modo
+  estricto se hicieron en 1.1/1.2; solo faltaba el estado vacío en la web):
+  actualizar su fila en GA9 a "Cerrada el dd/mm/2026" con la evidencia, y el
+  CP-016/CP-012 si aplica.
 - Prueba: la web no tiene pruebas automáticas; npm run lint y npm run build,
-  revisión a 375 px y /impeccable audit. Sin NC asociada (GA9 no cambia salvo
-  que el dueño decida abrir una).
+  revisión a 375 px con la API apagada (debe verse un error, no perritos), con
+  la API encendida (el dueño la arranca) y /impeccable audit. Contraprueba: con
+  el código viejo y la API apagada se ven las mascotas falsas.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -373,6 +398,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.2** (A-21): formularios de adopción, contacto y checkout que dicen “enviado” sin enviar nada. El 3.1
-quedó hecho el 06/11/2026 en sus 3 partes (API + BD, web y móvil) y cerró NC-005. Después: 3.3, y el 3.5
-(autorización de las cuentas existentes) cuando toque.
+**Próximo ítem: 3.3** (A-23, NC-009): la web esconde los fallos de la API con perritos y productos falsos. El 3.2
+quedó hecho el 06/11/2026 (formularios rotulados como demo y bloqueados; el envío real es el 3.6). Después: 3.4, el 3.5
+(autorización de las cuentas existentes) y el 3.6 cuando toquen.

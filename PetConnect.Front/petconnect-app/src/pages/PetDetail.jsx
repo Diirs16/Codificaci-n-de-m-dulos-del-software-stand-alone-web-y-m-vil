@@ -1,22 +1,19 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Check, X as XIcon, Heart } from "lucide-react";
 import { pets as staticPets } from "../data/pets";
 import { getMascota } from "../services/api";
+import AvisoDemo from "../components/AvisoDemo";
+
+// Clases de los campos bloqueados del formulario demo (3.2): no se puede escribir en ellos.
+const CAMPO_DEMO =
+  "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-not-allowed";
 
 export default function PetDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [pet, setPet] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    message: "",
-  });
 
   useEffect(() => {
     getMascota(id)
@@ -46,34 +43,6 @@ export default function PetDetail() {
     return (
       <main className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-400">
         Cargando información de la mascota...
-      </main>
-    );
-  }
-
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setSubmitted(true);
-    setShowForm(false);
-  };
-
-  if (submitted) {
-    return (
-      <main className="max-w-lg mx-auto px-4 py-20 text-center">
-        <Heart className="w-16 h-16 text-black mx-auto mb-6" />
-        <h1 className="text-2xl font-bold mb-3">Solicitud Enviada</h1>
-        <p className="text-gray-500 mb-8">
-          Tu solicitud de adopción para <strong>{pet.name}</strong> ha sido
-          enviada. Nos pondremos en contacto contigo pronto.
-        </p>
-        <button
-          onClick={() => navigate("/adopcion")}
-          className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
-        >
-          Ver más mascotas
-        </button>
       </main>
     );
   }
@@ -141,78 +110,65 @@ export default function PetDetail() {
             </button>
           ) : (
             <form
-              onSubmit={handleSubmit}
+              onSubmit={(e) => e.preventDefault()}
               className="space-y-4 border border-gray-200 rounded-lg p-4"
             >
               <h3 className="font-semibold">Formulario de Adopción</h3>
-              <div>
-                <label htmlFor="adopt-name" className="block text-sm font-medium mb-1">
-                  Nombre completo
-                </label>
-                <input
-                  id="adopt-name"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-                />
-              </div>
-              <div>
-                <label htmlFor="adopt-email" className="block text-sm font-medium mb-1">
-                  Correo electrónico
-                </label>
-                <input
-                  id="adopt-email"
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-                />
-              </div>
-              <div>
-                <label htmlFor="adopt-phone" className="block text-sm font-medium mb-1">
-                  Teléfono
-                </label>
-                <input
-                  id="adopt-phone"
-                  name="phone"
-                  type="tel"
-                  value={form.phone}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-                />
-              </div>
-              <div>
-                <label htmlFor="adopt-message" className="block text-sm font-medium mb-1">
-                  ¿Por qué quieres adoptar a {pet.name}?
-                </label>
-                <textarea
-                  id="adopt-message"
-                  name="message"
-                  value={form.message}
-                  onChange={handleChange}
-                  required
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black resize-none"
-                />
-              </div>
-              <div className="flex gap-3">
+              {/* 3.2 (A-21): las solicitudes todavía no se envían a la API. Los campos van
+                  bloqueados para no recoger datos personales que nadie recibe. */}
+              <AvisoDemo
+                id="adopt-demo"
+                titulo="Demo — la solicitud no se envía"
+                invitacion={`Si te interesa adoptar a ${pet.name}, escríbenos a`}
+              >
+                Por ahora las solicitudes de adopción no están disponibles: este
+                formulario es una muestra y no se puede llenar.
+              </AvisoDemo>
+              <fieldset disabled aria-describedby="adopt-demo" className="min-w-0 space-y-4">
+                <div>
+                  <label htmlFor="adopt-name" className="block text-sm font-medium mb-1">
+                    Nombre completo
+                  </label>
+                  <input id="adopt-name" name="name" className={CAMPO_DEMO} />
+                </div>
+                <div>
+                  <label htmlFor="adopt-email" className="block text-sm font-medium mb-1">
+                    Correo electrónico
+                  </label>
+                  <input id="adopt-email" name="email" type="email" className={CAMPO_DEMO} />
+                </div>
+                <div>
+                  <label htmlFor="adopt-phone" className="block text-sm font-medium mb-1">
+                    Teléfono
+                  </label>
+                  <input id="adopt-phone" name="phone" type="tel" className={CAMPO_DEMO} />
+                </div>
+                <div>
+                  <label htmlFor="adopt-message" className="block text-sm font-medium mb-1">
+                    ¿Por qué quieres adoptar a {pet.name}?
+                  </label>
+                  <textarea
+                    id="adopt-message"
+                    name="message"
+                    rows={3}
+                    className={`${CAMPO_DEMO} resize-none`}
+                  />
+                </div>
+              </fieldset>
+              <div className="flex flex-wrap gap-3">
                 <button
                   type="submit"
-                  className="flex-1 bg-black text-white py-2.5 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                  disabled
+                  className="flex-1 min-h-11 bg-gray-200 text-gray-700 py-2.5 px-4 rounded-lg font-medium cursor-not-allowed"
                 >
-                  Enviar Solicitud
+                  No disponible (demo)
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 transition-colors"
+                  className="min-h-11 px-4 py-2.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 transition-colors"
                 >
-                  Cancelar
+                  Cerrar
                 </button>
               </div>
             </form>

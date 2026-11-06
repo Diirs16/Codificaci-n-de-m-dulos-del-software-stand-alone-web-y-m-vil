@@ -28,7 +28,8 @@ Esta auditoría **confirmó 12 de los 13 puntos principales** de la auditoría d
 no se puede verificar porque falta el esquema SQL), encontró **15 hallazgos nuevos** y amplió otros 4. Los más serios:
 
 1. El correo se envía por TLS **sin verificar el certificado**: la contraseña de aplicación de Gmail puede ser interceptada.
-2. Los formularios de **solicitud de adopción y de contacto** dicen “enviado” pero **no envían nada** (y recogen datos personales).
+2. Los formularios de **solicitud de adopción y de contacto** dicen “enviado” pero **no envían nada** (y recogen datos personales)
+   *(resuelto el 06/11/2026, ítem 3.2: rotulados como demo y bloqueados; ver A-21)*.
 3. Los códigos OTP y los correos de los usuarios se **imprimen en la consola** del servidor cuando el correo falla
    *(resuelto el 04/11/2026, ítem 2.8: ver A-10)*.
 4. La ficha de la mascota muestra **“Pendiente de vacunación”** a mascotas cuya descripción dice “Vacunada”: información de salud contradictoria.
@@ -434,6 +435,32 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - **Impacto:** una persona que quiere adoptar cree que ya aplicó; además se recogen datos sin aviso de privacidad.
 - **Arreglo:** o se implementa el endpoint (con consentimiento y `@require_auth`), o se rotula claramente **“Demo — no
   se envía”** y se deshabilita el botón.
+- **Estado: resuelto el 06/11/2026 (ítem 3.2 de PRIORIDADES) con el camino “rotular”; solo web.** Decisión del dueño:
+  rotular y bloquear ahora, sin recoger datos, y dejar el envío real para el ítem futuro 3.6 (API + tabla +
+  consentimiento + política v1.1). Componente nuevo `src/components/AvisoDemo.jsx` (recuadro `role="note"` con el título
+  “Demo — …”, el motivo y, si se pide, una línea con el correo de atención de la D.1 como alternativa real).
+  `PetDetail.jsx`: el botón “Solicitar Adopción” abre el formulario con el aviso “Demo — la solicitud no se envía” y la
+  invitación “Si te interesa adoptar a {nombre}, escríbenos a proyectopetconnect+atencion@gmail.com”; los 4 campos van
+  dentro de `<fieldset disabled aria-describedby>` (no se puede escribir ni enviar), el botón queda deshabilitado
+  (“No disponible (demo)”) y se quitaron el estado `submitted`, el estado del formulario y la pantalla “Solicitud
+  Enviada… Nos pondremos en contacto contigo pronto”. `Contact.jsx`: igual (“Demo — el mensaje no se envía”), sin la
+  pantalla “Mensaje Enviado… Responderemos”, y la columna de contacto cambió los datos inventados
+  (`info@petconnect.com`, `+57 300 123 4567`, Bogotá: un dominio ajeno al proyecto) por el correo de atención (enlace
+  `mailto`) y Armenia, Quindío (D.1). El teléfono de la D.1 no se puso en la página (expone menos; se puede agregar si el
+  dueño lo decide). `Checkout.jsx`: aviso “Demo — no se procesan pedidos”, campos bloqueados, botón “Pedido no
+  disponible (demo)” y el carrito **ya no se vacía**. `Confirmation.jsx` (“Pedido Confirmado… Recibirás un correo”) se
+  borró junto con su ruta `/confirmacion` en `App.jsx`. Los envíos tienen además `onSubmit` con `preventDefault()`
+  (segunda barrera). Nada de lo escrito se guarda en `localStorage` (no se puede escribir, y antes tampoco se guardaba).
+  Verificación (la web no tiene pruebas automáticas): `npm run lint` 0 errores (los 2 avisos de siempre) y
+  `npm run build` OK. Búsqueda de textos engañosos (`enviad[ao]`, `recibimos`, `recibirás`, `nos pondremos en
+  contacto`, `responderemos`, `pedido confirmado`, `procesado exitosamente`) en `src/`: con el código viejo (HEAD) 7
+  coincidencias en `PetDetail`, `Contact` y `Confirmation`; con el nuevo, ninguna en los formularios (queda una en
+  `PoliticaDatos.jsx`, correcta: habla del correo de atención, que sí existe). Revisión a 375 px y a escritorio en el
+  navegador: sin desplazamiento horizontal, todos los campos y botones `:disabled`, aun forzando `click()` y
+  `requestSubmit()` el checkout sigue en `/checkout` con el carrito intacto, y ninguna petición `POST` a `/api`;
+  `/confirmacion` ya no muestra nada. `/impeccable audit` 16/20 (detector sin hallazgos); queda como pulido, ya
+  existente antes: al abrir el formulario de adopción el foco cae en `body`, el horario de atención de `Contact.jsx` es
+  inventado y la web no tiene modo oscuro ni tokens de color.
 
 #### A-22 · 🟡 Media · Información de salud contradictoria en la ficha de la mascota [N]
 - La API pone siempre `vaccinated=False`, `sterilized=False`, `size="Mediano"` (`api.py:215-220`), así que
@@ -461,6 +488,9 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 
 #### A-26 · ⚪ Baja · Precio calculado en el navegador [A]
 - `CartContext.jsx:37`. Aceptable mientras el checkout sea demo; si se implementa, el servidor recalcula precio y stock.
+- Desde el 06/11/2026 (3.2, A-21) el checkout está rotulado como demo y bloqueado. Un checkout real (sin ítem todavía)
+  exige: tabla de pedidos, endpoint con `@require_auth`, precio y stock recalculados en el servidor y una versión nueva de
+  la política (dirección y teléfono de envío son datos personales).
 
 ### 3.5 Móvil (Expo)
 

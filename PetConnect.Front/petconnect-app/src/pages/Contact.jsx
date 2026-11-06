@@ -1,134 +1,107 @@
-import { useState } from "react";
-import { Mail, Phone, MapPin, CheckCircle } from "lucide-react";
+import { Mail, MapPin } from "lucide-react";
+import AvisoDemo from "../components/AvisoDemo";
+
+// Correo de atención de la política de datos (D.1). Si cambia, cambiarlo también en
+// AvisoDemo.jsx, PoliticaDatos.jsx, RegisterModal.jsx, el móvil y el borrador .md.
+const CORREO_ATENCION = "proyectopetconnect+atencion@gmail.com";
+
+// Clases de los campos bloqueados del formulario demo (3.2): no se puede escribir en ellos.
+const CAMPO_DEMO =
+  "w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-not-allowed";
 
 export default function Contact() {
-  const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    message: "",
-  });
-
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setSubmitted(true);
-  };
-
-  if (submitted) {
-    return (
-      <main className="max-w-lg mx-auto px-4 py-20 text-center">
-        <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-6" />
-        <h1 className="text-2xl font-bold mb-3">Mensaje Enviado</h1>
-        <p className="text-gray-500 mb-8">
-          Gracias por contactarnos. Responderemos tu mensaje lo antes posible.
-        </p>
-        <button
-          onClick={() => {
-            setSubmitted(false);
-            setForm({ name: "", email: "", message: "" });
-          }}
-          className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
-        >
-          Enviar otro mensaje
-        </button>
-      </main>
-    );
-  }
-
   return (
     <main className="page-enter max-w-5xl mx-auto px-4 py-8">
       <div className="text-center mb-10">
         <h1 className="text-2xl md:text-3xl font-bold mb-3">Contacto</h1>
         <p className="text-gray-500 max-w-xl mx-auto">
-          ¿Tienes alguna pregunta o sugerencia? Escríbenos y te responderemos lo
-          antes posible.
+          ¿Tienes alguna pregunta o sugerencia? Escríbenos a nuestro correo de
+          atención.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="contact-name" className="block text-sm font-medium mb-1">
-              Nombre
-            </label>
-            <input
-              id="contact-name"
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-              placeholder="Tu nombre"
-            />
-          </div>
+        {/* 3.2 (A-21): el formulario todavía no envía nada a la API. Los campos van
+            bloqueados para no recoger datos personales que nadie recibe. */}
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-4 min-w-0">
+          <AvisoDemo
+            id="contact-demo"
+            titulo="Demo — el mensaje no se envía"
+            invitacion="Para escribirnos, usa el correo"
+          >
+            Este formulario es una muestra y no se puede llenar.
+          </AvisoDemo>
 
-          <div>
-            <label htmlFor="contact-email" className="block text-sm font-medium mb-1">
-              Correo electrónico
-            </label>
-            <input
-              id="contact-email"
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-              placeholder="tu@correo.com"
-            />
-          </div>
+          <fieldset disabled aria-describedby="contact-demo" className="min-w-0 space-y-4">
+            <div>
+              <label htmlFor="contact-name" className="block text-sm font-medium mb-1">
+                Nombre
+              </label>
+              <input
+                id="contact-name"
+                name="name"
+                className={CAMPO_DEMO}
+                placeholder="Tu nombre"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="contact-message" className="block text-sm font-medium mb-1">
-              Mensaje
-            </label>
-            <textarea
-              id="contact-message"
-              name="message"
-              value={form.message}
-              onChange={handleChange}
-              required
-              rows={5}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black resize-none"
-              placeholder="Escribe tu mensaje..."
-            />
-          </div>
+            <div>
+              <label htmlFor="contact-email" className="block text-sm font-medium mb-1">
+                Correo electrónico
+              </label>
+              <input
+                id="contact-email"
+                name="email"
+                type="email"
+                className={CAMPO_DEMO}
+                placeholder="tu@correo.com"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="contact-message" className="block text-sm font-medium mb-1">
+                Mensaje
+              </label>
+              <textarea
+                id="contact-message"
+                name="message"
+                rows={5}
+                className={`${CAMPO_DEMO} resize-none`}
+                placeholder="Escribe tu mensaje..."
+              />
+            </div>
+          </fieldset>
 
           <button
             type="submit"
-            className="btn-hover btn-ripple w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+            disabled
+            className="w-full min-h-11 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium cursor-not-allowed"
           >
-            Enviar Mensaje
+            Envío no disponible (demo)
           </button>
         </form>
 
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           <h2 className="text-lg font-semibold">Información de contacto</h2>
 
           <div className="flex items-start gap-3">
-            <Mail className="w-5 h-5 text-black mt-0.5" />
-            <div>
-              <p className="text-sm font-medium">Correo electrónico</p>
-              <p className="text-sm text-gray-500">info@petconnect.com</p>
+            <Mail className="w-5 h-5 text-black mt-0.5 shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Correo de atención</p>
+              <a
+                href={`mailto:${CORREO_ATENCION}`}
+                className="text-sm text-gray-700 underline hover:no-underline break-all"
+              >
+                {CORREO_ATENCION}
+              </a>
             </div>
           </div>
 
           <div className="flex items-start gap-3">
-            <Phone className="w-5 h-5 text-black mt-0.5" />
-            <div>
-              <p className="text-sm font-medium">Teléfono</p>
-              <p className="text-sm text-gray-500">+57 300 123 4567</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <MapPin className="w-5 h-5 text-black mt-0.5" />
+            <MapPin className="w-5 h-5 text-black mt-0.5 shrink-0" aria-hidden="true" />
             <div>
               <p className="text-sm font-medium">Ubicación</p>
-              <p className="text-sm text-gray-500">Bogotá, Colombia</p>
+              <p className="text-sm text-gray-500">Armenia, Quindío, Colombia</p>
             </div>
           </div>
 

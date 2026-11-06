@@ -1,7 +1,11 @@
-import { useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import AvisoDemo from "../components/AvisoDemo";
+
+// Clases de los campos bloqueados del formulario demo (3.2): no se puede escribir en ellos.
+const CAMPO_DEMO =
+  "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-not-allowed";
 
 function formatPrice(price) {
   return new Intl.NumberFormat("es-CO", {
@@ -12,14 +16,8 @@ function formatPrice(price) {
 }
 
 export default function Checkout() {
-  const { items, totalPrice, clearCart } = useCart();
+  const { items, totalPrice } = useCart();
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    name: "",
-    address: "",
-    city: "",
-    phone: "",
-  });
 
   if (items.length === 0) {
     return (
@@ -35,15 +33,6 @@ export default function Checkout() {
     );
   }
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    clearCart();
-    navigate("/confirmacion");
-  };
-
   return (
     <main className="page-enter max-w-3xl mx-auto px-4 py-8">
       <button
@@ -57,71 +46,49 @@ export default function Checkout() {
       <h1 className="text-2xl font-bold mb-8">Checkout</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* 3.2 (A-21): no hay pedidos ni pagos en la API. Los campos van bloqueados para
+            no recoger datos de envío que nadie recibe, y el carrito no se vacía. */}
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-4 min-w-0">
           <h2 className="text-lg font-semibold mb-2">Datos de envío</h2>
 
-          <div>
-            <label htmlFor="checkout-name" className="block text-sm font-medium mb-1">
-              Nombre completo
-            </label>
-            <input
-              id="checkout-name"
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-            />
-          </div>
+          <AvisoDemo id="checkout-demo" titulo="Demo — no se procesan pedidos">
+            Esta tienda es una muestra: no se crean pedidos, no se cobra nada y
+            este formulario no se puede llenar. Tu carrito se conserva.
+          </AvisoDemo>
 
-          <div>
-            <label htmlFor="checkout-address" className="block text-sm font-medium mb-1">
-              Dirección
-            </label>
-            <input
-              id="checkout-address"
-              name="address"
-              value={form.address}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="checkout-city" className="block text-sm font-medium mb-1">
-              Ciudad
-            </label>
-            <input
-              id="checkout-city"
-              name="city"
-              value={form.city}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="checkout-phone" className="block text-sm font-medium mb-1">
-              Teléfono
-            </label>
-            <input
-              id="checkout-phone"
-              name="phone"
-              type="tel"
-              value={form.phone}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-black"
-            />
-          </div>
+          <fieldset disabled aria-describedby="checkout-demo" className="min-w-0 space-y-4">
+            <div>
+              <label htmlFor="checkout-name" className="block text-sm font-medium mb-1">
+                Nombre completo
+              </label>
+              <input id="checkout-name" name="name" className={CAMPO_DEMO} />
+            </div>
+            <div>
+              <label htmlFor="checkout-address" className="block text-sm font-medium mb-1">
+                Dirección
+              </label>
+              <input id="checkout-address" name="address" className={CAMPO_DEMO} />
+            </div>
+            <div>
+              <label htmlFor="checkout-city" className="block text-sm font-medium mb-1">
+                Ciudad
+              </label>
+              <input id="checkout-city" name="city" className={CAMPO_DEMO} />
+            </div>
+            <div>
+              <label htmlFor="checkout-phone" className="block text-sm font-medium mb-1">
+                Teléfono
+              </label>
+              <input id="checkout-phone" name="phone" type="tel" className={CAMPO_DEMO} />
+            </div>
+          </fieldset>
 
           <button
             type="submit"
-            className="btn-hover btn-ripple w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors mt-4"
+            disabled
+            className="w-full min-h-11 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium cursor-not-allowed mt-4"
           >
-            Confirmar Pedido
+            Pedido no disponible (demo)
           </button>
         </form>
 
