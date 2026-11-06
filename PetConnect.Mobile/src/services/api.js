@@ -13,6 +13,14 @@ const HOST = Platform.select({
 
 export const API_BASE = `http://${HOST}:5000/api`;
 
+/**
+ * NC-005 (ítem 3.1): página de la Política de tratamiento de datos personales,
+ * publicada por la web (/politica-de-datos). Se abre en el navegador del celular.
+ * Solo vale en desarrollo (web en el puerto 5173 del computador); al desplegar
+ * debe salir de una variable de entorno, como la API (A-27, ítem 5.3).
+ */
+export const POLITICA_URL = `http://${HOST}:5173/politica-de-datos`;
+
 const TOKEN_KEY = "petconnect_token";
 
 async function apiFetch(path, options = {}) {
@@ -58,10 +66,12 @@ export function loginUser(email, password) {
   });
 }
 
-export function registerUser(name, email, password) {
+export function registerUser(name, email, password, aceptaDatos) {
   return apiFetch("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    // NC-005: la API solo acepta el booleano JSON true; "=== true" evita mandar
+    // un texto como "true" o un 1 (que la API rechazaría con 400).
+    body: JSON.stringify({ name, email, password, acepta_datos: aceptaDatos === true }),
   });
 }
 

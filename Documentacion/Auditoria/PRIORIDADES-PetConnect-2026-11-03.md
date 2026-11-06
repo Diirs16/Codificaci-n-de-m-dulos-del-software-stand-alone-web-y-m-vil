@@ -65,7 +65,7 @@ se borra de aquí y se marca `[x]` en su fase.
 
 | ✔ | # | ID | NC | Qué | Esfuerzo | Listo cuando |
 |---|---|---|---|---|---|---|
-| [ ] | 3.1 | A-20 | NC-005 | Casilla de autorización **sin marcar** + enlace a política en web y móvil; la API rechaza sin ella; guardar fecha y versión; quitar `acepta_datos=True` por defecto | 🟡 | Registro sin casilla → 400; con casilla → `acepta_datos=1` y fecha guardada — *Parte 1 de 3 (API + BD) hecha el 05/11/2026: `api.py` (`VERSION_POLITICA_DATOS = "1.0"`, 400 sin `"acepta_datos": true`, fecha y versión en el pendiente y en el usuario), modelo y DAO, `schema.sql` + migración `2026-11-05_autorizacion_datos.sql` (aplicada por el dueño); `tests/test_registro_datos.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Borrador de la política en `Documentacion/Legal/`. Parte 2 de 3 (web) hecha el 05/11/2026: casilla sin marcar con +18 y enlace a la política en pestaña nueva, aviso corto, mensaje sin llamar a la API (`RegisterModal.jsx`), `acepta_datos` booleano (`api.js`), página `/politica-de-datos` (`PoliticaDatos.jsx`, borrador con “Por definir”) y enlace en el pie; probada por el dueño con la API real (conteo `0 \| 10 \| 0` y `1 \| 1 \| 1`). Falta la parte 3 (móvil); NC-005 se cierra con ella* |
+| [x] | 3.1 | A-20 | NC-005 | Casilla de autorización **sin marcar** + enlace a política en web y móvil; la API rechaza sin ella; guardar fecha y versión; quitar `acepta_datos=True` por defecto | 🟡 | Registro sin casilla → 400; con casilla → `acepta_datos=1` y fecha guardada — *Parte 1 de 3 (API + BD) hecha el 05/11/2026: `api.py` (`VERSION_POLITICA_DATOS = "1.0"`, 400 sin `"acepta_datos": true`, fecha y versión en el pendiente y en el usuario), modelo y DAO, `schema.sql` + migración `2026-11-05_autorizacion_datos.sql` (aplicada por el dueño); `tests/test_registro_datos.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Borrador de la política en `Documentacion/Legal/`. Parte 2 de 3 (web) hecha el 05/11/2026: casilla sin marcar con +18 y enlace a la política en pestaña nueva, aviso corto, mensaje sin llamar a la API (`RegisterModal.jsx`), `acepta_datos` booleano (`api.js`), página `/politica-de-datos` (`PoliticaDatos.jsx`, borrador con “Por definir”) y enlace en el pie; probada por el dueño con la API real (conteo `0 \| 10 \| 0` y `1 \| 1 \| 1`). Parte 3 de 3 (móvil) hecha el 06/11/2026: casilla sin marcar con +18, enlace aparte “Leer los términos y condiciones que aceptas: Política…” (`Linking.openURL`), aviso corto y mensaje sin llamar a la API (`RegisterScreen.js`), `acepta_datos` booleano y `POLITICA_URL` (`api.js`); `npx expo export --platform web` OK y revisión a 375 px con la API simulada; probada por el dueño en el emulador con la API real (conteo `0 \| 5 \| 0` y `1 \| 1 \| 1`). NC-005 cerrada el 06/11/2026* |
 | [ ] | 3.2 | A-21 | — | Formularios de adopción, contacto y checkout: implementar el envío **o** rotular “Demo — no se envía” y deshabilitar | 🟢 (rotular) / 🔴 (implementar) | Ningún formulario dice “enviado” si no envió nada |
 | [ ] | 3.3 | A-23 | NC-009 | Web: estados de carga/vacío/error en Catálogo, Adopción, detalles y Home; `data/*.js` solo para pruebas | 🟡 | Con la API apagada, la web muestra un error, no perritos falsos |
 | [ ] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` |
@@ -144,9 +144,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 05/11/2026, actualizada al terminar la parte 2 del 3.1 (web): estado conocido al día y contexto de
-la parte 3 (móvil) del 3.1, que cierra NC-005. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada
-ítem o cada parte.*
+*Versión del 06/11/2026, actualizada al terminar el 3.1 (parte 3, móvil; NC-005 cerrada): estado conocido al día y
+contexto del 3.2. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -161,13 +160,12 @@ Lee primero:
   especificación; Parte D = decisiones pendientes)
 - git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
   git status -sb si hay commits sin push; el 05/11/2026 se subió todo hasta el
-  botón web del 2.7, 6e0bbc5; los commits de las partes 1 y 2 del 3.1 quedaron
-  sin push)
+  botón web del 2.7, 6e0bbc5; los 3 commits del 3.1 (API + BD, web y móvil)
+  quedaron sin push)
 
-Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el git log):
-- Hechos: 0.1, 1.1, 1.2 y toda la fase 2 (2.1 a 2.9; ver git log). Fase 3: el
-  3.1 va por partes: la parte 1 (API + BD) y la parte 2 (web) están hechas;
-  sigue la parte 3 (móvil), que cierra NC-005.
+Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9) y el 3.1 (3 partes: API +
+  BD, web y móvil; ver git log). NC-005 cerrada el 06/11/2026.
 - "Por actualizar" está vacía.
 - Pruebas: 125 (110 OK + 15 omitidas que necesitan MariaDB).
 - Autorización de datos (3.1 parte 1, NC-005 en corrección): api.py tiene
@@ -199,6 +197,31 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
   D.3 y D.5 salen como "Por definir"; si cambias el texto, cambia también el .md
   y sube la versión aquí y en la API). Ruta en App.jsx y enlace en Footer.jsx.
   Probada por el dueño con la API real: conteo 0 | 10 | 0 y 1 | 1 | 1.
+- Móvil (3.1 parte 3, hecha el 06/11/2026): RegisterScreen.js tiene la casilla
+  sin marcar (Pressable con role="checkbox" y aria-checked; se usan role/aria-*
+  porque react-native-web no traduce accessibilityState), el enlace en su propia
+  línea "Leer los términos y condiciones que aceptas: Política de tratamiento
+  de datos personales" (decisión del dueño; Linking.openURL(POLITICA_URL)), el
+  aviso B.2 y el error en una zona aria-live="polite". Sin marcar: mensaje B.3
+  y ninguna petición. ScrollView + KeyboardAvoidingView (behavior="padding",
+  offset con measureInWindow: en Expo 57 Android no encoge la ventana con el
+  teclado). api.js: registerUser(..., aceptaDatos) manda acepta_datos:
+  aceptaDatos === true y exporta POLITICA_URL (http://${HOST}:5173/
+  politica-de-datos; solo desarrollo, 5.3). Probado por el dueño en el
+  emulador: conteo 0 | 5 | 0 y 1 | 1 | 1 (el dueño borró sus cuentas de prueba
+  viejas el 06/11/2026; la cuenta del refugio de seed.py, dueña de las 6
+  mascotas, NO se debe borrar: ON DELETE CASCADE borraría las mascotas).
+  /impeccable audit 15/20 (foco a la casilla tras el error, android_ripple,
+  48 dp en el enlace: pulido opcional).
+- Emulador Android (PC del dueño): AVD Pixel_7. Encenderlo sin depender de una
+  terminal: Start-Process "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe"
+  -ArgumentList "-avd","Pixel_7". ANDROID_HOME está vacía: se creó
+  PetConnect.Mobile/android/local.properties con sdk.dir (android/ está en
+  .gitignore). Antes de npm run android, en ESA terminal:
+  $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr" (Java 21; con
+  el Java 25 del sistema falla configureCMakeDebug). La terminal de Metro no
+  sirve para escribir comandos (cada letra es un atajo: j abre DevTools, r
+  recarga). La web para el emulador: npm run dev -- --host 127.0.0.1.
 - La API NO tiene recargador: después de cambiar el backend hay que reiniciarla
   (Ctrl+C y ..\.venv\Scripts\python api.py desde petconnect.Backend). Para saber
   si corre el código nuevo: CreationDate del proceso (Get-CimInstance
@@ -209,7 +232,8 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
   las cuentas existentes y a quienes aceptaron una versión vieja, al iniciar
   sesión; nunca con un UPDATE que la invente); botón "borrar mi cuenta"
   (supresión, C.8) y llenar las decisiones D.1 a D.3, D.5 y D.6 de la política
-  (no bloquean el cierre técnico, sí la publicación).
+  (no bloquean el cierre técnico, sí la publicación). El móvil tampoco tiene
+  "Reenviar código" en "Verifica tu correo" (pendiente del 2.7).
 - Registro (2.7, A-09): AlmacenOTP tiene vigente(clave) (borra el pendiente si
   venció) y para_reenviar(clave) (60 s entre correos, máximo 3 reenvíos, no
   alarga los 10 minutos, no reenvía un código con 5 fallos). /register NO toca
@@ -284,33 +308,24 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
 - La web (src/services/api.js:20) y el móvil (src/services/api.js:34) muestran
   data.error con cualquier respuesta que no sea ok.
 
-Contexto del próximo paso (3.1 parte 3 de 3: MÓVIL, A-20, NC-005). Solo
-PetConnect.Mobile; no tocar backend ni web (regla 3). Si el plan ya fue
-aprobado en la sesión anterior, revisa si hay cambios sin commit en
-PetConnect.Mobile antes de tocar nada.
-- Hoy el registro del móvil recibe 400 "Debes autorizar el tratamiento de tus
-  datos personales para registrarte": la API ya lo exige (parte 1) y el móvil
-  no manda la casilla.
-- Móvil: src/screens/RegisterScreen.js (estados ~línea 15, handleRegister ~23
-  con registerUser en la 27, formulario ~71, botón "Registrarme" ~94; hoy no
-  tiene casilla ni enlace) y src/services/api.js:61 registerUser(name, email,
-  password), que debe mandar acepta_datos: aceptaDatos === true (igual que la
-  web). No hay componente de casilla ni expo-web-browser instalados: la casilla
-  se arma con Pressable + accessibilityRole="checkbox" +
-  accessibilityState={{ checked }} (sin librería nueva) y la política se abre
-  con Linking.openURL de react-native en el navegador del celular. Ojo: en el
-  emulador la web está en http://10.0.2.2:5173/politica-de-datos (misma lógica
-  que HOST en api.js); solo vale en desarrollo (A-27, 5.3).
-- Qué hacer (Parte B y C del borrador): los mismos textos B.1 (con +18), B.2 y
-  B.3 de la web; casilla SIN marcar, antes del botón; sin marcar → mensaje B.3
-  sin llamar a la API; área táctil de 44 px; leer bien en TalkBack.
-- Prueba: el móvil no tiene pruebas automáticas ni linter (package.json solo
-  tiene start, android, ios y web); revisión en el emulador Android. El dueño prueba
-  con la API real: sin marcar → mensaje sin petición; el enlace abre la
-  política; marcada → código → cuenta creada; conteo → la fila de 1 sube a 2.
-  Usar vercel-react-native-skills y /impeccable audit al final.
-- Al terminar: NC-005 "Cerrada el dd/mm/2026" en GA9 (fila ~708, H-08 ~167,
-  CP-001 ~672), "Estado" de A-20 en la AUDITORÍA y [x] en el 3.1.
+Contexto del próximo paso (3.2, A-21, sin NC): formularios que dicen "enviado"
+sin enviar nada y recogen datos personales (Ley 1581). Solo web
+(PetConnect.Front/petconnect-app), salvo que el plan aprobado diga otra cosa.
+- PetDetail.jsx: solicitud de adopción (estado submitted ~13, handleSubmit ~56,
+  "Solicitud Enviada ... Nos pondremos en contacto contigo pronto" ~66-69,
+  formulario ~144). Contact.jsx: contacto (submitted ~5, handleSubmit ~15,
+  "Mensaje Enviado" ~24, formulario ~52). Checkout.jsx: compra (handleSubmit
+  ~41, formulario ~60; lleva a Confirmation.jsx). Ninguno llama a la API.
+- Dos caminos (preguntar al dueño): rotular "Demo — no se envía" y deshabilitar
+  el envío (🟢, solo web, sin recoger datos) o implementar el envío (🔴: endpoint
+  con @require_auth, tabla, consentimiento y nueva versión de la política, que
+  hoy no cubre solicitudes de adopción ni contacto; ver Parte C, "Fuera del
+  3.1"). Lo simple primero: rotular, y anotar el envío real como ítem futuro.
+- Revisar que ningún texto diga "enviado", "recibimos" o "nos pondremos en
+  contacto" si no se envió nada; no guardar lo escrito en localStorage.
+- Prueba: la web no tiene pruebas automáticas; npm run lint y npm run build,
+  revisión a 375 px y /impeccable audit. Sin NC asociada (GA9 no cambia salvo
+  que el dueño decida abrir una).
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -349,7 +364,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.1, parte 3 de 3 (móvil)** (A-20, NC-005). Las partes 1 (API + BD) y 2 (web) quedaron hechas el
-05/11/2026; la web se probó con la API real. Hasta terminar la parte 3, el registro del móvil responde 400 porque
-todavía no manda la casilla. Con la parte 3 se cierra NC-005. Después: 3.2, y el 3.5 (autorización de las cuentas
-existentes) cuando toque.
+**Próximo ítem: 3.2** (A-21): formularios de adopción, contacto y checkout que dicen “enviado” sin enviar nada. El 3.1
+quedó hecho el 06/11/2026 en sus 3 partes (API + BD, web y móvil) y cerró NC-005. Después: 3.3, y el 3.5
+(autorización de las cuentas existentes) cuando toque.

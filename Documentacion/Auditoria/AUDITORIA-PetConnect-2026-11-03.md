@@ -369,7 +369,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - `api.py:409` crea el usuario con `acepta_datos=True` fijo; `modelo/usuario.py:10` también lo trae en `True` por
   defecto. Ni la web ni el móvil tienen casilla.
 - **Arreglo:** casilla **sin marcar** con enlace a la política; la API rechaza el registro sin ella; guardar fecha y versión.
-- **Estado: en corrección desde el 05/11/2026 (ítem 3.1 de PRIORIDADES, parte 2 de 3: API + BD y web hechas; falta el móvil).**
+- **Estado: resuelto el 06/11/2026 (ítem 3.1 de PRIORIDADES, en 3 partes: API + BD, web y móvil). NC-005 cerrada.**
   Borrador de la política v1.0: [POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md](../Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md)
   (texto para publicar, textos de la casilla y del aviso, especificación y decisiones pendientes: responsable, correo
   de contacto, alojamiento y mayoría de edad). Lo deben validar el dueño y el instructor antes de publicarlo.
@@ -400,8 +400,30 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `/impeccable audit` 17/20. La web no tiene pruebas automáticas (regresión manual). Prueba con la API real (dueño,
   05/11/2026, tras reiniciar la API: el 500 de `/verify` del intento anterior era la API corriendo con el código viejo):
   sin la casilla → 400; el enlace abre la política en otra pestaña; con la casilla → código → cuenta creada; conteo
-  `0 | 10 | 0` y `1 | 1 | 1`. Hasta la parte 3, el móvil recibe ese 400 al registrarse (no manda la casilla).
-  Pendiente sin cerrar la NC: pedir la autorización a las cuentas existentes al iniciar sesión (ítem 3.5); nunca con un
+  `0 | 10 | 0` y `1 | 1 | 1`.
+  **Móvil (parte 3, 05 y 06/11/2026):** `src/screens/RegisterScreen.js` tiene, antes de “Registrarme”, la casilla **sin
+  marcar** (`Pressable` con `role="checkbox"` y `aria-checked`, más de 44 px de alto) con el texto B.1 (+18), el enlace
+  en su propia línea “Leer los términos y condiciones que aceptas: Política de tratamiento de datos personales” (abre
+  `/politica-de-datos` en el navegador del celular con `Linking.openURL`) y el aviso B.2. Sin marcar: mensaje B.3 en una
+  zona `aria-live="polite"` y **ninguna** petición. `src/services/api.js`: `acepta_datos: aceptaDatos === true` y
+  `POLITICA_URL` (`http://${HOST}:5173/politica-de-datos`; solo desarrollo, A-27). El formulario va en `ScrollView` +
+  `KeyboardAvoidingView` (`behavior="padding"`, desplazamiento medido con `measureInWindow`), porque en Expo 57 la ventana
+  de Android no se encoge con el teclado. Decisiones del dueño: enlace aparte (dentro de la casilla, TalkBack lo leería
+  como un solo elemento y no podría abrirlo) y que el enlace mencione “términos y condiciones” además del nombre de la
+  política; sin librerías nuevas (`expo-web-browser`, casillas) ni copia de la política dentro de la app. Se usan
+  `role`/`aria-*` en lugar de `accessibilityRole`/`accessibilityState` porque `react-native-web` no traduce
+  `accessibilityState` y en React Native 0.86 hacen lo mismo en Android. El móvil no tiene pruebas automáticas ni linter
+  (regresión manual): `npx expo export --platform web` sin errores; a 375 px con la API simulada, sin marcar → mensaje y
+  0 peticiones a `/api/auth/`, marcada → 1 petición con `"acepta_datos": true` (booleano). `/impeccable audit` 15/20:
+  foco a la casilla tras el error, colores fijos y solo modo claro (de toda la app), sin `android_ripple` y enlace de
+  44 px (Material pide 48 dp); ninguno bloquea la NC. Prueba con la API real en el emulador Android (Pixel 7), ejecutada
+  por el dueño el 06/11/2026: el enlace abrió la política; registro con la casilla marcada → código → cuenta creada y
+  sesión iniciada; conteo tras borrar el dueño sus cuentas de prueba anteriores: `0 | 5 | 0` y `1 | 1 | 1`. El caso “sin
+  marcar” se verificó en la compilación web (mismo código), no en el emulador.
+  Entorno del emulador (solo en el PC del dueño, nada en git): `android/local.properties` con `sdk.dir` (faltaba
+  `ANDROID_HOME`) y `JAVA_HOME` apuntando al Java 21 de Android Studio (`jbr`) en la terminal de `npm run android`: con
+  el Java 25 del sistema falla `configureCMakeDebug`.
+  Pendiente fuera de la NC: pedir la autorización a las cuentas existentes al iniciar sesión (ítem 3.5); nunca con un
   `UPDATE` que la invente.
 
 #### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
