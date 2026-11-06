@@ -144,8 +144,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 06/11/2026, actualizada al terminar el 3.1 (parte 3, móvil; NC-005 cerrada): estado conocido al día y
-contexto del 3.2. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 06/11/2026, actualizada al terminar el 3.1 (parte 3, móvil; NC-005 cerrada), la D.1 de la política y
+el correo en el aviso del móvil: estado conocido al día y contexto del 3.2. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -160,15 +160,17 @@ Lee primero:
   especificación; Parte D = decisiones pendientes)
 - git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
   git status -sb si hay commits sin push; el 05/11/2026 se subió todo hasta el
-  botón web del 2.7, 6e0bbc5; los 3 commits del 3.1 (API + BD, web y móvil)
-  quedaron sin push)
+  botón web del 2.7, 6e0bbc5; al cerrar el 06/11/2026 quedaron 5 commits sin
+  push: los 3 del 3.1 (31f005c API + BD, fa1dda3 web, 6f0bdc9 móvil), 0a5e1dd
+  (D.1: responsable y correo de atención en la política) y b8d5ec2 (ese correo
+  en el aviso del móvil). Pregunta al dueño si quiere hacer push antes de seguir)
 
 Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9) y el 3.1 (3 partes: API +
   BD, web y móvil; ver git log). NC-005 cerrada el 06/11/2026.
 - "Por actualizar" está vacía.
 - Pruebas: 125 (110 OK + 15 omitidas que necesitan MariaDB).
-- Autorización de datos (3.1 parte 1, NC-005 en corrección): api.py tiene
+- Autorización de datos (3.1 parte 1, NC-005 cerrada): api.py tiene
   VERSION_POLITICA_DATOS = "1.0" y _MENSAJE_SIN_AUTORIZACION. /register exige
   "acepta_datos": true (solo el booleano JSON, con `is True`) justo después de
   revisar los campos obligatorios, antes del nombre, el DNS, la BD, la revisión
