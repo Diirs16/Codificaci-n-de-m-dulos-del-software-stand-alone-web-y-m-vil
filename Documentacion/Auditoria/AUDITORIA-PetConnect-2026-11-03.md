@@ -478,6 +478,34 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `PetDetail.jsx:21-31`, `ProductDetail.jsx:24-30` → `.catch(() => {})` o *fallback* a `data/*.js`.
 - `Home.jsx:4,8-9` **siempre** usa `data/products.js` (campos `discount`/`isNew` que la BD no tiene) [N].
 - Así se ocultó NC-009. **Arreglo:** estados de carga / vacío / error como en el móvil; usar `data/*.js` solo en pruebas.
+- **Estado: resuelto el 06/11/2026 (ítem 3.3 de PRIORIDADES); solo web. NC-009 cerrada.** Decisiones del dueño: Home
+  muestra los productos reales de la API y se borran `src/data/pets.js` y `src/data/products.js` (git conserva la
+  historia). `src/services/api.js`: cada error lleva `status` (código HTTP; `0` si el servidor no respondió), así las
+  páginas distinguen “no encontrada” (404) de “no pudimos cargar” (503 BD caída, 502 proxy de Vite sin API, 0 sin
+  conexión). Componente nuevo `src/components/EstadoCarga.jsx`: estados “cargando” (`role="status"`), “error”
+  (`role="alert"` + botón “Reintentar”) y “vacío”; con `encabezado="h1"` en las fichas para que la página no pierda su
+  título. `Adoption.jsx` y `Catalog.jsx` empiezan vacíos y en “cargando” (ya no con 6 mascotas / 12 productos
+  inventados); con 0 resultados muestran “Por ahora no hay mascotas en adopción” / “Todavía no hay productos”; las
+  categorías del catálogo salen de la API. `PetDetail.jsx` y `ProductDetail.jsx`: 404 → “no encontrada”; otro error →
+  “No pudimos cargar…” con “Reintentar” y “Volver”; nunca la ficha falsa ni el formulario demo del 3.2. `Home.jsx`: las
+  secciones “Ofertas destacadas” y “Nuevos productos” (descuento y “nuevo” que la BD no tiene) se cambian por
+  “Productos destacados”: los 4 primeros productos de la API, con los mismos estados.
+  Prueba de regresión: la web no tenía pruebas; se agregó `npm test` (`node --test`, incluido en Node, sin dependencias
+  nuevas): `tests/api.test.js` (404, 503, 502 sin cuerpo, servidor que no responde y respuesta correcta, con `fetch`
+  simulado) y `tests/sin-datos-falsos.test.js` (ningún archivo de `src/` importa `data/`). Con el código viejo fallan
+  5 de 6 (pasa a propósito la de la respuesta correcta, que comprueba que no se rompió lo que funcionaba); con el nuevo
+  pasan 6 de 6. Lint 0 errores, build OK. Revisión a 375 px con la API apagada: Adopción, Catálogo, Home y las dos
+  fichas muestran el error (ningún perrito ni producto), sin desborde horizontal; con `fetch` simulado en el navegador:
+  404 → “Mascota no encontrada”, lista vacía → estado vacío, “Reintentar” con datos → tarjetas. Contraprueba visual con
+  el código viejo y la API apagada: las 6 mascotas falsas, la ficha falsa de “Luna” con “Solicitar Adopción” y las
+  “Ofertas destacadas”. Probado por el dueño con la API real el 06/11/2026: Adopción con las 6 mascotas de la BD,
+  `/adopcion/99999` → “Mascota no encontrada”, Home con productos reales (API: 200, 404 y 200). `/impeccable audit` 17/20 (detector sin hallazgos; pendiente opcional: el foco se va al
+  `body` cuando “Reintentar” desaparece; sin modo oscuro ni tokens, como el resto de la web).
+  Fuera de este ítem: las etiquetas “Nuevo” / “-x%” y el precio anterior de `ProductCard.jsx` y `ProductDetail.jsx`
+  quedan sin uso (la API no manda esos campos) y Home sigue prometiendo “Envío en 24-48 horas” y “garantía de
+  devolución”, que la demo no ofrece (anotado como pendiente). En la prueba del dueño se vio además que el pie
+  (`Footer.jsx`) muestra un contacto inventado (`info@petconnect.com`, `+57 300 123 4567`, Bogotá) que contradice la
+  D.1 de la política (correo de atención y Armenia): pendiente sin ítem.
 
 #### A-24 · 🟡 Media · La sesión web nunca se revalida [A]
 - `AuthContext.jsx:23-33` carga el usuario de `localStorage` y lo da por bueno siempre, aunque el token (24 h) venza.
@@ -571,7 +599,7 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
 | 4 | Singleton de una conexión (NC-003) | ✅ Cierto | A-11; ojo con A-12 al pasar a Gunicorn |
 | 5 | `debug=True` (`:458`), `str(e)`, secreto JWT por defecto (`jwt_helper.py:9`) | ✅ Cierto, **probado** | Además 404/405 se vuelven 500 (A-08) |
 | 6 | `acepta_datos=True` fijo (NC-005) | ✅ Cierto | Hoy está en `api.py:409` (el plan cita la 401) |
-| 7 | La web esconde errores con datos falsos | ✅ Cierto | Y `Home` siempre usa datos fijos (A-23) |
+| 7 | La web esconde errores con datos falsos | ✅ Cierto | Y `Home` siempre usa datos fijos (A-23; resuelto el 06/11/2026, ítem 3.3) |
 | 8 | Checkout falso (`Checkout.jsx:41`) | ✅ Cierto | También adopción y contacto (A-21) |
 | 9 | NC-009, enum sin `en_adopcion` | ⚠️ No verificable en el repo | No hay esquema SQL; se acepta por la evidencia del equipo (AA2, CP-012) |
 | 10 | Móvil fijo a `10.0.2.2` (`api.js:14`) | ✅ Cierto con matiz | En web usa `localhost`; HTTP solo permitido en *debug* (A-27) |

@@ -1,6 +1,16 @@
 const API_BASE = "/api";
 const TOKEN_KEY = "petconnect_token";
 
+// Ítem 3.3 (A-23): cada error lleva `status`, el número de respuesta HTTP
+// (404 = no existe, 503 = BD caída, 502 = el proxy de Vite no encontró la API).
+// Vale 0 si el servidor ni siquiera respondió. Así las páginas distinguen
+// "no encontrada" de "no pudimos cargar" sin comparar textos.
+function errorDeApi(mensaje, status) {
+  const error = new Error(mensaje);
+  error.status = status;
+  return error;
+}
+
 async function apiFetch(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = {
@@ -9,15 +19,20 @@ async function apiFetch(path, options = {}) {
     ...options.headers,
   };
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  } catch {
+    throw errorDeApi("No se pudo conectar con el servidor", 0);
+  }
 
   let data;
   try {
     data = await res.json();
   } catch {
-    throw new Error(`Error ${res.status}: respuesta inválida del servidor`);
+    throw errorDeApi(`Error ${res.status}: respuesta inválida del servidor`, res.status);
   }
-  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  if (!res.ok) throw errorDeApi(data.error || `Error ${res.status}`, res.status);
   return data;
 }
 

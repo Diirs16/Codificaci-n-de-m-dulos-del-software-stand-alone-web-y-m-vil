@@ -1,48 +1,78 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Check, X as XIcon, Heart } from "lucide-react";
-import { pets as staticPets } from "../data/pets";
 import { getMascota } from "../services/api";
 import AvisoDemo from "../components/AvisoDemo";
+import EstadoCarga from "../components/EstadoCarga";
 
 // Clases de los campos bloqueados del formulario demo (3.2): no se puede escribir en ellos.
 const CAMPO_DEMO =
   "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-not-allowed";
 
+const VOLVER_ADOPCION = (
+  <Link
+    to="/adopcion"
+    className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-medium text-black no-underline hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+  >
+    <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+    Volver a adopción
+  </Link>
+);
+
 export default function PetDetail() {
   const { id } = useParams();
   const [pet, setPet] = useState(null);
-  const [notFound, setNotFound] = useState(false);
+  // 3.3 (A-23): "no-encontrada" solo si la API respondió 404 (no existe o no
+  // está en adopción, ítem 2.9). Cualquier otro fallo (503 BD caída, 502 API
+  // apagada, 0 sin conexión) es "error". Antes, si la API fallaba, se mostraba
+  // una mascota inventada de data/pets.js con su formulario de adopción.
+  const [estado, setEstado] = useState("cargando"); // "cargando" | "no-encontrada" | "error" | "listo"
+  const [intento, setIntento] = useState(0); // al sumar 1, se vuelve a pedir la ficha
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
+    let vigente = true; // evita actualizar la página si el usuario ya se fue
     getMascota(id)
-      .then(setPet)
-      .catch(() => {
-        const fallback = staticPets.find((p) => p.id === Number(id));
-        if (fallback) {
-          setPet(fallback);
-        } else {
-          setNotFound(true);
-        }
+      .then((data) => {
+        if (!vigente) return;
+        setPet(data);
+        setEstado("listo");
+      })
+      .catch((e) => {
+        if (vigente) setEstado(e.status === 404 ? "no-encontrada" : "error");
       });
-  }, [id]);
+    return () => {
+      vigente = false;
+    };
+  }, [id, intento]);
 
-  if (notFound) {
-    return (
-      <main className="max-w-7xl mx-auto px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold mb-4">Mascota no encontrada</h1>
-        <Link to="/adopcion" className="text-black underline hover:no-underline">
-          Volver a adopción
-        </Link>
-      </main>
-    );
+  function reintentar() {
+    setEstado("cargando");
+    setIntento((n) => n + 1);
   }
 
-  if (!pet) {
+  if (estado !== "listo") {
     return (
-      <main className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-400">
-        Cargando información de la mascota...
+      <main className="max-w-7xl mx-auto px-4 py-16">
+        {estado === "cargando" && (
+          <EstadoCarga tipo="cargando" encabezado="h1" titulo="Cargando información de la mascota…" />
+        )}
+        {estado === "no-encontrada" && (
+          <EstadoCarga tipo="vacio" encabezado="h1" titulo="Mascota no encontrada" accion={VOLVER_ADOPCION}>
+            Puede que ya haya sido adoptada o que ya no esté disponible.
+          </EstadoCarga>
+        )}
+        {estado === "error" && (
+          <EstadoCarga
+            tipo="error"
+            encabezado="h1"
+            titulo="No pudimos cargar la información de esta mascota"
+            onReintentar={reintentar}
+            accion={VOLVER_ADOPCION}
+          >
+            Revisa tu conexión o inténtalo de nuevo en unos minutos.
+          </EstadoCarga>
+        )}
       </main>
     );
   }

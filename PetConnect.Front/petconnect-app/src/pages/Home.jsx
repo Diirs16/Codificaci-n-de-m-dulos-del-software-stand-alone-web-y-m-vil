@@ -1,14 +1,44 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Heart, Truck, Shield } from "lucide-react";
 import ProductCard from "../components/ProductCard";
-import { products } from "../data/products";
+import EstadoCarga from "../components/EstadoCarga";
+import { getProductos } from "../services/api";
 import { useScrollReveal } from "../assets/js/useScrollReveal";
 
+// Cuántos productos de la API se muestran en "Productos destacados".
+const CANTIDAD_DESTACADOS = 4;
+
 export default function Home() {
-  const discountProducts = products.filter((p) => p.discount > 0).slice(0, 4);
-  const newProducts = products.filter((p) => p.isNew).slice(0, 4);
+  // 3.3 (A-23): antes Home SIEMPRE usaba productos inventados de
+  // data/products.js, con "descuento" y "nuevo", datos que la BD no tiene.
+  // Ahora muestra los primeros productos reales de la API, en una sola sección.
+  const [products, setProducts] = useState([]);
+  const [estado, setEstado] = useState("cargando"); // "cargando" | "error" | "listo"
+  const [intento, setIntento] = useState(0); // al sumar 1, se vuelve a pedir la lista
 
   useScrollReveal();
+
+  useEffect(() => {
+    let vigente = true; // evita actualizar la página si el usuario ya se fue
+    getProductos()
+      .then((data) => {
+        if (!vigente) return;
+        setProducts(data.slice(0, CANTIDAD_DESTACADOS));
+        setEstado("listo");
+      })
+      .catch(() => {
+        if (vigente) setEstado("error");
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [intento]);
+
+  function reintentar() {
+    setEstado("cargando");
+    setIntento((n) => n + 1);
+  }
 
   return (
     <main className="page-enter">
@@ -74,10 +104,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Discount Products */}
+      {/* Productos destacados (de la API; 3.3) */}
       <section className="max-w-7xl mx-auto px-4 py-10">
         <div className="scroll-reveal flex items-center justify-between mb-6">
-          <h2 className="text-xl md:text-2xl font-bold">Ofertas destacadas</h2>
+          <h2 className="text-xl md:text-2xl font-bold">Productos destacados</h2>
           <Link
             to="/catalogo"
             className="link-animate text-sm text-gray-500 hover:text-black no-underline flex items-center gap-1"
@@ -85,33 +115,28 @@ export default function Home() {
             Ver todo <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {discountProducts.map((product, i) => (
-            <div key={product.id} className={`scroll-reveal stagger-${i + 1}`}>
-              <ProductCard product={product} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* New Products */}
-      <section className="max-w-7xl mx-auto px-4 py-10">
-        <div className="scroll-reveal flex items-center justify-between mb-6">
-          <h2 className="text-xl md:text-2xl font-bold">Nuevos productos</h2>
-          <Link
-            to="/catalogo"
-            className="link-animate text-sm text-gray-500 hover:text-black no-underline flex items-center gap-1"
+        {estado === "cargando" && <EstadoCarga tipo="cargando" titulo="Cargando productos…" />}
+        {estado === "error" && (
+          <EstadoCarga
+            tipo="error"
+            titulo="No pudimos cargar los productos"
+            onReintentar={reintentar}
           >
-            Ver todo <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {newProducts.map((product, i) => (
-            <div key={product.id} className={`scroll-reveal stagger-${i + 1}`}>
-              <ProductCard product={product} />
-            </div>
-          ))}
-        </div>
+            Revisa tu conexión o inténtalo de nuevo en unos minutos.
+          </EstadoCarga>
+        )}
+        {estado === "listo" && products.length === 0 && (
+          <EstadoCarga tipo="vacio" titulo="Todavía no hay productos en el catálogo" />
+        )}
+        {estado === "listo" && products.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {products.map((product, i) => (
+              <div key={product.id} className={`scroll-reveal stagger-${i + 1}`}>
+                <ProductCard product={product} />
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* CTA Adoption */}
