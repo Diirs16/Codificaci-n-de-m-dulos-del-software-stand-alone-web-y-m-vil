@@ -366,8 +366,10 @@ export default function RegisterModal() {
                 </div>
                 <p id="reg-acepta-aviso" className="mt-2 pl-8 text-xs leading-relaxed text-gray-600">
                   Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación.
-                  En la política te explicamos cómo conocer, actualizar, corregir o borrar tus datos y
-                  cómo retirar este permiso.
+                  Puedes conocer, actualizar, rectificar o borrar tus datos y revocar este permiso
+                  escribiendo a{" "}
+                  {/* Correo de atención del proyecto (D.1, 06/11/2026); el mismo de PoliticaDatos.jsx */}
+                  <span className="break-words font-medium text-gray-800">proyectopetconnect+atencion@gmail.com.</span>
                 </p>
               </div>
 

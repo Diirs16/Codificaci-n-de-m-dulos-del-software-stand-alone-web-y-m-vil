@@ -28,11 +28,13 @@ El responsable del tratamiento de tus datos personales es:
 
 | Dato | Valor |
 |---|---|
-| Nombre | [PENDIENTE: nombre de la persona o del equipo responsable de PetConnect] |
-| Domicilio | [PENDIENTE: ciudad], Colombia |
-| Dirección física | [PENDIENTE: dirección de notificación] |
-| Correo para temas de datos personales | [PENDIENTE: correo exclusivo, ej. datos@…] |
-| Teléfono | [PENDIENTE: teléfono de contacto] |
+| Nombre | PetConnect y sus asociados: Daniel Jimenez, Andrea Silva, Nelson Perez y Andrea Yasmin |
+| Domicilio | Armenia, Quindío, Colombia |
+| Dirección física | Cra. 6 # 17 Norte 01, Armenia, Quindío |
+| Correo para temas de datos personales | proyectopetconnect+atencion@gmail.com |
+| Teléfono | 324 368 2078 |
+
+(Datos de A.1 decididos por el dueño del proyecto el 06/11/2026, D.1.)
 
 PetConnect es una plataforma para personas que tienen mascotas o quieren adoptar una. Reúne adopción, catálogo de
 productos y directorio de servicios. [PENDIENTE: decidir si se aclara que es un proyecto formativo del SENA, ficha
@@ -114,7 +116,7 @@ Como titular tienes derecho a (Ley 1581, art. 8):
 
 ### A.8 Cómo ejercer tus derechos
 
-Escríbenos a **[PENDIENTE: correo de datos personales]** desde el correo de tu cuenta, para que podamos comprobar que
+Escríbenos a **proyectopetconnect+atencion@gmail.com** desde el correo de tu cuenta, para que podamos comprobar que
 eres tú sin pedirte más datos. También pueden hacerlo tus causahabientes o tu representante, demostrando esa calidad.
 
 **Consultas** (quieres saber qué datos tenemos o cómo los usamos): te respondemos en máximo **10 días hábiles**
@@ -200,11 +202,11 @@ en el formulario; en el móvil abre la misma página.
 
 **B.2 Aviso corto** (letra pequeña, debajo de la casilla; cumple el deber de informar del art. 12 de la Ley 1581):
 
-> Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación. En la política te explicamos
-> cómo conocer, actualizar, corregir o borrar tus datos y cómo retirar este permiso.
+> Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación. Puedes conocer, actualizar,
+> rectificar o borrar tus datos y revocar este permiso escribiendo a proyectopetconnect+atencion@gmail.com.
 
-(Redacción cambiada el 05/11/2026 para no mostrar un dato “por definir” dentro del formulario: el correo de contacto
-está en la política, sección A.8, a un clic.)
+(El 05/11/2026 se quitó el correo porque aún estaba “por definir”; el 06/11/2026, con el correo decidido (D.1), el
+dueño del proyecto pidió volver a mostrarlo en el aviso. El correo también está en la política, secciones A.1 y A.8.)
 
 **B.3 Mensajes:**
 
@@ -231,7 +233,7 @@ está en la política, sección A.8, a un clic.)
 | C.5 | Conservar la prueba de la autorización | Ley 1581, art. 17 b; Decreto 1377, art. 8 | Columnas `usuarios.fecha_autorizacion_datos` (DATETIME) y `usuarios.version_politica_datos` (VARCHAR); la fecha es la de `/register` y la versión sale de `VERSION_POLITICA_DATOS = "1.0"` en el servidor | 1 (API + BD) |
 | C.6 | No afirmar una autorización que no existe | Ley 1581, arts. 4 y 9 | `acepta_datos` sin `DEFAULT 1` (pasa a `NOT NULL DEFAULT 0`); `Usuario()` trae `False`; regla `CHECK`: `acepta_datos = 0` o fecha y versión presentes; los usuarios existentes sin fecha pasan a `0` en la migración | 1 (BD) |
 | C.7 | Política publicada y disponible | Decreto 1377, art. 13 | Página web `/politica-de-datos` con la Parte A, enlazada desde el registro y el pie de página | 2 |
-| C.8 | Canal para consultas y reclamos | Ley 1581, arts. 14 y 15 | Correo de A.8 (proceso manual). Un botón de “borrar mi cuenta” queda para un ítem futuro | Fuera del 3.1 |
+| C.8 | Canal para consultas y reclamos | Ley 1581, arts. 14 y 15 | Correo de A.8, `proyectopetconnect+atencion@gmail.com` (decidido el 06/11/2026; proceso manual). Un botón de “borrar mi cuenta” queda para un ítem futuro | Fuera del 3.1 |
 | C.9 | Cambios en la política | Decreto 1377, art. 13 | Cambiar el texto obliga a subir `VERSION_POLITICA_DATOS`; volver a pedir la autorización a quienes aceptaron una versión vieja queda para un ítem futuro | Fuera del 3.1 |
 | C.10 | Usuarios sin autorización registrada | Riesgo R05 del plan GA9 (contingencia) | Quedan con `acepta_datos = 0`; pedirles la autorización al iniciar sesión queda para un ítem futuro | Fuera del 3.1 |
 | C.11 | Datos personales fuera de los registros técnicos | Ley 1581, art. 4 (seguridad y confidencialidad) | Ya cumplido en el 2.8: los registros no llevan correos ni códigos | Hecho |
@@ -246,7 +248,7 @@ que hoy no envían nada, son el 3.2: si algún día envían datos, esta polític
 
 | # | Decisión | Recomendación |
 |---|---|---|
-| D.1 | Quién figura como responsable (A.1) y con qué correo de contacto | Un correo del proyecto, no uno personal |
+| D.1 | Quién figura como responsable (A.1) y con qué correo de contacto | **Decidido el 06/11/2026:** PetConnect y sus asociados: Daniel Jimenez, Andrea Silva, Nelson Perez y Andrea Yasmin; Armenia, Quindío; Cra. 6 # 17 Norte 01; `proyectopetconnect+atencion@gmail.com`; 324 368 2078 |
 | D.2 | Si se dice que es un proyecto formativo del SENA | Sí, mientras no sea un servicio real |
 | D.3 | Dónde se alojará la API y la BD (A.9) | Llenarlo antes de publicar en internet (ítem 5.5) |
 | D.4 | Solo mayores de 18 años (A.12) | **Decidido el 05/11/2026: sí**, declarado en la misma casilla (B.1) |
@@ -259,14 +261,14 @@ que hoy no envían nada, son el 3.2: si algún día envían datos, esta polític
 
 | Categoría | Archivo / sección | Hallazgo | Gravedad | Acción sugerida |
 |---|---|---|---|---|
-| Datos personales | Este archivo, A.1 y B.2 | El responsable y el correo de contacto están `[PENDIENTE]`; sin ellos la política no cumple el art. 12 d) de la Ley 1581 | Alta | Llenar D.1 antes de publicar |
+| Datos personales | Este archivo, A.1 | Desde el 06/11/2026 A.1 publica a propósito los nombres de los integrantes, una dirección y un teléfono (lo exige el Decreto 1377, art. 13). Cada integrante debe estar de acuerdo con que su nombre salga en la web, y conviene que el teléfono y la dirección sean del proyecto o del centro, no personales | Media | Confirmarlo con el equipo y el instructor antes de publicar |
 | Datos personales | A.9 | La transmisión a Google (Gmail) y al futuro alojamiento debe revisarla un profesional | Media | Validar con el instructor; llenar D.3 |
 | Datos personales | A.10 | Hoy la web y el móvil hablan con la API por HTTP sin cifrar en desarrollo (A-27), y el token del móvil está en AsyncStorage sin cifrar (A-28). A.10 no promete HTTPS a propósito | Media | Hacer el 5.3 antes de publicar en internet y entonces agregar “conexión cifrada (HTTPS)” a A.10 |
 | Datos personales | A.11 | Hoy los registros pendientes vencidos no se limpian de la memoria (A-12) | Baja | El 4.6 los limpia. El texto dice solo lo que es cierto hoy |
-| Datos personales | Todo el archivo | Sin datos reales: solo marcadores `[PENDIENTE]` | — | Ninguna |
+| Datos personales | Todo el archivo | Fuera de A.1 no hay datos de personas: solo marcadores `[PENDIENTE]` | — | Ninguna |
 | Salud animal | A.4 | Solo nombra que existen datos de vacunas; no da información veterinaria | — | No necesita `REVISAR-VETERINARIO` |
 | Imágenes | — | No hay imágenes | — | Ninguna |
 | Legal | Todo el archivo | Lo redactó una IA; las citas (Ley 1581 arts. 3, 8, 9, 10, 12, 14, 15, 16, 17, 26; Decreto 1377 arts. 7, 8, 11, 13, 24, 25; Decreto 090 de 2018) se deben comparar con el texto oficial | Alta | Validación del dueño y del instructor |
 
-**Veredicto: pendiente de** llenar D.1 a D.3, D.5 y D.6 (D.4 ya está decidido), validar el texto legal con el instructor y hacer el 5.3 (HTTPS) antes de
+**Veredicto: pendiente de** llenar D.2, D.3, D.5 y D.6 (D.1 y D.4 ya están decididos), validar el texto legal con el instructor y hacer el 5.3 (HTTPS) antes de
 publicar en internet. Para desarrollo y para la evidencia GA9, el borrador sirve para implementar las 3 partes del 3.1.

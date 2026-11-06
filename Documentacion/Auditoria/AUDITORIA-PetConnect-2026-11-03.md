@@ -393,9 +393,10 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   el enlace a `/politica-de-datos` en una pestaña nueva y el aviso corto B.2 debajo. Sin marcar: mensaje B.3 con
   `role="alert"`, foco en la casilla y **ninguna** petición a la API. `src/services/api.js` manda `acepta_datos` solo como
   booleano (`=== true`). Página nueva `src/pages/PoliticaDatos.jsx` (ruta en `App.jsx`, enlace en `Footer.jsx`) con la
-  Parte A, rotulada “Borrador en revisión” y con los datos de D.1, D.3 y D.5 como “Por definir”. El modal se desplaza si
+  Parte A, rotulada “Borrador en revisión” y con los datos de D.3 y D.5 como “Por definir” (D.1 se completó el 06/11/2026). El modal se desplaza si
   no cabe a 375 px. Decisiones de la parte 2: página propia en JSX (no leer el `.md`, que exigiría una librería nueva), los
-  pendientes visibles como “Por definir” y el aviso B.2 sin el correo de contacto (está en la política, a un clic).
+  pendientes visibles como “Por definir”. El 06/11/2026 el dueño decidió el correo de atención (`proyectopetconnect+atencion@gmail.com`, D.1),
+  que ya aparece en la política (secciones 1 y 8) y en el aviso B.2.
   `npm run lint` 0 errores (2 avisos de siempre), `npm run build` OK, revisión a 375 y 1280 px con respuestas simuladas,
   `/impeccable audit` 17/20. La web no tiene pruebas automáticas (regresión manual). Prueba con la API real (dueño,
   05/11/2026, tras reiniciar la API: el 500 de `/verify` del intento anterior era la API corriendo con el código viejo):

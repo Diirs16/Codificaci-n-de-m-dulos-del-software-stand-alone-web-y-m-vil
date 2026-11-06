@@ -8,6 +8,20 @@ import { AlertTriangle } from "lucide-react";
 // de qué aceptó cada persona.
 // BORRADOR: lo deben validar el dueño del proyecto y el instructor antes de publicarlo.
 const VERSION_POLITICA = "1.0";
+// Correo de atención del proyecto (decisión D.1, 06/11/2026). Es del proyecto, no de una persona.
+const CORREO_DATOS = "proyectopetconnect+atencion@gmail.com";
+
+/** Enlace al correo de datos; break-words: baja entero de línea y solo se parte si no cabe solo (375 px). */
+function CorreoDatos() {
+  return (
+    <a
+      href={`mailto:${CORREO_DATOS}`}
+      className="font-medium text-black underline underline-offset-2 break-words hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+    >
+      {CORREO_DATOS}
+    </a>
+  );
+}
 
 const SECCIONES = [
   { id: "responsable", titulo: "Quién es el responsable de tus datos" },
@@ -145,15 +159,25 @@ export default function PoliticaDatos() {
             <p>El responsable del tratamiento de tus datos personales es:</p>
             <dl className="grid grid-cols-1 sm:grid-cols-[11rem_1fr] gap-x-4 gap-y-1 sm:gap-y-3">
               <dt className="font-semibold text-gray-950">Nombre</dt>
-              <dd className="mb-3 sm:mb-0"><PorDefinir>persona o equipo responsable de PetConnect</PorDefinir></dd>
+              {/* D.1 completa, decidida por el dueño del proyecto el 06/11/2026 */}
+              <dd className="mb-3 sm:mb-0">
+                PetConnect y sus asociados: Daniel Jimenez, Andrea Silva, Nelson Perez y Andrea Yasmin
+              </dd>
               <dt className="font-semibold text-gray-950">Domicilio</dt>
-              <dd className="mb-3 sm:mb-0"><PorDefinir>ciudad</PorDefinir>, Colombia</dd>
+              <dd className="mb-3 sm:mb-0">Armenia, Quindío, Colombia</dd>
               <dt className="font-semibold text-gray-950">Dirección física</dt>
-              <dd className="mb-3 sm:mb-0"><PorDefinir>dirección de notificación</PorDefinir></dd>
+              <dd className="mb-3 sm:mb-0">Cra. 6 # 17 Norte 01, Armenia, Quindío</dd>
               <dt className="font-semibold text-gray-950">Correo para temas de datos</dt>
-              <dd className="mb-3 sm:mb-0"><PorDefinir>correo exclusivo</PorDefinir></dd>
+              <dd className="mb-3 sm:mb-0"><CorreoDatos /></dd>
               <dt className="font-semibold text-gray-950">Teléfono</dt>
-              <dd><PorDefinir>teléfono de contacto</PorDefinir></dd>
+              <dd>
+                <a
+                  href="tel:+573243682078"
+                  className="font-medium text-black underline underline-offset-2 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+                >
+                  324 368 2078
+                </a>
+              </dd>
             </dl>
             <p>
               PetConnect es una plataforma para personas que tienen mascotas o quieren adoptar una. Reúne adopción,
@@ -279,7 +303,7 @@ export default function PoliticaDatos() {
 
           <Seccion id="ejercer-derechos">
             <p>
-              Escríbenos a <PorDefinir>correo para temas de datos personales</PorDefinir> desde el correo de tu
+              Escríbenos a <CorreoDatos /> desde el correo de tu
               cuenta, para comprobar que eres tú sin pedirte más datos. También pueden hacerlo tus causahabientes o tu
               representante, demostrando esa calidad.
             </p>

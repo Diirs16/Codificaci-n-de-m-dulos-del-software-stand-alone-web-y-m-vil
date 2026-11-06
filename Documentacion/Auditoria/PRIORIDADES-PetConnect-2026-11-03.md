@@ -189,12 +189,15 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   ("Soy mayor de 18 años, he leído la Política de tratamiento de datos
   personales y autorizo...", D.4 decidido: la edad va en la misma casilla), el
   enlace a /politica-de-datos con target="_blank" y el aviso corto B.2 debajo
-  (aria-describedby). Sin marcar: MENSAJE_SIN_AUTORIZACION en el cuadro rojo
+  (aria-describedby), que desde el 06/11/2026 termina con el correo de atención
+  proyectopetconnect+atencion@gmail.com (D.1). Sin marcar: MENSAJE_SIN_AUTORIZACION en el cuadro rojo
   (role="alert"), foco en la casilla y NINGUNA llamada a la API. api.js:
   registerUser(name, email, password, aceptaDatos) manda
   acepta_datos: aceptaDatos === true. Página src/pages/PoliticaDatos.jsx (copia
-  en JSX de la Parte A del borrador; VERSION_POLITICA = "1.0"; los datos de D.1,
-  D.3 y D.5 salen como "Por definir"; si cambias el texto, cambia también el .md
+  en JSX de la Parte A del borrador; VERSION_POLITICA = "1.0"; CORREO_DATOS y
+  <CorreoDatos /> (mailto) en las secciones 1 y 8; D.1 completa desde el
+  06/11/2026 (responsable, Armenia, dirección y teléfono en la sección 1); D.3
+  y D.5 salen como "Por definir"; si cambias el texto, cambia también el .md
   y sube la versión aquí y en la API). Ruta en App.jsx y enlace en Footer.jsx.
   Probada por el dueño con la API real: conteo 0 | 10 | 0 y 1 | 1 | 1.
 - Móvil (3.1 parte 3, hecha el 06/11/2026): RegisterScreen.js tiene la casilla
@@ -202,7 +205,9 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   porque react-native-web no traduce accessibilityState), el enlace en su propia
   línea "Leer los términos y condiciones que aceptas: Política de tratamiento
   de datos personales" (decisión del dueño; Linking.openURL(POLITICA_URL)), el
-  aviso B.2 y el error en una zona aria-live="polite". Sin marcar: mensaje B.3
+  aviso B.2 (PENDIENTE: todavía con la redacción sin correo; el 06/11/2026 la web
+  pasó al B.2 con proyectopetconnect+atencion@gmail.com y el móvil debe igualarlo
+  en RegisterScreen.js ~180) y el error en una zona aria-live="polite". Sin marcar: mensaje B.3
   y ninguna petición. ScrollView + KeyboardAvoidingView (behavior="padding",
   offset con measureInWindow: en Expo 57 Android no encoge la ventana con el
   teclado). api.js: registerUser(..., aceptaDatos) manda acepta_datos:
@@ -231,7 +236,8 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
 - Pendientes que dejó el 3.1 (fuera de NC-005): el 3.5 (pedir la autorización a
   las cuentas existentes y a quienes aceptaron una versión vieja, al iniciar
   sesión; nunca con un UPDATE que la invente); botón "borrar mi cuenta"
-  (supresión, C.8) y llenar las decisiones D.1 a D.3, D.5 y D.6 de la política
+  (supresión, C.8) y llenar las decisiones D.2, D.3, D.5 y D.6 de la política
+  (D.1 y D.4 decididas)
   (no bloquean el cierre técnico, sí la publicación). El móvil tampoco tiene
   "Reenviar código" en "Verifica tu correo" (pendiente del 2.7).
 - Registro (2.7, A-09): AlmacenOTP tiene vigente(clave) (borra el pendiente si
