@@ -470,7 +470,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `seed.py:59` no coincide con las tuplas).
 - **Arreglo:** columnas reales (`vacunada`, `esterilizada`, `tamano`) o no mostrar el dato; corregir la semilla;
   pasar los textos por `/revision-contenido-mascotas` (regla 6: validación veterinaria).
-- **Estado: en curso (ítem 3.4 de PRIORIDADES). Parte 1 de 3 (backend) hecha el 06/11/2026.** Decisión del dueño:
+- **Estado: resuelto el 06/11/2026 (ítem 3.4 de PRIORIDADES, en 3 partes). Parte 1 de 3 (backend) hecha el 06/11/2026.** Decisión del dueño:
   opción (a), **no mostrar** vacunación, esterilización ni tamaño (descartadas: columnas nuevas, que obligan a validar
   cada dato de salud y nadie las llenaría, y solo `tamano`, que cambia la estructura y deja la API rota en una BD sin
   migrar). `api.py`: `_mascota_to_dict` ya no agrega `vaccinated`, `sterilized` ni `size`; las 3 rutas de mascotas
@@ -501,7 +501,27 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
   `data/`). Lint 0 errores, build OK. Revisión a 375 px con la API real: 6 tarjetas (“Labrador Retriever · 2 años ·
   Hembra”… “Siames · Menos de 1 año · Hembra”), sin desborde horizontal, y la ficha de Luna ya no contradice su
   descripción. Detector de `/impeccable` sin hallazgos; `/impeccable audit` 16/20 (sin tokens ni modo oscuro y el botón
-  “Conocer más” de ~36 px: ya existían). Pendiente: parte 3 (móvil: `PetDetailScreen.js` y `AdoptionScreen.js`).
+  “Conocer más” de ~36 px: ya existían).
+  **Parte 3 de 3 (móvil) hecha el 06/11/2026:** `src/utils/mascota.js` del móvil (copia de la de la web: no hay paquete
+  compartido). `PetDetailScreen.js`: se quitaron las insignias “Vacunada”/“Esterilizada” (desde la parte 1 decían “No” en
+  **todas** las fichas), el componente `Badge` y la “Talla undefined”; la especie va en su línea y debajo “Raza · Edad ·
+  Sexo” (no se pinta si no hay datos). `AdoptionScreen.js`: la misma línea (antes Nala, con edad 0, salía sin edad y el
+  sexo en minúscula). Las fotos de las dos pantallas tienen `role="img"` y `aria-label` con el nombre de la mascota
+  (hallazgo de `/revision-contenido-mascotas`; sin el rol, react-native-web deja la etiqueta en un `div` que el lector de
+  pantalla ignora). Pruebas nuevas del móvil (`npm test`, `node --test`, sin dependencias; 7 en total):
+  `tests/mascota.test.mjs` (las 5 del formato de la web + que las dos pantallas usen `datosMascota`) y
+  `tests/sin-salud-inventada.test.mjs` (falla si `src/` menciona `vaccinated`, `sterilized`, `.size`, “Talla”,
+  “Vacunada/o” o “Esterilizada/o”). Las pruebas son `.mjs` y el script usa
+  `--disable-warning=MODULE_TYPELESS_PACKAGE_JSON` para no poner `"type": "module"` en el `package.json` de Expo.
+  Contraprueba con `git stash` de las dos pantallas: fallan 2 de 7 (la de regresión, que nombra `PetDetailScreen.js`, y
+  la del uso de `datosMascota`, que nombra `AdoptionScreen.js`); las 5 del formato pasan a propósito (la utilidad es un
+  archivo nuevo). `npx expo export --platform web` OK; revisión a 375 px con la API simulada (datos inventados): “Labrador
+  Retriever · 2 años · Hembra”, “Siames · Menos de 1 año · Hembra” y, sin raza ni sexo definido, solo la especie; ficha
+  sin talla ni insignias y sin desborde horizontal. Probado por el dueño en el emulador (Pixel 7) con la API real: las 6
+  mascotas de la BD con “Labrador Retriever · 2 años · Hembra”, “Siames · Menos de 1 año · Hembra”, etc., sin talla.
+  `/impeccable audit` 14/20 (ya existían: texto gris `#64748b` sobre el
+  fondo `#f2f2f2` de la ficha ≈ 4,3:1, por debajo de 4,5:1; error sin “Reintentar”; colores fijos sin modo oscuro;
+  miniaturas con la foto completa). Sigue pendiente la validación veterinaria de los textos marcados (regla 6).
 
 ### 3.4 Web (React)
 

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { getMascotasAdopcion } from "../services/api";
+import { datosMascota } from "../utils/mascota";
 
 export default function AdoptionScreen({ navigation }) {
   const [mascotas, setMascotas] = useState([]);
@@ -56,11 +57,12 @@ export default function AdoptionScreen({ navigation }) {
           style={styles.card}
           onPress={() => navigation.navigate("PetDetail", { id: item.id })}
         >
-          <Image source={{ uri: item.image }} style={styles.image} />
+          <Image source={{ uri: item.image }} style={styles.image} role="img" aria-label={item.name} />
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.meta}>{item.species} · {item.breed}</Text>
-            <Text style={styles.meta}>{item.age ? `${item.age} años` : ""} {item.gender}</Text>
+            {item.species ? <Text style={styles.meta}>{item.species}</Text> : null}
+            {/* Ítem 3.4 (A-22): "Raza · Edad · Sexo" solo con lo que se conoce. */}
+            {datosMascota(item) ? <Text style={styles.meta}>{datosMascota(item)}</Text> : null}
           </View>
         </TouchableOpacity>
       )}
