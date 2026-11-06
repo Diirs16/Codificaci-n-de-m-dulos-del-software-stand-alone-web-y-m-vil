@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Check, X as XIcon, Heart } from "lucide-react";
+import { ArrowLeft, Heart } from "lucide-react";
 import { getMascota } from "../services/api";
+import { datosMascota } from "../utils/mascota";
 import AvisoDemo from "../components/AvisoDemo";
 import EstadoCarga from "../components/EstadoCarga";
 
@@ -77,6 +78,8 @@ export default function PetDetail() {
     );
   }
 
+  const datos = datosMascota(pet);
+
   return (
     <main className="page-enter max-w-7xl mx-auto px-4 py-8">
       <Link
@@ -102,33 +105,12 @@ export default function PetDetail() {
             </span>
           </div>
 
-          <p className="text-gray-500 mb-4">
-            {pet.breed} &middot; {pet.age} &middot; {pet.gender} &middot;{" "}
-            {pet.size}
-          </p>
+          {/* 3.4 (A-22): solo raza, edad y sexo que vienen de la BD, ya formateados.
+              Sin tamaño, vacunación ni esterilización: la BD no los tiene y un dato
+              de salud no se inventa (antes todas salían con una ✗ de vacunas pendientes). */}
+          {datos && <p className="text-gray-500 mb-4">{datos}</p>}
 
-          <p className="text-gray-600 leading-relaxed mb-6">{pet.description}</p>
-
-          <div className="space-y-2 mb-8">
-            <div className="flex items-center gap-2 text-sm">
-              {pet.vaccinated ? (
-                <Check className="w-4 h-4 text-green-600" />
-              ) : (
-                <XIcon className="w-4 h-4 text-red-500" />
-              )}
-              <span>{pet.vaccinated ? "Vacunado/a" : "Pendiente de vacunación"}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              {pet.sterilized ? (
-                <Check className="w-4 h-4 text-green-600" />
-              ) : (
-                <XIcon className="w-4 h-4 text-red-500" />
-              )}
-              <span>
-                {pet.sterilized ? "Esterilizado/a" : "Pendiente de esterilización"}
-              </span>
-            </div>
-          </div>
+          <p className="text-gray-600 leading-relaxed mb-8">{pet.description}</p>
 
           {!showForm ? (
             <button

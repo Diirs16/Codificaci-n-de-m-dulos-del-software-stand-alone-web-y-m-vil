@@ -488,8 +488,20 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `test_seed_no_guarda_el_tamano_en_color`). Total 140 (120 OK + 20 omitidas sin MariaDB); con MariaDB, corridas por el
 dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contraprueba: con el `api.py`
   y el `seed.py` viejos fallan las 6 pruebas nuevas de `test_ficha_mascota.py` (28 subcasos); sin el archivo de la
-  migración fallan sus pruebas. Pendiente: parte 2 (web: quitar el bloque ✓/✗ y la talla de `PetDetail.jsx` y
-  `Adoption.jsx`; edad “2 años / Menos de 1 año” y sexo con mayúscula) y parte 3 (móvil: `PetDetailScreen.js`).
+  migración fallan sus pruebas.
+  **Parte 2 de 3 (web) hecha el 06/11/2026:** función nueva `src/utils/mascota.js` (`formatearEdad`: 0 → “Menos de 1
+  año”, 1 → “1 año”, 2 → “2 años”, null/negativo/no entero → no se muestra; `formatearSexo`: “Hembra”/“Macho”,
+  `no_definido` → no se muestra; `datosMascota`: “Raza · Edad · Sexo” solo con lo que se conoce, sin separadores
+  sueltos). `PetDetail.jsx`: se quitó el bloque ✓/✗ (“Pendiente de vacunación / esterilización” que salía en **todas**
+  las fichas) y la talla, y los íconos `Check`/`XIcon`; `Adoption.jsx`: se quitó la línea de la talla. Pruebas nuevas
+  (`npm test`, 12 en total): `tests/mascota.test.js` (5, formato) y `tests/sin-salud-inventada.test.js` (falla si
+  `src/` vuelve a mencionar `vaccinated`, `sterilized`, `pet.size` o “Pendiente de vacunación/esterilización”).
+  Contraprueba con `git stash` de las dos páginas: falla 1 de 12 (la de regresión, que nombra `Adoption.jsx` y
+  `PetDetail.jsx`); las 11 restantes pasan a propósito (5 de `api.js`, 5 del formato, que es un archivo nuevo, y la de
+  `data/`). Lint 0 errores, build OK. Revisión a 375 px con la API real: 6 tarjetas (“Labrador Retriever · 2 años ·
+  Hembra”… “Siames · Menos de 1 año · Hembra”), sin desborde horizontal, y la ficha de Luna ya no contradice su
+  descripción. Detector de `/impeccable` sin hallazgos; `/impeccable audit` 16/20 (sin tokens ni modo oscuro y el botón
+  “Conocer más” de ~36 px: ya existían). Pendiente: parte 3 (móvil: `PetDetailScreen.js` y `AdoptionScreen.js`).
 
 ### 3.4 Web (React)
 

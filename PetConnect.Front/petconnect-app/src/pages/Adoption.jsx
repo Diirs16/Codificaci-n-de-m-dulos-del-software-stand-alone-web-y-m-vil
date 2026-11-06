@@ -4,6 +4,7 @@ import { getMascotasAdopcion } from "../services/api";
 import { Heart } from "lucide-react";
 import { useScrollReveal } from "../assets/js/useScrollReveal";
 import EstadoCarga from "../components/EstadoCarga";
+import { datosMascota } from "../utils/mascota";
 
 export default function Adoption() {
   // 3.3 (A-23, NC-009): la lista sale SOLO de la API. Antes empezaba con 6
@@ -95,10 +96,8 @@ export default function Adoption() {
                     {pet.species}
                   </span>
                 </div>
-                <p className="text-sm text-gray-500 mb-1">
-                  {pet.breed} &middot; {pet.age} &middot; {pet.gender}
-                </p>
-                <p className="text-sm text-gray-500 mb-3">{pet.size}</p>
+                {/* 3.4 (A-22): raza, edad y sexo formateados; sin tamaño (la BD no lo tiene). */}
+                <p className="text-sm text-gray-500 mb-3">{datosMascota(pet)}</p>
                 <Link
                   to={`/adopcion/${pet.id}`}
                   className="btn-hover w-full flex items-center justify-center gap-2 border-2 border-black text-black py-2 rounded-lg text-sm font-medium hover:bg-black hover:text-white transition-colors no-underline"
