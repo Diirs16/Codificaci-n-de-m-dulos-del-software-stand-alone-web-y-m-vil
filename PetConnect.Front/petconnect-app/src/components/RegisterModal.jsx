@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { X, Check, AlertCircle, Loader2, RotateCw, MailCheck, ExternalLink } from "lucide-react";
+import { X, Check, AlertCircle, Loader2, RotateCw, MailCheck } from "lucide-react";
+import CasillaAutorizacion from "./CasillaAutorizacion";
 import { useAuth } from "../context/AuthContext";
 import { esFormatoCorreoValido } from "../utils/validarCorreo";
 import { validarCorreo, resendRegisterCode } from "../services/api";
@@ -17,7 +18,8 @@ const RULES = [
 ];
 
 // NC-005 (ítem 3.1): la casilla de autorización empieza SIN marcar (Ley 1581, art. 9).
-// Textos de la Parte B de Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md
+// Su texto (B.1 y B.2) vive en CasillaAutorizacion.jsx; el mensaje es el de B.3 de
+// Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md
 const FORM_VACIO = {
   name: "",
   email: "",
@@ -337,41 +339,13 @@ export default function RegisterModal() {
               </div>
 
               {/* NC-005: autorización previa, expresa e informada (Ley 1581, arts. 9 y 12) */}
-              <div>
-                <div className="flex items-start gap-3">
-                  <input
-                    ref={aceptaRef}
-                    id="reg-acepta"
-                    name="aceptaDatos"
-                    type="checkbox"
-                    checked={form.aceptaDatos}
-                    onChange={handleChange}
-                    aria-describedby="reg-acepta-aviso"
-                    className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
-                  />
-                  <label htmlFor="reg-acepta" className="min-h-11 text-sm leading-snug cursor-pointer">
-                    Soy mayor de 18 años, he leído la{" "}
-                    <a
-                      href="/politica-de-datos"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-black underline underline-offset-2 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
-                    >
-                      Política de tratamiento de datos personales
-                      <ExternalLink className="inline w-3.5 h-3.5 ml-0.5 -mt-0.5" aria-hidden="true" />
-                      <span className="sr-only"> (se abre en una pestaña nueva)</span>
-                    </a>{" "}
-                    y autorizo a PetConnect a tratar mis datos para crear y usar mi cuenta.
-                  </label>
-                </div>
-                <p id="reg-acepta-aviso" className="mt-2 pl-8 text-xs leading-relaxed text-gray-600">
-                  Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación.
-                  Puedes conocer, actualizar, rectificar o borrar tus datos y revocar este permiso
-                  escribiendo a{" "}
-                  {/* Correo de atención del proyecto (D.1, 06/11/2026); el mismo de PoliticaDatos.jsx */}
-                  <span className="break-words font-medium text-gray-800">proyectopetconnect+atencion@gmail.com.</span>
-                </p>
-              </div>
+              <CasillaAutorizacion
+                ref={aceptaRef}
+                id="reg-acepta"
+                name="aceptaDatos"
+                checked={form.aceptaDatos}
+                onChange={handleChange}
+              />
 
               <button
                 type="submit"

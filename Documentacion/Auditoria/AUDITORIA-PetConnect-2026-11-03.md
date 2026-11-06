@@ -446,6 +446,29 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   que siguen: un token entregado antes del cambio vale hasta 24 h (4.13) y la consola no la pide (4.11). Faltan la web
   (parte 2) y el móvil (parte 3); si la persona no autoriza, la app le ofrecerá escribir al correo de atención para
   borrar su cuenta (proceso manual, C.8; decisión del dueño).
+  **Ítem 3.5, parte 2 de 3 (web, 06/11/2026):** la casilla del registro (texto B.1 con +18, enlace a la política en
+  pestaña nueva y aviso B.2) pasó a un componente propio, `src/components/CasillaAutorizacion.jsx`, que usan
+  `RegisterModal.jsx` (sin cambio visible) y `LoginModal.jsx`: el texto legal vive en un solo archivo. Cuando
+  `/login` responde 403 con `requiere_autorizacion`, el modal muestra el paso “Autoriza el uso de tus datos” con el
+  mensaje de la API, la casilla **sin marcar**, “Autorizar y continuar” (repite `/login` con el mismo correo y
+  contraseña y `"acepta_datos": true`), “Cancelar” (vuelve al formulario y borra la contraseña escrita) y la línea B.3
+  “Si no quieres autorizarlo, escríbenos a … y borraremos tu cuenta” con enlace `mailto:`. Sin marcar: “Para continuar
+  debes autorizar el tratamiento de tus datos personales.” (`role="alert"`), foco en la casilla y **ninguna**
+  petición. Si `/login/verify` responde ese 403 (la versión cambió mientras llegaba el código), vuelve al paso de la
+  casilla. `src/services/api.js`: `loginUser(email, password, aceptaDatos)` manda `acepta_datos` solo si
+  `aceptaDatos === true`, y el error lleva `requiereAutorizacion` solo si la API mandó `requiere_autorizacion: true`
+  (el 403 “Cuenta inactiva” no lo trae). `AuthContext.jsx`: `login(email, password, aceptaDatos)`. Regresión:
+  `tests/api.test.js` (5 pruebas nuevas, `fetch` simulado) y `tests/casilla-autorizacion.test.js` (3, leen el texto de
+  los archivos: la frase “Soy mayor de 18 años” solo en el componente, los dos modales lo usan y el inicio de sesión
+  tiene los mensajes de B.3). Contraprueba con `git stash` de los 4 archivos y sin el componente: fallan 7 de las 8
+  nuevas; pasa a propósito “sin la casilla NO manda acepta_datos” (el código viejo nunca lo mandaba; la prueba impide
+  que se empiece a mandar siempre). `npm test` 20 de 20, lint 0 errores (los 2 avisos de siempre), build OK; revisión
+  a 375 px con la API simulada en el navegador: sin marcar, 0 peticiones nuevas; marcada, 1 petición con
+  `"acepta_datos": true` y paso al código; 403 en `/login/verify` → vuelve a la casilla sin marcar; “Cancelar” deja la
+  contraseña vacía; el registro conserva su casilla sin marcar; sin desborde horizontal. `/impeccable audit` 16/20
+  (detector sin hallazgos; pulido opcional: al cambiar de paso el foco queda en `body` y los modales no tienen
+  `role="dialog"`, como ya se anotó en el 2.7; colores fijos sin modo oscuro, como toda la web). Prueba con la API
+  real: pendiente del dueño. Falta el móvil (parte 3).
 
 #### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
 - **Solicitud de adopción** (`PetDetail.jsx:56-60`) y **Contacto** (`Contact.jsx:15-17`) piden nombre, correo, teléfono y

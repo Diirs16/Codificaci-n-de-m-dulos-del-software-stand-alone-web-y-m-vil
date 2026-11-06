@@ -43,9 +43,11 @@ export function AuthProvider({ children }) {
     else clearSession();
   };
 
-  const login = async (email, password) => {
+  // aceptaDatos: solo true cuando la persona marcó la casilla de autorización
+  // (ítem 3.5, cuentas sin autorización vigente). Si no, no se manda.
+  const login = async (email, password, aceptaDatos) => {
     setAuthError(null);
-    await loginUser(email, password);
+    await loginUser(email, password, aceptaDatos);
     setPendingLoginEmail(email);
   };
 

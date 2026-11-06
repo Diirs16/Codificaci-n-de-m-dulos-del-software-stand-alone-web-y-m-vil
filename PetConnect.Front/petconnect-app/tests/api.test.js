@@ -18,7 +18,7 @@ Object.defineProperty(globalThis, "localStorage", {
   writable: true,
 });
 
-const { getMascota, getMascotasAdopcion, getProductos } = await import(
+const { getMascota, getMascotasAdopcion, getProductos, loginUser, verifyLoginCode } = await import(
   "../src/services/api.js"
 );
 
@@ -80,4 +80,70 @@ test("el servidor no responde (fetch falla): status 0 y mensaje en español", as
 test("respuesta correcta: devuelve los datos tal cual (lista vacía incluida)", async () => {
   responder(200, []);
   assert.deepEqual(await getMascotasAdopcion(), []);
+});
+
+// --- Ítem 3.5 (A-20, R05): autorización de datos al iniciar sesión ---
+// La API responde 403 con "requiere_autorizacion": true a las cuentas sin
+// autorización vigente. La web debe reconocerlo (para mostrar la casilla) y
+// mandar "acepta_datos": true SOLO cuando la persona marcó la casilla.
+// Los correos y contraseñas de estas pruebas son inventados.
+
+// fetch falso que guarda el cuerpo enviado para revisarlo después.
+function capturarCuerpo(status, respuesta) {
+  const enviados = [];
+  globalThis.fetch = async (_url, opciones) => {
+    enviados.push(JSON.parse(opciones.body));
+    return new Response(JSON.stringify(respuesta), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  return enviados;
+}
+
+test("loginUser con la casilla marcada manda acepta_datos como booleano true", async () => {
+  const enviados = capturarCuerpo(200, { message: "Codigo enviado" });
+  await loginUser("ana@ejemplo.test", "Clave@123", true);
+  assert.equal(enviados.length, 1);
+  assert.equal(enviados[0].acepta_datos, true);
+});
+
+test("loginUser sin la casilla NO manda acepta_datos (ni con valores parecidos a true)", async () => {
+  const enviados = capturarCuerpo(200, { message: "Codigo enviado" });
+  await loginUser("ana@ejemplo.test", "Clave@123");
+  await loginUser("ana@ejemplo.test", "Clave@123", "true");
+  await loginUser("ana@ejemplo.test", "Clave@123", 1);
+  for (const cuerpo of enviados) {
+    assert.deepEqual(Object.keys(cuerpo).sort(), ["email", "password"]);
+  }
+});
+
+test("403 con requiere_autorizacion: el error trae requiereAutorizacion y el mensaje", async () => {
+  responder(403, {
+    error: "Para seguir usando tu cuenta debes autorizar el tratamiento de tus datos personales",
+    requiere_autorizacion: true,
+  });
+  await assert.rejects(loginUser("ana@ejemplo.test", "Clave@123"), (e) => {
+    assert.equal(e.status, 403);
+    assert.equal(e.requiereAutorizacion, true);
+    assert.match(e.message, /autorizar el tratamiento/);
+    return true;
+  });
+});
+
+test("403 de /login/verify con requiere_autorizacion también lo trae", async () => {
+  responder(403, { error: "Para seguir usando tu cuenta...", requiere_autorizacion: true });
+  await assert.rejects(verifyLoginCode("ana@ejemplo.test", "123456"), (e) => {
+    assert.equal(e.requiereAutorizacion, true);
+    return true;
+  });
+});
+
+test("otro 403 (cuenta inactiva) NO pide la casilla", async () => {
+  responder(403, { error: "Cuenta inactiva o bloqueada" });
+  await assert.rejects(loginUser("ana@ejemplo.test", "Clave@123"), (e) => {
+    assert.equal(e.status, 403);
+    assert.equal(e.requiereAutorizacion, false);
+    return true;
+  });
 });

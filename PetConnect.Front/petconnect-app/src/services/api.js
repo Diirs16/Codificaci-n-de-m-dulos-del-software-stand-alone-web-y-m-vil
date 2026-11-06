@@ -5,9 +5,14 @@ const TOKEN_KEY = "petconnect_token";
 // (404 = no existe, 503 = BD caída, 502 = el proxy de Vite no encontró la API).
 // Vale 0 si el servidor ni siquiera respondió. Así las páginas distinguen
 // "no encontrada" de "no pudimos cargar" sin comparar textos.
-function errorDeApi(mensaje, status) {
+//
+// Ítem 3.5 (A-20, R05): si la API manda "requiere_autorizacion": true (403 de
+// /auth/login o /auth/login/verify), el error lleva requiereAutorizacion = true
+// y el inicio de sesión muestra la casilla. Otro 403 (cuenta inactiva) no lo trae.
+function errorDeApi(mensaje, status, data) {
   const error = new Error(mensaje);
   error.status = status;
+  error.requiereAutorizacion = data?.requiere_autorizacion === true;
   return error;
 }
 
@@ -32,15 +37,20 @@ async function apiFetch(path, options = {}) {
   } catch {
     throw errorDeApi(`Error ${res.status}: respuesta inválida del servidor`, res.status);
   }
-  if (!res.ok) throw errorDeApi(data.error || `Error ${res.status}`, res.status);
+  if (!res.ok) throw errorDeApi(data.error || `Error ${res.status}`, res.status, data);
   return data;
 }
 
 // --- Auth ---
-export function loginUser(email, password) {
+// Ítem 3.5: `acepta_datos` solo viaja cuando la persona marcó la casilla
+// (aceptaDatos === true) y siempre como booleano. Una cuenta que ya autorizó
+// inicia sesión sin mandarlo.
+export function loginUser(email, password, aceptaDatos) {
+  const cuerpo = { email, password };
+  if (aceptaDatos === true) cuerpo.acepta_datos = true;
   return apiFetch("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(cuerpo),
   });
 }
 
