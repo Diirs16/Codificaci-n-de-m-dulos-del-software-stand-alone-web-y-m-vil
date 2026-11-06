@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { X, Check, AlertCircle, Loader2, RotateCw, MailCheck } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { X, Check, AlertCircle, Loader2, RotateCw, MailCheck, ExternalLink } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { esFormatoCorreoValido } from "../utils/validarCorreo";
 import { validarCorreo, resendRegisterCode } from "../services/api";
@@ -16,6 +16,17 @@ const RULES = [
   { id: "special", label: 'Al menos un carácter especial: @ # ! " $ & ? ¡', test: (p) => /[@#!"$&?¡\-_*.]/.test(p) },
 ];
 
+// NC-005 (ítem 3.1): la casilla de autorización empieza SIN marcar (Ley 1581, art. 9).
+// Textos de la Parte B de Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md
+const FORM_VACIO = {
+  name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  aceptaDatos: false,
+};
+const MENSAJE_SIN_AUTORIZACION = "Para crear tu cuenta debes autorizar el tratamiento de tus datos personales.";
+
 export default function RegisterModal() {
   const {
     showRegister,
@@ -29,12 +40,8 @@ export default function RegisterModal() {
     setPendingEmail,
   } = useAuth();
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
+  const [form, setForm] = useState(FORM_VACIO);
+  const aceptaRef = useRef(null);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -111,8 +118,10 @@ export default function RegisterModal() {
     setAvisoReenvio("");
   };
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, type, checked, value } = e.target;
+    setForm({ ...form, [name]: type === "checkbox" ? checked : value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -129,10 +138,16 @@ export default function RegisterModal() {
       setAuthError("Las contraseñas no coinciden");
       return;
     }
+    // Sin la casilla no se llama a la API (y la API lo rechazaría igual con 400)
+    if (!form.aceptaDatos) {
+      setAuthError(MENSAJE_SIN_AUTORIZACION);
+      aceptaRef.current?.focus();
+      return;
+    }
     setLoading(true);
     try {
-      await register(form.name, form.email, form.password);
-      setForm({ name: "", email: "", password: "", confirmPassword: "" });
+      await register(form.name, form.email, form.password, form.aceptaDatos);
+      setForm(FORM_VACIO);
       reiniciarReenvio();
       iniciarEspera();   // la espera arranca también con el primer código
     } catch (err) {
@@ -182,16 +197,22 @@ export default function RegisterModal() {
   const handleClose = () => {
     setShowRegister(false);
     setCode("");
-    setForm({ name: "", email: "", password: "", confirmPassword: "" });
+    setForm(FORM_VACIO);
     reiniciarReenvio();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    // overflow-y-auto + min-h-full: si el formulario es más alto que la pantalla
+    // (celular de 375 × 812 con la casilla de datos), se desplaza en vez de cortarse.
+    <div className="fixed inset-0 z-50 overflow-y-auto">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-fade"
+        className="fixed inset-0 bg-black/40 backdrop-fade"
         onClick={handleClose}
       />
+      <div
+        className="relative flex min-h-full items-center justify-center p-4"
+        onClick={(e) => e.target === e.currentTarget && handleClose()}   // clic fuera del modal
+      >
       <div className="modal-enter relative bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
         <button
           onClick={handleClose}
@@ -206,7 +227,7 @@ export default function RegisterModal() {
             <h2 className="text-xl font-bold mb-6 text-center">Crear Cuenta</h2>
 
             {authError && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4 text-center">
+              <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4 text-center">
                 {authError}
               </p>
             )}
@@ -315,6 +336,41 @@ export default function RegisterModal() {
                 />
               </div>
 
+              {/* NC-005: autorización previa, expresa e informada (Ley 1581, arts. 9 y 12) */}
+              <div>
+                <div className="flex items-start gap-3">
+                  <input
+                    ref={aceptaRef}
+                    id="reg-acepta"
+                    name="aceptaDatos"
+                    type="checkbox"
+                    checked={form.aceptaDatos}
+                    onChange={handleChange}
+                    aria-describedby="reg-acepta-aviso"
+                    className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+                  />
+                  <label htmlFor="reg-acepta" className="min-h-11 text-sm leading-snug cursor-pointer">
+                    Soy mayor de 18 años, he leído la{" "}
+                    <a
+                      href="/politica-de-datos"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-black underline underline-offset-2 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+                    >
+                      Política de tratamiento de datos personales
+                      <ExternalLink className="inline w-3.5 h-3.5 ml-0.5 -mt-0.5" aria-hidden="true" />
+                      <span className="sr-only"> (se abre en una pestaña nueva)</span>
+                    </a>{" "}
+                    y autorizo a PetConnect a tratar mis datos para crear y usar mi cuenta.
+                  </label>
+                </div>
+                <p id="reg-acepta-aviso" className="mt-2 pl-8 text-xs leading-relaxed text-gray-600">
+                  Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación.
+                  En la política te explicamos cómo conocer, actualizar, corregir o borrar tus datos y
+                  cómo retirar este permiso.
+                </p>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading || emailBloqueaEnvio || !allRulesOk || form.password !== form.confirmPassword}
@@ -416,6 +472,7 @@ export default function RegisterModal() {
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );

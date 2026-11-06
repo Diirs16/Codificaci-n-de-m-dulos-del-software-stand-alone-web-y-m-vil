@@ -6,8 +6,10 @@
 > llenar todos los `[PENDIENTE: …]`. Las citas de artículos se deben comparar con el texto oficial.
 >
 > **Para qué sirve este archivo:**
-> - **Parte A**: el texto de la política que se publicará en la web (`/politica-de-datos`, parte 2 del 3.1) y al que
->   enlazará el móvil (parte 3).
+> - **Parte A**: el texto de la política que se publica en la web (`/politica-de-datos`, parte 2 del 3.1) y al que
+>   enlazará el móvil (parte 3). La copia publicada está en
+>   `PetConnect.Front/petconnect-app/src/pages/PoliticaDatos.jsx`: **si cambias uno, cambia el otro** y sube la
+>   versión allí y en `VERSION_POLITICA_DATOS` de la API.
 > - **Parte B**: los textos cortos de la interfaz (casilla, aviso y mensajes).
 > - **Parte C**: lo que el sistema debe hacer para cumplir. Es la especificación de las 3 partes del 3.1.
 > - **Parte D**: las decisiones que faltan. **Parte E**: la revisión de datos personales.
@@ -167,8 +169,9 @@ Solo guardamos los datos el tiempo razonable y necesario para la finalidad (Decr
 
 ### A.12 Niñas, niños y adolescentes
 
-PetConnect es para **mayores de 18 años**. Si eres menor de edad, pide a tu madre, padre o representante legal que
-use la plataforma por ti. [PENDIENTE: confirmar esta decisión; ver D.4.]
+PetConnect es para **mayores de 18 años**. Al registrarte declaras que lo eres. Si eres menor de edad, pide a tu
+madre, padre o representante legal que use la plataforma por ti. (Decidido por el dueño del proyecto el 05/11/2026,
+D.4.)
 
 ### A.13 Cambios a esta política
 
@@ -187,16 +190,21 @@ correo. Si el cambio afecta para qué usamos tus datos, te pediremos de nuevo la
 
 **B.1 Casilla** (sin marcar al abrir el formulario, obligatoria, al final del formulario y antes del botón):
 
-> ☐ He leído la **[Política de tratamiento de datos personales]** y autorizo a PetConnect a tratar mis datos para crear
-> y usar mi cuenta.
+> ☐ Soy mayor de 18 años, he leído la **[Política de tratamiento de datos personales]** y autorizo a PetConnect a
+> tratar mis datos para crear y usar mi cuenta.
+
+La declaración de edad va en la misma casilla (D.4). La API no la recibe aparte: solo `"acepta_datos": true`.
 
 El texto entre corchetes es un enlace a la política. En la web se abre en una pestaña nueva para no perder lo escrito
 en el formulario; en el móvil abre la misma página.
 
 **B.2 Aviso corto** (letra pequeña, debajo de la casilla; cumple el deber de informar del art. 12 de la Ley 1581):
 
-> Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación. Puedes conocer, actualizar,
-> rectificar o borrar tus datos y revocar este permiso escribiendo a [PENDIENTE: correo de datos personales].
+> Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación. En la política te explicamos
+> cómo conocer, actualizar, corregir o borrar tus datos y cómo retirar este permiso.
+
+(Redacción cambiada el 05/11/2026 para no mostrar un dato “por definir” dentro del formulario: el correo de contacto
+está en la política, sección A.8, a un clic.)
 
 **B.3 Mensajes:**
 
@@ -241,7 +249,7 @@ que hoy no envían nada, son el 3.2: si algún día envían datos, esta polític
 | D.1 | Quién figura como responsable (A.1) y con qué correo de contacto | Un correo del proyecto, no uno personal |
 | D.2 | Si se dice que es un proyecto formativo del SENA | Sí, mientras no sea un servicio real |
 | D.3 | Dónde se alojará la API y la BD (A.9) | Llenarlo antes de publicar en internet (ítem 5.5) |
-| D.4 | Solo mayores de 18 años (A.12) | Sí: evita pedir la autorización de los padres. Agregar “Soy mayor de 18 años” a la casilla o en una casilla aparte |
+| D.4 | Solo mayores de 18 años (A.12) | **Decidido el 05/11/2026: sí**, declarado en la misma casilla (B.1) |
 | D.5 | Cuánto se conserva la prueba de la autorización y si se borran las cuentas inactivas (A.11) | Pedir criterio al instructor |
 | D.6 | Registro Nacional de Bases de Datos (RNBD) de la SIC | Según el Decreto 090 de 2018, hoy solo obliga a sociedades y entidades sin ánimo de lucro con activos de más de 100.000 UVT y a entidades públicas. **Verificar con el instructor** |
 
@@ -260,5 +268,5 @@ que hoy no envían nada, son el 3.2: si algún día envían datos, esta polític
 | Imágenes | — | No hay imágenes | — | Ninguna |
 | Legal | Todo el archivo | Lo redactó una IA; las citas (Ley 1581 arts. 3, 8, 9, 10, 12, 14, 15, 16, 17, 26; Decreto 1377 arts. 7, 8, 11, 13, 24, 25; Decreto 090 de 2018) se deben comparar con el texto oficial | Alta | Validación del dueño y del instructor |
 
-**Veredicto: pendiente de** llenar D.1 a D.6, validar el texto legal con el instructor y hacer el 5.3 (HTTPS) antes de
+**Veredicto: pendiente de** llenar D.1 a D.3, D.5 y D.6 (D.4 ya está decidido), validar el texto legal con el instructor y hacer el 5.3 (HTTPS) antes de
 publicar en internet. Para desarrollo y para la evidencia GA9, el borrador sirve para implementar las 3 partes del 3.1.

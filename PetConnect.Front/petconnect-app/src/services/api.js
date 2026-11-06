@@ -29,10 +29,12 @@ export function loginUser(email, password) {
   });
 }
 
-export function registerUser(name, email, password) {
+// NC-005 (ítem 3.1): la API solo acepta el booleano true como autorización de
+// datos (Ley 1581, art. 9); nunca se manda como texto.
+export function registerUser(name, email, password, aceptaDatos) {
   return apiFetch("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, password, acepta_datos: aceptaDatos === true }),
   });
 }
 

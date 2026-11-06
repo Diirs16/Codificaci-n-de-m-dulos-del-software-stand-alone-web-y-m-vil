@@ -278,6 +278,12 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   pedir la contraseña y la compare con el hash pendiente. (2) Un `/register` con pendiente vigente responde más
   rápido (no calcula bcrypt ni envía correo): midiendo el tiempo se podría saber que hay un registro en curso. Taparlo
   exige enviar los correos en segundo plano; el 409 de A-14 (4.10) revela aún más.
+  **Mejora pendiente, sin ítem todavía (hallada por el dueño en la prueba del 3.1 parte 2, 05/11/2026):** el código
+  vencido no se avisa. Si alguien se registra otra vez con un correo que tiene un código vigente, `/register` responde
+  “Codigo enviado” pero no manda uno nuevo (correcto según A-09) y los 10 minutos siguen contando desde el primero; cuando
+  vence, “Reenviar código” tampoco envía nada (respuesta neutra) y la web no dice que el código venció. Hace falta un
+  camino claro para pedir un código nuevo tras el vencimiento (por ejemplo, que la web cuente los 10 minutos y, al
+  vencer, ofrezca “Volver a registrarme”, que sí reemplaza un pendiente vencido) sin revelar registros en curso (A-14).
 
 #### A-10 · 🟠 Alta · Códigos OTP y correos impresos en la consola [N]
 - **Dónde:** `api.py:305`, `:377`, `:421` → `print(f"[DEV] ... Codigo ... para {email}: {code}")`.
@@ -363,7 +369,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - `api.py:409` crea el usuario con `acepta_datos=True` fijo; `modelo/usuario.py:10` también lo trae en `True` por
   defecto. Ni la web ni el móvil tienen casilla.
 - **Arreglo:** casilla **sin marcar** con enlace a la política; la API rechaza el registro sin ella; guardar fecha y versión.
-- **Estado: en corrección desde el 05/11/2026 (ítem 3.1 de PRIORIDADES, parte 1 de 3: API + BD; faltan web y móvil).**
+- **Estado: en corrección desde el 05/11/2026 (ítem 3.1 de PRIORIDADES, parte 2 de 3: API + BD y web hechas; falta el móvil).**
   Borrador de la política v1.0: [POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md](../Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md)
   (texto para publicar, textos de la casilla y del aviso, especificación y decisiones pendientes: responsable, correo
   de contacto, alojamiento y mayoría de edad). Lo deben validar el dueño y el instructor antes de publicarlo.
@@ -381,8 +387,22 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `tests/test_registro_datos.py` (7) y `tests/test_esquema.py` (7 sin BD, 4 con MariaDB). Contraprueba: con el `api.py`
   anterior fallan 5 de 7 (9 casos); con el modelo y el DAO anteriores, 3 de 7; con el `schema.sql` anterior, 4 (6 casos);
   pasan a propósito las que dependen de otro archivo y las 3 que solo leen la migración. Con MariaDB temporal: 10 de 10
-  OK. Suite: 125 pruebas, 110 OK y 15 omitidas que requieren MariaDB. Hasta la parte 2, el formulario web viejo recibe
-  ese 400 (no manda la casilla).
+  OK. Suite: 125 pruebas, 110 OK y 15 omitidas que requieren MariaDB.
+  **Web (parte 2, 05/11/2026):** `RegisterModal.jsx` tiene, antes del botón, la casilla **sin marcar** “Soy mayor de 18
+  años, he leído la Política de tratamiento de datos personales y autorizo…” (D.4: la edad va en la misma casilla), con
+  el enlace a `/politica-de-datos` en una pestaña nueva y el aviso corto B.2 debajo. Sin marcar: mensaje B.3 con
+  `role="alert"`, foco en la casilla y **ninguna** petición a la API. `src/services/api.js` manda `acepta_datos` solo como
+  booleano (`=== true`). Página nueva `src/pages/PoliticaDatos.jsx` (ruta en `App.jsx`, enlace en `Footer.jsx`) con la
+  Parte A, rotulada “Borrador en revisión” y con los datos de D.1, D.3 y D.5 como “Por definir”. El modal se desplaza si
+  no cabe a 375 px. Decisiones de la parte 2: página propia en JSX (no leer el `.md`, que exigiría una librería nueva), los
+  pendientes visibles como “Por definir” y el aviso B.2 sin el correo de contacto (está en la política, a un clic).
+  `npm run lint` 0 errores (2 avisos de siempre), `npm run build` OK, revisión a 375 y 1280 px con respuestas simuladas,
+  `/impeccable audit` 17/20. La web no tiene pruebas automáticas (regresión manual). Prueba con la API real (dueño,
+  05/11/2026, tras reiniciar la API: el 500 de `/verify` del intento anterior era la API corriendo con el código viejo):
+  sin la casilla → 400; el enlace abre la política en otra pestaña; con la casilla → código → cuenta creada; conteo
+  `0 | 10 | 0` y `1 | 1 | 1`. Hasta la parte 3, el móvil recibe ese 400 al registrarse (no manda la casilla).
+  Pendiente sin cerrar la NC: pedir la autorización a las cuentas existentes al iniciar sesión (ítem 3.5); nunca con un
+  `UPDATE` que la invente.
 
 #### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
 - **Solicitud de adopción** (`PetDetail.jsx:56-60`) y **Contacto** (`Contact.jsx:15-17`) piden nombre, correo, teléfono y

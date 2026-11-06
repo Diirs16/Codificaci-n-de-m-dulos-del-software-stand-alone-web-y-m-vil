@@ -57,9 +57,9 @@ export function AuthProvider({ children }) {
     setShowLogin(false);
   };
 
-  const register = async (name, email, password) => {
+  const register = async (name, email, password, aceptaDatos) => {
     setAuthError(null);
-    await registerUser(name, email, password);
+    await registerUser(name, email, password, aceptaDatos);
     setPendingEmail(email);
   };
 

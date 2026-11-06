@@ -65,10 +65,11 @@ se borra de aquí y se marca `[x]` en su fase.
 
 | ✔ | # | ID | NC | Qué | Esfuerzo | Listo cuando |
 |---|---|---|---|---|---|---|
-| [ ] | 3.1 | A-20 | NC-005 | Casilla de autorización **sin marcar** + enlace a política en web y móvil; la API rechaza sin ella; guardar fecha y versión; quitar `acepta_datos=True` por defecto | 🟡 | Registro sin casilla → 400; con casilla → `acepta_datos=1` y fecha guardada — *Parte 1 de 3 (API + BD) hecha el 05/11/2026: `api.py` (`VERSION_POLITICA_DATOS = "1.0"`, 400 sin `"acepta_datos": true`, fecha y versión en el pendiente y en el usuario), modelo y DAO, `schema.sql` + migración `2026-11-05_autorizacion_datos.sql` (aplicada por el dueño); `tests/test_registro_datos.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Borrador de la política en `Documentacion/Legal/`. Faltan la parte 2 (web) y la 3 (móvil); NC-005 se cierra con la 3* |
+| [ ] | 3.1 | A-20 | NC-005 | Casilla de autorización **sin marcar** + enlace a política en web y móvil; la API rechaza sin ella; guardar fecha y versión; quitar `acepta_datos=True` por defecto | 🟡 | Registro sin casilla → 400; con casilla → `acepta_datos=1` y fecha guardada — *Parte 1 de 3 (API + BD) hecha el 05/11/2026: `api.py` (`VERSION_POLITICA_DATOS = "1.0"`, 400 sin `"acepta_datos": true`, fecha y versión en el pendiente y en el usuario), modelo y DAO, `schema.sql` + migración `2026-11-05_autorizacion_datos.sql` (aplicada por el dueño); `tests/test_registro_datos.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Borrador de la política en `Documentacion/Legal/`. Parte 2 de 3 (web) hecha el 05/11/2026: casilla sin marcar con +18 y enlace a la política en pestaña nueva, aviso corto, mensaje sin llamar a la API (`RegisterModal.jsx`), `acepta_datos` booleano (`api.js`), página `/politica-de-datos` (`PoliticaDatos.jsx`, borrador con “Por definir”) y enlace en el pie; probada por el dueño con la API real (conteo `0 \| 10 \| 0` y `1 \| 1 \| 1`). Falta la parte 3 (móvil); NC-005 se cierra con ella* |
 | [ ] | 3.2 | A-21 | — | Formularios de adopción, contacto y checkout: implementar el envío **o** rotular “Demo — no se envía” y deshabilitar | 🟢 (rotular) / 🔴 (implementar) | Ningún formulario dice “enviado” si no envió nada |
 | [ ] | 3.3 | A-23 | NC-009 | Web: estados de carga/vacío/error en Catálogo, Adopción, detalles y Home; `data/*.js` solo para pruebas | 🟡 | Con la API apagada, la web muestra un error, no perritos falsos |
 | [ ] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` |
+| [ ] | 3.5 | A-20 | — (R05) | Pedir la autorización de datos a las cuentas existentes (`acepta_datos = 0`) y a quienes aceptaron una versión vieja de la política, al iniciar sesión (API + web + móvil); si no autorizan, ofrecer borrar la cuenta. **Nunca** con un `UPDATE` que la invente. Después de la parte 3 del 3.1. Surgió el 05/11/2026 | 🔴 | Una cuenta en 0 que inicia sesión ve la casilla y, al marcarla, queda con fecha y versión; sin marcarla no entra |
 
 ---
 
@@ -143,8 +144,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 05/11/2026, actualizada al terminar la parte 1 del 3.1 (API + BD): estado conocido al día y contexto de
-la parte 2 (web) del 3.1 (NC-005). Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada
+*Versión del 05/11/2026, actualizada al terminar la parte 2 del 3.1 (web): estado conocido al día y contexto de
+la parte 3 (móvil) del 3.1, que cierra NC-005. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada
 ítem o cada parte.*
 
 ```text
@@ -160,11 +161,13 @@ Lee primero:
   especificación; Parte D = decisiones pendientes)
 - git log --oneline -12 (qué se hizo en sesiones anteriores; revisa con
   git status -sb si hay commits sin push; el 05/11/2026 se subió todo hasta el
-  botón web del 2.7, 6e0bbc5; el commit de la parte 1 del 3.1 quedó sin push)
+  botón web del 2.7, 6e0bbc5; los commits de las partes 1 y 2 del 3.1 quedaron
+  sin push)
 
 Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - Hechos: 0.1, 1.1, 1.2 y toda la fase 2 (2.1 a 2.9; ver git log). Fase 3: el
-  3.1 va por partes y la parte 1 (API + BD) está hecha; sigue la parte 2 (web).
+  3.1 va por partes: la parte 1 (API + BD) y la parte 2 (web) están hechas;
+  sigue la parte 3 (móvil), que cierra NC-005.
 - "Por actualizar" está vacía.
 - Pruebas: 125 (110 OK + 15 omitidas que necesitan MariaDB).
 - Autorización de datos (3.1 parte 1, NC-005 en corrección): api.py tiene
@@ -183,10 +186,30 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
   dueño (10 usuarios en 0, sin fecha). Toda prueba que se registre debe mandar
   "acepta_datos": true. Pruebas: tests/test_registro_datos.py y test_esquema.py
   (PruebasMigracionDatosSinBD / PruebasMigracionDatosEnBD).
-- Pendientes que dejó la parte 1 (sin ítem, preguntar al dueño): pedir la
-  autorización a los usuarios existentes al iniciar sesión (R05 del plan GA9),
-  volver a pedirla cuando cambie VERSION_POLITICA_DATOS, botón "borrar mi
-  cuenta" (supresión) y llenar las decisiones D.1 a D.6 de la política.
+- Web (3.1 parte 2, hecha el 05/11/2026): RegisterModal.jsx tiene FORM_VACIO
+  (aceptaDatos: false), la casilla id="reg-acepta" sin marcar antes del botón
+  ("Soy mayor de 18 años, he leído la Política de tratamiento de datos
+  personales y autorizo...", D.4 decidido: la edad va en la misma casilla), el
+  enlace a /politica-de-datos con target="_blank" y el aviso corto B.2 debajo
+  (aria-describedby). Sin marcar: MENSAJE_SIN_AUTORIZACION en el cuadro rojo
+  (role="alert"), foco en la casilla y NINGUNA llamada a la API. api.js:
+  registerUser(name, email, password, aceptaDatos) manda
+  acepta_datos: aceptaDatos === true. Página src/pages/PoliticaDatos.jsx (copia
+  en JSX de la Parte A del borrador; VERSION_POLITICA = "1.0"; los datos de D.1,
+  D.3 y D.5 salen como "Por definir"; si cambias el texto, cambia también el .md
+  y sube la versión aquí y en la API). Ruta en App.jsx y enlace en Footer.jsx.
+  Probada por el dueño con la API real: conteo 0 | 10 | 0 y 1 | 1 | 1.
+- La API NO tiene recargador: después de cambiar el backend hay que reiniciarla
+  (Ctrl+C y ..\.venv\Scripts\python api.py desde petconnect.Backend). Para saber
+  si corre el código nuevo: CreationDate del proceso (Get-CimInstance
+  Win32_Process, CommandLine con api.py) más reciente que LastWriteTime de
+  api.py, o un POST /api/auth/register sin acepta_datos que responda 400
+  "Debes autorizar...".
+- Pendientes que dejó el 3.1 (fuera de NC-005): el 3.5 (pedir la autorización a
+  las cuentas existentes y a quienes aceptaron una versión vieja, al iniciar
+  sesión; nunca con un UPDATE que la invente); botón "borrar mi cuenta"
+  (supresión, C.8) y llenar las decisiones D.1 a D.3, D.5 y D.6 de la política
+  (no bloquean el cierre técnico, sí la publicación).
 - Registro (2.7, A-09): AlmacenOTP tiene vigente(clave) (borra el pendiente si
   venció) y para_reenviar(clave) (60 s entre correos, máximo 3 reenvíos, no
   alarga los 10 minutos, no reenvía un código con 5 fallos). /register NO toca
@@ -201,7 +224,10 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
   en LoginModal.jsx y en el móvil; que /verify vuelva a pedir la contraseña
   (otra persona puede borrar el pendiente con 6 códigos falsos y registrarse);
   la caja del código sin aria-label/autoComplete="one-time-code" y los modales
-  sin role="dialog" (/impeccable audit, 17/20).
+  sin role="dialog" (/impeccable audit, 17/20); el código vencido no se avisa
+  (registrarse otra vez con un código vigente no manda otro y los 10 minutos
+  siguen desde el primero; tras vencer, "Reenviar código" no envía nada y la
+  web no dice que venció; ver A-09 de la AUDITORÍA).
 - NC-007 solo espera decrypt() (4.8). NC-006 cerrada el 04/11/2026. NC-002
   cerrada el 05/11/2026.
 - Mascotas (2.9): GET /api/mascotas/<id> pública solo devuelve en_adopcion (SQL
@@ -258,39 +284,33 @@ Estado conocido (5/11/2026; si el git log muestra más ítems hechos, manda el g
 - La web (src/services/api.js:20) y el móvil (src/services/api.js:34) muestran
   data.error con cualquier respuesta que no sea ok.
 
-Contexto del próximo paso (3.1 parte 2 de 3: WEB, A-20, NC-005). Solo
-PetConnect.Front/petconnect-app; no tocar backend ni móvil (regla 3).
-- Hoy el formulario web de registro recibe 400 "Debes autorizar..." porque no
-  manda la casilla: la API ya la exige (parte 1).
-- Web: src/components/RegisterModal.jsx (estado del formulario ~línea 32,
-  handleSubmit ~117, <form> ~214, botón submit ~319) y src/services/api.js:32
-  registerUser(name, email, password), que debe mandar también
-  "acepta_datos": true SOLO si la casilla está marcada (booleano, nunca texto).
-  Rutas en src/App.jsx; pie de página en src/components/Footer.jsx.
-- Qué hacer (Parte B y C del borrador de la política): casilla SIN marcar al
-  abrir, obligatoria, antes del botón, con el texto de B.1 y un enlace a la
-  política que se abra en una pestaña nueva (no perder lo escrito); aviso corto
-  B.2 debajo; si se envía sin marcar, mensaje B.3 sin llamar a la API; página
-  nueva /politica-de-datos con el texto de la Parte A, marcada como BORRADOR
-  mientras no la valide el instructor, y enlace "Política de datos personales"
-  en el pie de página. Accesibilidad B.4: <label htmlFor>, área de 44 px,
-  contraste, error con role="alert" (como el del 2.7). Debe verse bien a 375 px.
-- Decidir (con pros/contras): cómo mostrar la política (página propia con el
-  texto en JSX, o leer el .md: ojo, Vite no lo convierte solo y una librería
-  nueva necesita permiso); qué hacer con los [PENDIENTE] de la Parte A mientras
-  no estén las decisiones D.1 a D.6 (dejarlos visibles como "por definir" o
-  esperar); si la casilla también dice "Soy mayor de 18 años" (D.4).
-- Usar frontend-design para la página nueva y /impeccable audit al final.
-- Prueba: npm run lint y npm run build; revisión a 375 px con respuestas
-  simuladas; el dueño prueba con la API real: sin marcar → mensaje sin petición;
-  marcada → "Codigo enviado" y, al verificar, la cuenta se crea (comprobar con
-  el conteo: SELECT acepta_datos, COUNT(*), COUNT(fecha_autorizacion_datos)
-  FROM usuarios GROUP BY acepta_datos → aparece una fila con 1 y fecha).
-- Parte 3 (móvil, después y aparte): src/screens/RegisterScreen.js
-  (handleRegister, registerUser en la línea 27) y src/services/api.js:61; abrir
-  la política web con Linking. NC-005 se cierra al terminar la parte 3.
-- GA9: fila NC-005 (~708, "En corrección desde el 05/11/2026"), H-08 (~167) y
-  CP-001 (~672). AUDITORÍA: "Estado" de A-20.
+Contexto del próximo paso (3.1 parte 3 de 3: MÓVIL, A-20, NC-005). Solo
+PetConnect.Mobile; no tocar backend ni web (regla 3). Si el plan ya fue
+aprobado en la sesión anterior, revisa si hay cambios sin commit en
+PetConnect.Mobile antes de tocar nada.
+- Hoy el registro del móvil recibe 400 "Debes autorizar el tratamiento de tus
+  datos personales para registrarte": la API ya lo exige (parte 1) y el móvil
+  no manda la casilla.
+- Móvil: src/screens/RegisterScreen.js (estados ~línea 15, handleRegister ~23
+  con registerUser en la 27, formulario ~71, botón "Registrarme" ~94; hoy no
+  tiene casilla ni enlace) y src/services/api.js:61 registerUser(name, email,
+  password), que debe mandar acepta_datos: aceptaDatos === true (igual que la
+  web). No hay componente de casilla ni expo-web-browser instalados: la casilla
+  se arma con Pressable + accessibilityRole="checkbox" +
+  accessibilityState={{ checked }} (sin librería nueva) y la política se abre
+  con Linking.openURL de react-native en el navegador del celular. Ojo: en el
+  emulador la web está en http://10.0.2.2:5173/politica-de-datos (misma lógica
+  que HOST en api.js); solo vale en desarrollo (A-27, 5.3).
+- Qué hacer (Parte B y C del borrador): los mismos textos B.1 (con +18), B.2 y
+  B.3 de la web; casilla SIN marcar, antes del botón; sin marcar → mensaje B.3
+  sin llamar a la API; área táctil de 44 px; leer bien en TalkBack.
+- Prueba: el móvil no tiene pruebas automáticas ni linter (package.json solo
+  tiene start, android, ios y web); revisión en el emulador Android. El dueño prueba
+  con la API real: sin marcar → mensaje sin petición; el enlace abre la
+  política; marcada → código → cuenta creada; conteo → la fila de 1 sube a 2.
+  Usar vercel-react-native-skills y /impeccable audit al final.
+- Al terminar: NC-005 "Cerrada el dd/mm/2026" en GA9 (fila ~708, H-08 ~167,
+  CP-001 ~672), "Estado" de A-20 en la AUDITORÍA y [x] en el 3.1.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -329,6 +349,7 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.1, parte 2 de 3 (web)** (A-20, NC-005). La parte 1 (API + BD) quedó hecha el 05/11/2026 y la
-migración ya se aplicó a la BD de desarrollo. Hasta terminar la parte 2, el registro web responde 400 porque todavía
-no manda la casilla. Después sigue la parte 3 (móvil), que cierra NC-005.
+**Próximo ítem: 3.1, parte 3 de 3 (móvil)** (A-20, NC-005). Las partes 1 (API + BD) y 2 (web) quedaron hechas el
+05/11/2026; la web se probó con la API real. Hasta terminar la parte 3, el registro del móvil responde 400 porque
+todavía no manda la casilla. Con la parte 3 se cierra NC-005. Después: 3.2, y el 3.5 (autorización de las cuentas
+existentes) cuando toque.

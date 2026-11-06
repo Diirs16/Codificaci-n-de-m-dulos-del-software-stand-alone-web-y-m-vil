@@ -12,6 +12,7 @@ import Confirmation from "./pages/Confirmation";
 import Adoption from "./pages/Adoption";
 import PetDetail from "./pages/PetDetail";
 import Contact from "./pages/Contact";
+import PoliticaDatos from "./pages/PoliticaDatos";
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/adopcion" element={<Adoption />} />
           <Route path="/adopcion/:id" element={<PetDetail />} />
           <Route path="/contacto" element={<Contact />} />
+          <Route path="/politica-de-datos" element={<PoliticaDatos />} />
         </Routes>
       </div>
       <Footer />

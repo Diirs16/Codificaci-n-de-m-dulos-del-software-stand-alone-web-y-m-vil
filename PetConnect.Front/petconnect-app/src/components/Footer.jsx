@@ -25,6 +25,7 @@ export default function Footer() {
               <li><a href="/catalogo" className="hover:text-white transition-colors no-underline text-gray-400">Catálogo</a></li>
               <li><a href="/adopcion" className="hover:text-white transition-colors no-underline text-gray-400">Adopción</a></li>
               <li><a href="/contacto" className="hover:text-white transition-colors no-underline text-gray-400">Contacto</a></li>
+              <li><a href="/politica-de-datos" className="hover:text-white transition-colors no-underline text-gray-400">Política de datos personales</a></li>
             </ul>
           </div>
 
