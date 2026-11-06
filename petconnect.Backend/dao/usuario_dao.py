@@ -13,8 +13,9 @@ class UsuarioDAO:
     """Acceso a datos para la tabla usuarios."""
 
     # NC-005 (item 3.1): la fecha y la version de la politica aceptada son la prueba
-    # de la autorizacion. Solo se escriben al crear el usuario (los SELECT no las leen
-    # porque hoy nadie las usa).
+    # de la autorizacion. Se escriben al crear el usuario y, desde el item 3.5, cuando
+    # una cuenta vieja (o que acepto otra version) la da al iniciar sesion. Los SELECT
+    # las leen para que /api/auth/login sepa si hay que pedirla.
     _INSERTAR = """
         INSERT INTO usuarios (nombres, apellidos, correo, telefono,
                             password_hash, foto_perfil, estado, verificado, acepta_datos,
@@ -25,21 +26,24 @@ class UsuarioDAO:
     _CONSULTAR_TODOS = """
         SELECT id_usuario, nombres, apellidos, correo, telefono,
             password_hash, foto_perfil, estado, verificado, acepta_datos,
-            fecha_creacion, fecha_actualizacion
+            fecha_creacion, fecha_actualizacion,
+            fecha_autorizacion_datos, version_politica_datos
         FROM usuarios ORDER BY id_usuario
     """
 
     _CONSULTAR_POR_ID = """
         SELECT id_usuario, nombres, apellidos, correo, telefono,
             password_hash, foto_perfil, estado, verificado, acepta_datos,
-            fecha_creacion, fecha_actualizacion
+            fecha_creacion, fecha_actualizacion,
+            fecha_autorizacion_datos, version_politica_datos
         FROM usuarios WHERE id_usuario = %s
     """
 
     _CONSULTAR_POR_CORREO = """
         SELECT id_usuario, nombres, apellidos, correo, telefono,
             password_hash, foto_perfil, estado, verificado, acepta_datos,
-            fecha_creacion, fecha_actualizacion
+            fecha_creacion, fecha_actualizacion,
+            fecha_autorizacion_datos, version_politica_datos
         FROM usuarios WHERE correo = %s
     """
 
@@ -54,6 +58,16 @@ class UsuarioDAO:
         UPDATE usuarios SET password_hash = %s WHERE id_usuario = %s
     """
 
+    # Item 3.5 (A-20, R05): las tres columnas van juntas porque la regla
+    # chk_autorizacion_datos de la BD no acepta un 1 sin fecha ni version.
+    # Solo la llama /api/auth/login/verify, con la casilla marcada por la persona
+    # y el codigo correcto: nunca se usa para "autorizar" cuentas en bloque.
+    _REGISTRAR_AUTORIZACION = """
+        UPDATE usuarios
+        SET acepta_datos = 1, fecha_autorizacion_datos = %s, version_politica_datos = %s
+        WHERE id_usuario = %s
+    """
+
     _ELIMINAR = """
         DELETE FROM usuarios WHERE id_usuario = %s
     """
@@ -61,7 +75,8 @@ class UsuarioDAO:
     _BUSCAR_POR_NOMBRE = """
         SELECT id_usuario, nombres, apellidos, correo, telefono,
             password_hash, foto_perfil, estado, verificado, acepta_datos,
-            fecha_creacion, fecha_actualizacion
+            fecha_creacion, fecha_actualizacion,
+            fecha_autorizacion_datos, version_politica_datos
         FROM usuarios WHERE nombres LIKE %s OR apellidos LIKE %s
         ORDER BY nombres
     """
@@ -83,7 +98,9 @@ class UsuarioDAO:
             verificado=bool(fila[8]),
             acepta_datos=bool(fila[9]),
             fecha_creacion=fila[10],
-            fecha_actualizacion=fila[11]
+            fecha_actualizacion=fila[11],
+            fecha_autorizacion_datos=fila[12],
+            version_politica_datos=fila[13]
         )
 
     def insertar(self, usuario):
@@ -192,6 +209,23 @@ class UsuarioDAO:
         except Error as e:
             self._conexion_bd.rollback()
             print(f"[ERROR] Al actualizar la contrasena: {e}")
+            return False
+
+    def registrar_autorizacion(self, id_usuario, fecha, version):
+        """Guarda la autorizacion de datos que la persona dio al iniciar sesion (item 3.5)."""
+        conexion = self._conexion_bd.obtener_conexion()
+        if conexion is None:
+            return False
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(self._REGISTRAR_AUTORIZACION, (fecha, version, id_usuario))
+            self._conexion_bd.commit()
+            filas_afectadas = cursor.rowcount
+            cursor.close()
+            return filas_afectadas > 0
+        except Error as e:
+            self._conexion_bd.rollback()
+            print(f"[ERROR] Al registrar la autorizacion de datos: {e}")
             return False
 
     def eliminar(self, id_usuario):

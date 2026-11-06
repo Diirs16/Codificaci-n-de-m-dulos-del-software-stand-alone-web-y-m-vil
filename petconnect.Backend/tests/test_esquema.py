@@ -355,6 +355,46 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         self.assertEqual(filas[correos[3]], (1, fecha, "1.0"))
         self.assertEqual(filas[correos[4]], (0, None, None))
 
+    def test_autorizacion_al_iniciar_sesion_con_la_base_real(self):
+        """Item 3.5 (A-20, R05): UsuarioDAO lee la prueba y registrar_autorizacion la escribe."""
+        from dao.usuario_dao import UsuarioDAO
+        from modelo.usuario import Usuario
+
+        # Correos inventados (Ley 1581)
+        correos = ["cuenta.en.cero@ejemplo.test", "version.vieja@ejemplo.test"]
+
+        def borrar():
+            c = self.conn.cursor()
+            c.execute("DELETE FROM usuarios WHERE correo IN (%s, %s)", tuple(correos))
+            self.conn.commit()
+            c.close()
+        self.addCleanup(borrar)
+
+        dao = UsuarioDAO()
+        fecha_vieja = datetime.datetime(2026, 11, 5, 10, 30, 0)
+        self.assertTrue(dao.insertar(Usuario(nombres="Prueba", correo=correos[0],
+                                             password_hash="hash-falso")))
+        self.assertTrue(dao.insertar(Usuario(
+            nombres="Prueba", correo=correos[1], password_hash="hash-falso", verificado=True,
+            acepta_datos=True, fecha_autorizacion_datos=fecha_vieja, version_politica_datos="0.9")))
+
+        # Los SELECT del DAO ya traen la prueba (antes no la leian)
+        en_cero = dao.consultar_por_correo(correos[0])
+        vieja = dao.consultar_por_correo(correos[1])
+        self.assertEqual((en_cero.acepta_datos, en_cero.fecha_autorizacion_datos,
+                          en_cero.version_politica_datos), (False, None, None))
+        self.assertEqual((vieja.acepta_datos, vieja.fecha_autorizacion_datos,
+                          vieja.version_politica_datos), (True, fecha_vieja, "0.9"))
+
+        # La persona marca la casilla y pone el codigo: se guardan las tres juntas
+        fecha = datetime.datetime(2026, 11, 6, 9, 0, 0)
+        for usuario in (en_cero, vieja):
+            with self.subTest(correo=usuario.correo):
+                self.assertTrue(dao.registrar_autorizacion(usuario.id_usuario, fecha, "1.0"))
+                despues = dao.consultar_por_correo(usuario.correo)
+                self.assertEqual((despues.acepta_datos, despues.fecha_autorizacion_datos,
+                                  despues.version_politica_datos), (True, fecha, "1.0"))
+
 
 def _lista_estados(sql):
     """Devuelve la ultima lista enum de `estado` que aparece en el texto."""

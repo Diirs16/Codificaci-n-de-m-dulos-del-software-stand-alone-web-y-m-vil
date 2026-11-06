@@ -61,6 +61,11 @@ limiter = Limiter(
 # Si el texto cambia, se sube esta version (Decreto 1377 de 2013, art. 13).
 VERSION_POLITICA_DATOS = "1.0"
 _MENSAJE_SIN_AUTORIZACION = "Debes autorizar el tratamiento de tus datos personales para registrarte"
+# Item 3.5 (A-20, R05): cuentas creadas antes del 3.1 (acepta_datos = 0) o que
+# aceptaron otra version de la politica. Se les pide al iniciar sesion.
+_MENSAJE_LOGIN_SIN_AUTORIZACION = (
+    "Para seguir usando tu cuenta debes autorizar el tratamiento de tus datos personales"
+)
 
 _conexion_bd = ConexionBD()
 _otp_registro = AlmacenOTP()
@@ -469,6 +474,20 @@ def validar_correo():
 # Autenticacion
 # ---------------------------------------------------------------------------
 
+def _autorizacion_vigente(usuario) -> bool:
+    """
+    Item 3.5 (A-20, R05): la cuenta autorizo el tratamiento de sus datos con la
+    version actual de la politica. Una cuenta en 0 (creada antes del 3.1) o que
+    acepto otra version debe autorizar otra vez (Decreto 1377, art. 13).
+    """
+    return usuario.acepta_datos is True and usuario.version_politica_datos == VERSION_POLITICA_DATOS
+
+
+def _pedir_autorizacion():
+    """403 que el cliente reconoce por "requiere_autorizacion" para mostrar la casilla."""
+    return jsonify({"error": _MENSAJE_LOGIN_SIN_AUTORIZACION, "requiere_autorizacion": True}), 403
+
+
 @app.route("/api/auth/login", methods=["POST"])
 @limiter.limit(LIMITE_AUTH)
 def login():
@@ -495,9 +514,23 @@ def login():
     if usuario.estado != "activo":
         return jsonify({"error": "Cuenta inactiva o bloqueada"}), 403
 
+    # Item 3.5 (A-20, R05): va DESPUES de la contrasena (el 403 no revela que la
+    # cuenta existe) y ANTES del correo. Sin autorizacion vigente no se manda el
+    # codigo hasta que la persona marque la casilla: solo vale el booleano JSON
+    # true, como en /register. Nunca se marca la cuenta como autorizada aqui: la
+    # prueba (fecha y version) viaja en el pendiente y /login/verify la escribe solo
+    # con el codigo correcto. Si la cuenta ya autorizo, "acepta_datos" se ignora y
+    # su fecha original no se toca.
+    pendiente = {"id_usuario": usuario.id_usuario}
+    if not _autorizacion_vigente(usuario):
+        if data.get("acepta_datos") is not True:
+            return _pedir_autorizacion()
+        pendiente["fecha_autorizacion_datos"] = datetime.now().replace(microsecond=0)
+        pendiente["version_politica_datos"] = VERSION_POLITICA_DATOS
+
     # Segundo factor: se manda un codigo de un solo uso al correo antes de
     # entregar el token. La sesion solo se completa en /api/auth/login/verify.
-    code = _otp_login.crear(email, {"id_usuario": usuario.id_usuario})
+    code = _otp_login.crear(email, pendiente)
 
     try:
         enviar_codigo(
@@ -539,6 +572,18 @@ def login_verify():
     usuario = dao.consultar_por_correo(email)
     if usuario is None:
         return jsonify({"error": "Usuario no encontrado"}), 404
+
+    # Item 3.5 (A-20, R05), doble barrera: sin autorizacion vigente no hay token.
+    # La prueba solo vale si es de la version actual (pudo cambiar en estos 10
+    # minutos) y si es del mismo usuario que pidio el codigo.
+    if not _autorizacion_vigente(usuario):
+        fecha = pending.get("fecha_autorizacion_datos")
+        version = pending.get("version_politica_datos")
+        if (fecha is None or version != VERSION_POLITICA_DATOS
+                or pending.get("id_usuario") != usuario.id_usuario):
+            return _pedir_autorizacion()
+        if not dao.registrar_autorizacion(usuario.id_usuario, fecha, version):
+            return jsonify({"error": "No pudimos guardar tu autorizacion. Intenta de nuevo"}), 500
 
     token = generate_token(usuario.id_usuario, usuario.correo)
     return jsonify({

@@ -215,6 +215,9 @@ dueño del proyecto pidió volver a mostrarlo en el aviso. El correo también es
 | Se intenta enviar el formulario sin marcar la casilla | Web y móvil, antes de llamar a la API | “Para crear tu cuenta debes autorizar el tratamiento de tus datos personales.” |
 | La API recibe un registro sin autorización válida | API, respuesta 400 | “Debes autorizar el tratamiento de tus datos personales para registrarte” |
 | Pie de página o menú | Web | Enlace “Política de datos personales” a `/politica-de-datos` |
+| Inicio de sesión de una cuenta sin autorización vigente (creada antes del 3.1 o que aceptó otra versión), sin la casilla | API, respuesta 403 con `"requiere_autorizacion": true` (ítem 3.5) | “Para seguir usando tu cuenta debes autorizar el tratamiento de tus datos personales” |
+| Se intenta continuar el inicio de sesión sin marcar la casilla | Web y móvil, antes de llamar a la API (ítem 3.5) | “Para continuar debes autorizar el tratamiento de tus datos personales.” |
+| Debajo de la casilla del inicio de sesión | Web y móvil (ítem 3.5) | “Si no quieres autorizarlo, escríbenos a proyectopetconnect+atencion@gmail.com y borraremos tu cuenta.” (enlace `mailto`, proceso manual de C.8) |
 
 **B.4 Accesibilidad:** la casilla debe tener su etiqueta asociada (`<label htmlFor>` en la web,
 `accessibilityRole="checkbox"` y `accessibilityState={{ checked }}` en el móvil), un área táctil de al menos
@@ -234,8 +237,8 @@ dueño del proyecto pidió volver a mostrarlo en el aviso. El correo también es
 | C.6 | No afirmar una autorización que no existe | Ley 1581, arts. 4 y 9 | `acepta_datos` sin `DEFAULT 1` (pasa a `NOT NULL DEFAULT 0`); `Usuario()` trae `False`; regla `CHECK`: `acepta_datos = 0` o fecha y versión presentes; los usuarios existentes sin fecha pasan a `0` en la migración | 1 (BD) |
 | C.7 | Política publicada y disponible | Decreto 1377, art. 13 | Página web `/politica-de-datos` con la Parte A, enlazada desde el registro y el pie de página | 2 |
 | C.8 | Canal para consultas y reclamos | Ley 1581, arts. 14 y 15 | Correo de A.8, `proyectopetconnect+atencion@gmail.com` (decidido el 06/11/2026; proceso manual). Un botón de “borrar mi cuenta” queda para un ítem futuro | Fuera del 3.1 |
-| C.9 | Cambios en la política | Decreto 1377, art. 13 | Cambiar el texto obliga a subir `VERSION_POLITICA_DATOS`; volver a pedir la autorización a quienes aceptaron una versión vieja queda para un ítem futuro | Fuera del 3.1 |
-| C.10 | Usuarios sin autorización registrada | Riesgo R05 del plan GA9 (contingencia) | Quedan con `acepta_datos = 0`; pedirles la autorización al iniciar sesión queda para un ítem futuro | Fuera del 3.1 |
+| C.9 | Cambios en la política | Decreto 1377, art. 13 | Cambiar el texto obliga a subir `VERSION_POLITICA_DATOS`; al iniciar sesión, quien aceptó otra versión debe autorizar otra vez (casilla + código; ítem 3.5, parte 1 hecha el 06/11/2026) | 3.5 |
+| C.10 | Usuarios sin autorización registrada | Riesgo R05 del plan GA9 (contingencia) | Quedan con `acepta_datos = 0` (nunca un `UPDATE` que la invente); al iniciar sesión deben marcar la casilla y la autorización se guarda con el código correcto (ítem 3.5, parte 1 hecha el 06/11/2026) | 3.5 |
 | C.11 | Datos personales fuera de los registros técnicos | Ley 1581, art. 4 (seguridad y confidencialidad) | Ya cumplido en el 2.8: los registros no llevan correos ni códigos | Hecho |
 
 **Fuera del 3.1** (no mezclar): la consola (`vista/menu_usuarios.py`) es el 4.11. Desde el 3.1 guardará

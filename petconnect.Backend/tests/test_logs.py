@@ -60,6 +60,9 @@ class PruebasLogsSinDatosPersonales(unittest.TestCase):
         usuario = SimpleNamespace(
             id_usuario=7, nombres="Persona", apellidos="Prueba", correo=CORREO_PRUEBA,
             password_hash="hash-falso", estado="activo",
+            # Item 3.5: cuenta con la autorizacion vigente, para que /login llegue al correo
+            acepta_datos=True, fecha_autorizacion_datos=datetime(2026, 11, 5, 10, 0, 0),
+            version_politica_datos="1.0",
         )
         parches = {
             # BD simulada "encendida" (un objeto cualquiera): el DAO tambien es falso

@@ -427,6 +427,25 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   el Java 25 del sistema falla `configureCMakeDebug`.
   Pendiente fuera de la NC: pedir la autorización a las cuentas existentes al iniciar sesión (ítem 3.5); nunca con un
   `UPDATE` que la invente.
+  **Ítem 3.5, parte 1 de 3 (API + DAO, 06/11/2026; riesgo R05; opción (a) aprobada por el dueño):** `/api/auth/login`,
+  después de comprobar la contraseña y el estado de la cuenta (así el 403 no revela si la cuenta existe), revisa si la
+  autorización está vigente (`acepta_datos` = 1 **y** `version_politica_datos` = `VERSION_POLITICA_DATOS`). Si no lo
+  está y el cuerpo no trae `"acepta_datos": true` (solo el booleano), responde 403 `{"error": "Para seguir usando tu
+  cuenta debes autorizar el tratamiento de tus datos personales", "requiere_autorizacion": true}` sin enviar código. Con
+  la casilla, la fecha (la de `/login`) y la versión viajan en el pendiente del OTP; `/api/auth/login/verify` las
+  escribe con `UsuarioDAO.registrar_autorizacion` (un `UPDATE` parametrizado de las tres columnas juntas) **solo** con
+  el código correcto, y sin una prueba válida (sin fecha, de otra versión o de otro usuario) responde el mismo 403 sin
+  token (doble barrera); si no se puede guardar, 500 sin token. Una cuenta ya autorizada entra igual que antes y su
+  fecha original no se toca. Los `SELECT` de `UsuarioDAO` ahora leen la fecha y la versión. Nunca se “autoriza” una
+  cuenta en bloque. Prueba de regresión: `tests/test_login_datos.py` (12) y en `test_esquema.py`
+  `test_autorizacion_al_iniciar_sesion_con_la_base_real` (MariaDB temporal). Contraprueba con `git stash` de un
+  archivo a la vez: con el `api.py` anterior fallan 5 de las 9 pruebas de la API (23 casos con los subcasos); con el
+  `dao/usuario_dao.py` anterior fallan las 3 del DAO; pasan con ambos códigos, a propósito, la contraseña mala (401),
+  la cuenta inactiva, la cuenta ya autorizada y el código incorrecto, que ya funcionaban. Suite: 153 pruebas, 132 OK y
+  21 omitidas que requieren MariaDB. `tests/test_logs.py` usa ahora un usuario falso con la autorización 1.0. Riesgos
+  que siguen: un token entregado antes del cambio vale hasta 24 h (4.13) y la consola no la pide (4.11). Faltan la web
+  (parte 2) y el móvil (parte 3); si la persona no autoriza, la app le ofrecerá escribir al correo de atención para
+  borrar su cuenta (proceso manual, C.8; decisión del dueño).
 
 #### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
 - **Solicitud de adopción** (`PetDetail.jsx:56-60`) y **Contacto** (`Contact.jsx:15-17`) piden nombre, correo, teléfono y
