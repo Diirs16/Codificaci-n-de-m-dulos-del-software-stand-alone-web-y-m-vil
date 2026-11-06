@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { errorDeApi, cuerpoLogin } from "../utils/peticiones";
 
 /**
  * URL base de la API PetConnect (mismo backend Flask que usan el módulo
@@ -37,9 +38,10 @@ async function apiFetch(path, options = {}) {
   try {
     data = await res.json();
   } catch {
-    throw new Error(`Error ${res.status}: respuesta inválida del servidor`);
+    throw errorDeApi(`Error ${res.status}: respuesta inválida del servidor`, res.status, null);
   }
-  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  // Ítem 3.5: el error lleva status y requiereAutorizacion (src/utils/peticiones.js)
+  if (!res.ok) throw errorDeApi(data.error || `Error ${res.status}`, res.status, data);
   return data;
 }
 
@@ -59,10 +61,12 @@ export function getMascota(id) {
   return apiFetch(`/mascotas/${id}`);
 }
 
-export function loginUser(email, password) {
+// Ítem 3.5: con aceptaDatos === true (casilla marcada) la API guarda la
+// autorización de una cuenta que no la tenía, solo cuando el código sea correcto.
+export function loginUser(email, password, aceptaDatos) {
   return apiFetch("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(cuerpoLogin(email, password, aceptaDatos)),
   });
 }
 

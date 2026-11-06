@@ -69,7 +69,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 3.2 | A-21 | — | Formularios de adopción, contacto y checkout: implementar el envío **o** rotular “Demo — no se envía” y deshabilitar | 🟢 (rotular) / 🔴 (implementar) | Ningún formulario dice “enviado” si no envió nada — *Hecho el 06/11/2026 (camino “rotular”, solo web): componente `AvisoDemo.jsx`; en `PetDetail.jsx`, `Contact.jsx` y `Checkout.jsx` aviso “Demo — …”, campos en `<fieldset disabled>`, botón deshabilitado y sin pantallas de “enviado”; el checkout ya no vacía el carrito; `Confirmation.jsx` y la ruta `/confirmacion` borradas; Contacto muestra el correo de atención y Armenia (D.1) en lugar de datos inventados. Lint 0 errores, build OK, 375 px sin desbordes y 0 `POST` a `/api`; búsqueda de textos engañosos: 7 con el código viejo, 0 con el nuevo; `/impeccable audit` 16/20. El envío real es el 3.6* |
 | [x] | 3.3 | A-23 | NC-009 | Web: estados de carga/vacío/error en Catálogo, Adopción, detalles y Home; `data/*.js` solo para pruebas | 🟡 | Con la API apagada, la web muestra un error, no perritos falsos — *Hecho el 06/11/2026 (solo web): `api.js` (cada error trae `status`; 0 sin conexión), componente `EstadoCarga.jsx` (cargando / error con “Reintentar” / vacío), `Adoption.jsx`, `Catalog.jsx`, `PetDetail.jsx` (404 → “no encontrada”, otro fallo → error; nunca la ficha falsa), `ProductDetail.jsx` y `Home.jsx` (“Productos destacados” de la API en lugar de ofertas/nuevos inventados); `src/data/pets.js` y `products.js` borrados. Pruebas nuevas `npm test` (`node --test`, sin dependencias): `tests/api.test.js` y `tests/sin-datos-falsos.test.js` (fallan 5 de 6 con el código viejo, pasan 6 de 6 con el nuevo). Lint 0 errores, build OK, 375 px con la API apagada: error en las 5 páginas (contraprueba: el código viejo mostraba las 6 mascotas falsas); `/impeccable audit` 17/20. Probado por el dueño con la API real: 6 mascotas de la BD, `/adopcion/99999` → “Mascota no encontrada”, Home con productos reales. NC-009 cerrada* |
 | [x] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` — *Opción (a) del dueño: no mostrar vacunación, esterilización ni tamaño. Parte 1 de 3 (backend) hecha el 06/11/2026: `api.py` ya no inventa `vaccinated`/`sterilized`/`size`; `seed.py` con `color` en `None` y 10 textos `# REVISAR-VETERINARIO`; migración `2026-11-06_mascotas_ejemplo.sql` (color con tamaño → `NULL`, Nala 6 → 0; reconoce las 6 de ejemplo por nombre + especie + `en_adopcion`), aplicada por el dueño; `tests/test_ficha_mascota.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Parte 2 de 3 (web) hecha el 06/11/2026: `src/utils/mascota.js` (edad “2 años” / “Menos de 1 año”, sexo “Hembra”/“Macho”, línea sin datos desconocidos); `PetDetail.jsx` sin el bloque ✓/✗ ni la talla y `Adoption.jsx` sin la talla; `tests/mascota.test.js` y `tests/sin-salud-inventada.test.js` (con las páginas viejas falla 1 de 12, que nombra las dos páginas; pasan 12 de 12 con las nuevas); lint 0 errores, build OK, 375 px con la API real; `/impeccable audit` 16/20. Parte 3 de 3 (móvil) hecha el 06/11/2026: `src/utils/mascota.js` (copia de la web); `PetDetailScreen.js` sin las insignias Vacunada/Esterilizada, sin `Badge` y sin “Talla undefined”; `AdoptionScreen.js` con la misma línea “Raza · Edad · Sexo”; fotos con `role="img"` y `aria-label`; `tests/mascota.test.mjs` y `tests/sin-salud-inventada.test.mjs` (`npm test` del móvil, `node --test`; con las pantallas viejas fallan 2 de 7, pasan 7 de 7 con las nuevas); `npx expo export --platform web` OK y 375 px con la API simulada; probado por el dueño en el emulador con la API real (6 mascotas, Nala “Menos de 1 año”); `/impeccable audit` 14/20. A-22 resuelto. Falta la validación veterinaria de los textos marcados antes de publicar* |
-| [ ] | 3.5 | A-20 | — (R05) | Pedir la autorización de datos a las cuentas existentes (`acepta_datos = 0`) y a quienes aceptaron una versión vieja de la política, al iniciar sesión (API + web + móvil); si no autorizan, ofrecer borrar la cuenta. **Nunca** con un `UPDATE` que la invente. Después de la parte 3 del 3.1. Surgió el 05/11/2026 | 🔴 | Una cuenta en 0 que inicia sesión ve la casilla y, al marcarla, queda con fecha y versión; sin marcarla no entra — *Opción (a) del dueño; si no autorizan, enlace al correo de atención para borrar la cuenta (proceso manual, C.8). Parte 1 de 3 (API + DAO) hecha el 06/11/2026: `api.py` (`_autorizacion_vigente`: `acepta_datos` = 1 y versión actual; `/login` responde 403 `"requiere_autorizacion": true` tras la contraseña y sin enviar código; con `"acepta_datos": true` la fecha y la versión van en el pendiente; `/login/verify` las escribe solo con el código correcto y sin prueba válida responde 403 sin token), `dao/usuario_dao.py` (los `SELECT` leen fecha y versión; `registrar_autorizacion`, `UPDATE` parametrizado de las tres columnas); `tests/test_login_datos.py` (12) y `test_esquema.py` (1 con MariaDB); con el `api.py` anterior fallan 5 de 9, con el DAO anterior 3 de 3. Parte 2 de 3 (web) hecha el 06/11/2026: componente `CasillaAutorizacion.jsx` (texto B.1 + B.2 en un solo lugar, lo usan el registro y el inicio de sesión); `LoginModal.jsx` muestra el paso “Autoriza el uso de tus datos” con el 403 (casilla sin marcar, “Autorizar y continuar”, “Cancelar” y `mailto` B.3 para pedir borrar la cuenta; sin marcar, mensaje B.3 y 0 peticiones; un 403 en `/login/verify` vuelve a la casilla); `api.js` (`acepta_datos` solo con `true`, error con `requiereAutorizacion`) y `AuthContext.jsx`; `tests/api.test.js` (+5) y `tests/casilla-autorizacion.test.js` (3): con el código anterior fallan 7 de 8; `npm test` 20/20, lint y build OK, 375 px con la API simulada; `/impeccable audit` 16/20. Arreglo de la auditoría del 06/11/2026: “Cancelar” desactivado mientras se envía (si no, al llegar la respuesta salía igual la pantalla del código). Probada por el dueño con la API real el 06/11/2026: la cuenta 18 (`acepta_datos = 0`) inició sesión en la web, vio “Autoriza el uso de tus datos”, marcó la casilla, escribió el código y quedó con `acepta_datos = 1` y fecha; el caso “sin marcar” quedó probado con las pruebas automáticas y la API simulada. Falta el móvil (parte 3)* |
+| [x] | 3.5 | A-20 | — (R05) | Pedir la autorización de datos a las cuentas existentes (`acepta_datos = 0`) y a quienes aceptaron una versión vieja de la política, al iniciar sesión (API + web + móvil); si no autorizan, ofrecer borrar la cuenta. **Nunca** con un `UPDATE` que la invente. Después de la parte 3 del 3.1. Surgió el 05/11/2026 | 🔴 | Una cuenta en 0 que inicia sesión ve la casilla y, al marcarla, queda con fecha y versión; sin marcarla no entra — *Opción (a) del dueño; si no autorizan, enlace al correo de atención para borrar la cuenta (proceso manual, C.8). Parte 1 de 3 (API + DAO) hecha el 06/11/2026: `api.py` (`_autorizacion_vigente`: `acepta_datos` = 1 y versión actual; `/login` responde 403 `"requiere_autorizacion": true` tras la contraseña y sin enviar código; con `"acepta_datos": true` la fecha y la versión van en el pendiente; `/login/verify` las escribe solo con el código correcto y sin prueba válida responde 403 sin token), `dao/usuario_dao.py` (los `SELECT` leen fecha y versión; `registrar_autorizacion`, `UPDATE` parametrizado de las tres columnas); `tests/test_login_datos.py` (12) y `test_esquema.py` (1 con MariaDB); con el `api.py` anterior fallan 5 de 9, con el DAO anterior 3 de 3. Parte 2 de 3 (web) hecha el 06/11/2026: componente `CasillaAutorizacion.jsx` (texto B.1 + B.2 en un solo lugar, lo usan el registro y el inicio de sesión); `LoginModal.jsx` muestra el paso “Autoriza el uso de tus datos” con el 403 (casilla sin marcar, “Autorizar y continuar”, “Cancelar” y `mailto` B.3 para pedir borrar la cuenta; sin marcar, mensaje B.3 y 0 peticiones; un 403 en `/login/verify` vuelve a la casilla); `api.js` (`acepta_datos` solo con `true`, error con `requiereAutorizacion`) y `AuthContext.jsx`; `tests/api.test.js` (+5) y `tests/casilla-autorizacion.test.js` (3): con el código anterior fallan 7 de 8; `npm test` 20/20, lint y build OK, 375 px con la API simulada; `/impeccable audit` 16/20. Arreglo de la auditoría del 06/11/2026: “Cancelar” desactivado mientras se envía (si no, al llegar la respuesta salía igual la pantalla del código). Probada por el dueño con la API real el 06/11/2026: la cuenta 18 (`acepta_datos = 0`) inició sesión en la web, vio “Autoriza el uso de tus datos”, marcó la casilla, escribió el código y quedó con `acepta_datos = 1` y fecha; el caso “sin marcar” quedó probado con las pruebas automáticas y la API simulada. Parte 3 de 3 (móvil) hecha el 06/11/2026: componente `src/components/CasillaAutorizacion.js` (texto B.1 + enlace aparte + B.2 en un solo lugar; lo usan `RegisterScreen.js`, sin cambio visible, y `LoginScreen.js`); `LoginScreen.js` muestra el paso “Autoriza el uso de tus datos” con el 403 (casilla sin marcar, “Autorizar y continuar”, “Cancelar” desactivado mientras se envía y que borra la contraseña, línea B.3 con enlace aparte `mailto`; sin marcar, mensaje B.3 en `aria-live` y 0 peticiones; un 403 en `/login/verify` vuelve a la casilla); `src/utils/peticiones.js` (`errorDeApi` con `status` y `requiereAutorizacion`, `cuerpoLogin` con `acepta_datos` solo con `true`) que usa `api.js`; `AuthContext.js` sin cambios. `tests/peticiones.test.mjs` (5) y `tests/casilla-autorizacion.test.mjs` (4): con el código anterior fallan las 9 nuevas (5 si se deja `peticiones.js`: pasan a propósito las 4 que solo prueban ese archivo nuevo); `npm test` 16/16; `npx expo export --platform web` OK; 375 px con la API simulada (sin marcar 0 peticiones, marcada 1 con `"acepta_datos": true`, 403 en verify → casilla, Cancelar borra la contraseña, registro igual); `/impeccable audit` 14/20. Prueba en el emulador con la API real (cuenta 17): opcional, pendiente del dueño. A-20 y R05: contingencia completa* |
 | [ ] | 3.6 | A-21 | — | Envío real de la solicitud de adopción y del mensaje de contacto: endpoint con `@require_auth` (y limitador), tabla nueva (migración + `schema.sql`), consentimiento para esa finalidad y **política v1.1** (Parte C, “Fuera del 3.1”; subir `VERSION_POLITICA_DATOS`), web y, si se decide, móvil. Quitar el `AvisoDemo` solo del formulario que ya envíe. El checkout real va aparte (A-26). Surgió en el 3.2 (06/11/2026) | 🔴 | Una solicitud enviada queda en la BD con el usuario, la fecha y la versión de la política, y la web dice “enviada” solo si la API respondió 201 |
 
 ---
@@ -145,8 +145,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 06/11/2026, actualizada al terminar el 3.5 parte 2 de 3 (web: el inicio de sesión muestra la casilla
-cuando la API la pide): estado conocido al día y contexto de la parte 3 (móvil). Sin push hasta terminar toda la Fase 3. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 06/11/2026, actualizada al terminar el 3.5 (parte 3 de 3, móvil: el inicio de sesión del móvil muestra
+la casilla cuando la API la pide): estado conocido al día y contexto del 3.6, último ítem de la Fase 3. Sin push hasta terminar toda la Fase 3. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -163,8 +163,8 @@ Lee primero:
   el 05/11/2026 se subió todo hasta el botón web del 2.7, 6e0bbc5; desde ahí
   todo queda en local: 3.1 (31f005c, fa1dda3, 6f0bdc9), 0a5e1dd, b8d5ec2,
   f40af07, 57e05c4 (3.2), 6c9c0bf (3.3), 47ae96d, b398126 y f441696 (3.4,
-  3 partes), 03925c5 (3.5 parte 1, API + DAO) y el commit del 3.5 parte 2
-  (web).
+  3 partes), 03925c5 y fdaf59b (3.5 partes 1 y 2), 09fe293 (Cancelar +
+  prueba web con la API real) y el commit del 3.5 parte 3 (móvil).
   REGLA DEL DUEÑO (06/11/2026): NO
   se hace push hasta terminar TODA la Fase 3 (3.1 a 3.6). No preguntes por el
   push antes; al marcar el último ítem de la fase, recuérdalo y pregunta)
@@ -173,9 +173,11 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
 - Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9), el 3.1 (3 partes: API +
   BD, web y móvil; ver git log), el 3.2, el 3.3 y el 3.4 (3 partes: backend,
   web y móvil; A-22 resuelto). NC-005 y NC-009 cerradas el 06/11/2026.
-  El 3.5 va por partes: parte 1 (API + DAO) y parte 2 (web) hechas el
-  06/11/2026; sigue la parte 3 (móvil). La parte 2 ya la probó el dueño con
-  la API real (cuenta 18; ver "Avance de esa prueba").
+  El 3.5 está HECHO (3 partes el 06/11/2026: API + DAO, web y móvil; A-20 y
+  R05 con la contingencia completa). La web la probó el dueño con la API
+  real (cuenta 18). La prueba del móvil en el emulador con la cuenta 17 es
+  opcional: si el dueño manda el resultado, anótalo (fila del 3.5, A-20 y
+  R05). Sigue el 3.6, último de la Fase 3.
 - Web sin datos falsos (3.3, A-23, hecho el 06/11/2026, solo web):
   src/data/pets.js y products.js BORRADOS; la prueba
   tests/sin-datos-falsos.test.js falla si algo de src/ vuelve a importar data/.
@@ -206,7 +208,7 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   apagada: el proxy de Vite responde 502 sin cuerpo.
 - Pruebas móvil (desde el 3.4 parte 3): npm test en PetConnect.Mobile
   ("node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test", sin
-  dependencias; 7 pruebas en tests/*.test.mjs). Las pruebas son .mjs y el
+  dependencias; 16 pruebas en tests/*.test.mjs desde el 3.5). Las pruebas son .mjs y el
   package.json NO tiene "type": "module" (cambiarlo puede romper Expo/Metro);
   Node 24 importa los .js de src/ con import y la bandera calla el aviso.
   Solo sirven para código JS puro (src/utils/) o para leer el texto de las
@@ -226,7 +228,8 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   formulario de adopción, sin modo oscuro ni tokens: pulido opcional).
   El correo de atención está ahora en AvisoDemo.jsx, Contact.jsx,
   PoliticaDatos.jsx, CasillaAutorizacion.jsx y LoginModal.jsx (desde el 3.5;
-  antes en RegisterModal.jsx), RegisterScreen.js y el borrador .md.
+  antes en RegisterModal.jsx), y en el móvil CasillaAutorizacion.js y
+  LoginScreen.js (desde el 3.5; antes en RegisterScreen.js), y el borrador .md.
 - "Por actualizar" está vacía.
 - Pruebas: 153 (132 OK + 21 omitidas que necesitan MariaDB).
 - Autorización de datos (3.1 parte 1, NC-005 cerrada): api.py tiene
@@ -268,7 +271,8 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   de datos personales" (decisión del dueño; Linking.openURL(POLITICA_URL)), el
   aviso B.2 (desde el 06/11/2026 con el correo de atención
   proyectopetconnect+atencion@gmail.com, igual que la web; si cambia, cambiarlo
-  en RegisterScreen.js, RegisterModal.jsx, PoliticaDatos.jsx y el borrador .md)
+  en CasillaAutorizacion.js del móvil y de la web (desde el 3.5), PoliticaDatos.jsx
+  y el borrador .md)
   y el error en una zona aria-live="polite". Sin marcar: mensaje B.3
   y ninguna petición. ScrollView + KeyboardAvoidingView (behavior="padding",
   offset con measureInWindow: en Expo 57 Android no encoge la ventana con el
@@ -298,7 +302,7 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   Win32_Process, CommandLine con api.py) más reciente que LastWriteTime de
   api.py, o un POST /api/auth/register sin acepta_datos que responda 400
   "Debes autorizar...".
-- Pendientes que dejó el 3.1 (fuera de NC-005): el 3.5 (en curso, ver abajo);
+- Pendientes que dejó el 3.1 (fuera de NC-005): el 3.5 (hecho el 06/11/2026);
   botón "borrar mi cuenta"
   (supresión, C.8) y llenar las decisiones D.2, D.3, D.5 y D.6 de la política
   (D.1 y D.4 decididas)
@@ -485,7 +489,7 @@ dueño):
   lugar de la web con el texto B.1 (+18, enlace a /politica-de-datos en
   pestaña nueva) y B.2 (con el correo de atención). Lo usan RegisterModal.jsx
   (id "reg-acepta", sin cambio visible) y LoginModal.jsx (id "login-acepta").
-  Si cambia el texto legal: este componente, RegisterScreen.js del móvil,
+  Si cambia el texto legal: este componente, CasillaAutorizacion.js del móvil,
   PoliticaDatos.jsx (si es la Parte A) y el borrador .md.
 - api.js: errorDeApi(mensaje, status, data) pone requiereAutorizacion = true
   solo si data.requiere_autorizacion === true (el 403 "Cuenta inactiva" no lo
@@ -555,37 +559,74 @@ dueño):
   las pruebas automáticas y la API simulada. Pendiente sin ítem: decidir si se
   borran las cuentas @example.com 9, 11, 12 y 13 (NO la 5).
 
-Contexto del próximo paso (3.5 parte 3 de 3: móvil; regla 3, solo móvil):
-- Hoy el móvil muestra el 403 de /login como un error cualquiera.
-  PetConnect.Mobile/src/services/api.js: apiFetch lanza new Error(data.error)
-  sin status ni requiere_autorizacion (líneas 40 y 42); loginUser(email,
-  password) (línea 62) no manda acepta_datos. src/context/AuthContext.js:
-  login. src/screens/LoginScreen.js (127 líneas): correo + contraseña y
-  código. El móvil no tiene componente de casilla: está dentro de
-  RegisterScreen.js (Pressable con role="checkbox", aria-checked, enlace
-  aparte con Linking.openURL(POLITICA_URL), aviso B.2, error en zona
-  aria-live="polite", ScrollView + KeyboardAvoidingView).
-- Plan propuesto (pedir aprobación): igual que la web. Sacar la casilla de
-  RegisterScreen.js a src/components/CasillaAutorizacion.js (mismo texto,
-  incluido el enlace "Leer los términos y condiciones que aceptas: ...") y
-  usarla en el registro y en un paso nuevo de LoginScreen.js ("Autoriza el
-  uso de tus datos": casilla sin marcar, "Autorizar y continuar",
-  "Cancelar", y el texto B.3 con Linking.openURL("mailto:...")). Sin marcar:
-  mensaje B.3 del cliente y ninguna petición. api.js: el error lleva
-  requiereAutorizacion (y quizá status) y loginUser(email, password,
-  aceptaDatos) manda acepta_datos solo con true. Si /login/verify responde
-  el 403, volver a la casilla.
-- Prueba: ampliar las pruebas .mjs del móvil (npm test): una prueba de
-  api.js con fetch simulado (OJO: api.js del móvil puede importar cosas de
-  React Native o Expo que Node no carga; si es así, probar leyendo el texto
-  del archivo, como mascota.test.mjs) y otra que lea el texto: la frase
-  "Soy mayor de 18 años" solo en el componente, las dos pantallas lo usan.
-  Contraprueba con el código viejo. npx expo export --platform web y 375 px
-  con la API simulada (config "movil-web-export", puerto 8090; sin marcar:
-  0 peticiones). Prueba en el emulador con la API real (la hace el dueño):
-  una cuenta vieja, casilla, código y conteo.
-- Al terminar la parte 3: marcar [x] el 3.5 y seguir con el 3.6 (último de
-  la Fase 3; después, recordar el push y preguntar).
+3.5 parte 3 (móvil, A-20, R05, hecha el 06/11/2026):
+- src/components/CasillaAutorizacion.js (props marcada, onCambiar, pista =
+  accessibilityHint, onErrorEnlace(mensaje)): ÚNICO lugar del móvil con el
+  texto B.1, el enlace aparte "Leer los términos y condiciones que aceptas:
+  ..." (Linking.openURL(POLITICA_URL)) y el aviso B.2 con el correo de
+  atención. Lo usan RegisterScreen.js (sin cambio visible) y LoginScreen.js.
+  Primer archivo de src/components/ del móvil.
+- src/utils/peticiones.js (JS puro, para que Node lo pruebe: api.js importa
+  react-native y Node falla con "Unexpected token 'typeof'"):
+  errorDeApi(mensaje, status, data) → Error con status y
+  requiereAutorizacion (solo data.requiere_autorizacion === true);
+  cuerpoLogin(email, password, aceptaDatos) → acepta_datos: true solo con
+  true. api.js los usa (apiFetch y loginUser(email, password, aceptaDatos)).
+  AuthContext.js NO cambió: LoginScreen llama a loginUser directamente y
+  luego a iniciarLogin(email); el error de verificarLogin llega tal cual.
+- LoginScreen.js: estados avisoAutorizacion (mensaje del 403) y aceptaDatos
+  (false). Paso "Autoriza el uso de tus datos" en un ScrollView: casilla,
+  zona aria-live con el error, "Autorizar y continuar" (Pressable; repite
+  loginUser(email.trim(), password, true) e iniciarLogin), "Cancelar"
+  (desactivado mientras se envía; borra la contraseña) y la línea B.3 "Si no
+  quieres autorizarlo, escríbenos a ... y borraremos tu cuenta." con un
+  enlace aparte "Escribir al correo de atención" (mailto). Sin marcar:
+  MENSAJE_SIN_AUTORIZACION y 0 peticiones. 403 en /login/verify → borra el
+  código, cancelarLogin() y vuelve a la casilla sin marcar. Orden: código
+  (pendingLoginEmail) > casilla > formulario.
+- Pruebas: tests/peticiones.test.mjs (5) y tests/casilla-autorizacion.test.mjs
+  (4, leen el texto). Contraprueba (git stash de api.js y las 2 pantallas +
+  sin el componente): fallan 5 de 9 dejando peticiones.js (pasan a propósito
+  las 4 que solo prueban ese archivo nuevo); sin peticiones.js fallan todas.
+  npm test 16/16; npx expo export --platform web OK.
+- Revisado a 375 px con la API simulada (window.fetch reemplazado, correo
+  inventado ana@ejemplo.test). OJO: el puerto 8090 lo tenía un http.server
+  de otra sesión (10:37) sirviendo la misma carpeta dist; se usó ese en
+  http://127.0.0.1:8090 (preview_start le asignó 8091 al nuevo, pero python
+  igual pedía el 8090 y no arrancó). /impeccable audit 14/20 (pulido
+  opcional: el mensaje del 403 en gris #64748b sobre #f2f2f2 ≈ 4,3:1; enlaces
+  de 44 px y no 48 dp; sin android_ripple; colores fijos sin modo oscuro, como
+  toda la app).
+- Prueba con la API real en el emulador (opcional, la hace el dueño): la API
+  de las 13:14:48 (después de api.py, 11:15:50) es la única; cuenta 17
+  (acepta_datos = 0): iniciar sesión → casilla → marcar → código → SELECT
+  id_usuario, acepta_datos, fecha_autorizacion_datos FROM usuarios WHERE
+  id_usuario >= 17; esperado: la 17 en 1 con fecha.
+
+Contexto del próximo paso (3.6, A-21; ÚLTIMO de la Fase 3; es 🔴: proponer
+partes, como el 3.1 y el 3.5, y esperar aprobación):
+- Qué pide la fila: envío real de la solicitud de adopción y del mensaje de
+  contacto. Endpoint con @require_auth y limitador (LIMITE_AUTH u otro),
+  tabla nueva (migración en sql/migraciones/ + schema.sql + test_esquema.py),
+  consentimiento para esa finalidad y política v1.1 (subir
+  VERSION_POLITICA_DATOS: al hacerlo, el 3.5 vuelve a pedir la casilla a
+  TODAS las cuentas al iniciar sesión; avisar al dueño y decidir si se sube
+  ya o al publicar). Web y, si se decide, móvil. Quitar AvisoDemo solo del
+  formulario que ya envíe; el checkout sigue en demo (A-26).
+- Hoy: PetDetail.jsx y Contact.jsx tienen AvisoDemo + <fieldset disabled>
+  (3.2). La tabla `adopciones` del schema.sql NO sirve para solicitudes: es
+  la publicación de una mascota (con vacunada/esterilizada, que el 3.4 dejó
+  de mostrar); no reutilizarla sin preguntar. El borrador de la política
+  (Parte A.5 finalidades, Parte C "Fuera del 3.1") dice que si los
+  formularios envían datos la política sube de versión.
+- Decisiones para el dueño antes del plan: ¿adopción y contacto, o solo
+  adopción?; ¿solo con sesión iniciada (los datos salen de la cuenta) o
+  también sin sesión?; ¿qué campos (teléfono sí/no: dato personal extra)?;
+  ¿quién lee las solicitudes (correo al refugio, consulta en la BD)?; ¿móvil
+  en este ítem o después?; texto de la casilla para esta finalidad (Parte
+  B nueva) y de la v1.1.
+- Al terminar el 3.6: marcar [x], y como es el último de la Fase 3,
+  RECORDAR EL PUSH y preguntar (regla del dueño).
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -624,6 +665,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.5, parte 3 de 3 (móvil)** (A-20, R05): la API ya pide la autorización al iniciar sesión (parte 1) y
-la web ya muestra la casilla (parte 2, 06/11/2026; probada por el dueño con la API real); falta que
-`LoginScreen.js` haga lo mismo en el móvil. Después: el 3.6. Sin push hasta terminar toda la Fase 3.
+**Próximo ítem: 3.6** (A-21): envío real de la solicitud de adopción y del mensaje de contacto (endpoint con sesión,
+tabla nueva, consentimiento y política v1.1). Es el último de la Fase 3 y es 🔴: va por partes, con decisiones del
+dueño antes del plan. Al terminarlo, recordar el push (regla del dueño: sin push hasta cerrar la Fase 3).

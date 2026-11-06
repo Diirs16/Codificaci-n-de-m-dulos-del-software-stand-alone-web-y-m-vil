@@ -6,12 +6,12 @@ import {
   Pressable,
   ScrollView,
   KeyboardAvoidingView,
-  Linking,
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { registerUser, verifyCode, POLITICA_URL } from "../services/api";
+import { registerUser, verifyCode } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import CasillaAutorizacion from "../components/CasillaAutorizacion";
 
 // NC-005 (ítem 3.1): textos de la Parte B de
 // Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md (los mismos de la web).
@@ -78,15 +78,6 @@ export default function RegisterScreen({ navigation }) {
     if (marcada && error === MENSAJE_SIN_AUTORIZACION) setError(null);
   }
 
-  async function abrirPolitica() {
-    // La pantalla sigue abierta detrás del navegador: lo escrito no se pierde.
-    try {
-      await Linking.openURL(POLITICA_URL);
-    } catch {
-      setError("No se pudo abrir la política en el navegador. Intenta de nuevo.");
-    }
-  }
-
   if (step === "code") {
     return (
       <View style={styles.container}>
@@ -145,44 +136,12 @@ export default function RegisterScreen({ navigation }) {
           />
 
           {/* NC-005: autorización previa, expresa e informada (Ley 1581, arts. 9 y 12) */}
-          <View style={styles.autorizacion}>
-            <Pressable
-              style={styles.casillaFila}
-              onPress={cambiarAutorizacion}
-              role="checkbox"
-              aria-checked={aceptaDatos}
-              accessibilityHint="Obligatoria para crear la cuenta"
-            >
-              <View style={[styles.casilla, aceptaDatos && styles.casillaMarcada]}>
-                {aceptaDatos ? <Text style={styles.casillaCheck}>✓</Text> : null}
-              </View>
-              <Text style={styles.casillaTexto}>
-                Soy mayor de 18 años, he leído la Política de tratamiento de datos personales y
-                autorizo a PetConnect a tratar mis datos para crear y usar mi cuenta.
-              </Text>
-            </Pressable>
-
-            {/* El enlace va en su propia línea: dentro de la casilla, TalkBack no lo
-                podría activar por separado (leería todo como un solo elemento). */}
-            <Pressable
-              style={({ pressed }) => [styles.enlaceFila, pressed && styles.pressed]}
-              onPress={abrirPolitica}
-              role="link"
-              aria-label="Leer los términos y condiciones que aceptas: Política de tratamiento de datos personales"
-              accessibilityHint="Se abre en el navegador"
-            >
-              <Text style={styles.enlace}>
-                Leer los términos y condiciones que aceptas: Política de tratamiento de datos personales ↗
-              </Text>
-            </Pressable>
-
-            <Text style={styles.aviso}>
-              Usaremos tu nombre y tu correo para crear tu cuenta y enviarte códigos de verificación.
-              Puedes conocer, actualizar, rectificar o borrar tus datos y revocar este permiso escribiendo a{" "}
-              {/* Correo de atención del proyecto (D.1, 06/11/2026); el mismo de la web (RegisterModal.jsx y PoliticaDatos.jsx) */}
-              <Text style={styles.avisoCorreo}>proyectopetconnect+atencion@gmail.com.</Text>
-            </Text>
-          </View>
+          <CasillaAutorizacion
+            marcada={aceptaDatos}
+            onCambiar={cambiarAutorizacion}
+            pista="Obligatoria para crear la cuenta"
+            onErrorEnlace={setError}
+          />
 
           {/* Zona que TalkBack lee sola cuando aparece un error */}
           <View aria-live="polite">
@@ -227,25 +186,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 15,
   },
-  autorizacion: { marginTop: 4, marginBottom: 8 },
-  // Área táctil de al menos 44 px de alto (B.4)
-  casillaFila: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 8 },
-  casilla: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: "#475569",
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  casillaMarcada: { backgroundColor: "#0f766e", borderColor: "#0f766e" },
-  casillaCheck: { color: "#fff", fontSize: 16, fontWeight: "700", lineHeight: 18 },
-  casillaTexto: { flex: 1, fontSize: 14, lineHeight: 20, color: "#0f172a" },
-  enlaceFila: { minHeight: 44, justifyContent: "center", paddingLeft: 36 },
-  enlace: { color: "#0f766e", fontSize: 14, fontWeight: "600", textDecorationLine: "underline", lineHeight: 20 },
-  aviso: { fontSize: 12, lineHeight: 18, color: "#475569", paddingLeft: 36 },
-  avisoCorreo: { fontWeight: "600", color: "#1e293b" },
   error: { color: "#b91c1c", marginBottom: 12, textAlign: "center" },
   button: { backgroundColor: "#0f766e", borderRadius: 10, padding: 14, alignItems: "center", marginTop: 8, minHeight: 48 },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 15 },

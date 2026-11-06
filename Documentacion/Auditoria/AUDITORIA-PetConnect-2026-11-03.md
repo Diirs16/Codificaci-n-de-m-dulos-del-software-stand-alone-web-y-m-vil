@@ -474,8 +474,29 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   cuenta 18 (`acepta_datos = 0`) inició sesión en la web, vio “Autoriza el uso de tus datos”, marcó la casilla, escribió
   el código y quedó con `acepta_datos = 1` y su fecha; la cuenta 19, creada desde el registro web con la casilla, quedó
   autorizada; la 17 sigue en 0. Conteo esperado `0 | 6 | 0` y `1 | 3 | 3` (deducido, no se corrió la consulta final).
-  El caso “sin marcar” no se capturó con la API real: lo cubren las pruebas automáticas y la API simulada. Falta el
-  móvil (parte 3).
+  El caso “sin marcar” no se capturó con la API real: lo cubren las pruebas automáticas y la API simulada.
+  **Ítem 3.5, parte 3 de 3 (móvil, 06/11/2026) — con ella el 3.5 queda hecho y la contingencia del R05 completa en
+  API, web y móvil.** La casilla del registro pasó a `src/components/CasillaAutorizacion.js` (texto B.1, enlace aparte a
+  la política y aviso B.2 en un solo archivo), que usan `RegisterScreen.js` (sin cambio visible) y `LoginScreen.js`.
+  Cuando `/login` responde 403 con `requiere_autorizacion`, la pantalla muestra el paso “Autoriza el uso de tus datos”
+  con el mensaje de la API, la casilla **sin marcar**, “Autorizar y continuar” (repite `/login` con `"acepta_datos":
+  true`), “Cancelar” (vuelve al formulario y borra la contraseña; desactivado mientras se envía) y la línea B.3 con un
+  enlace aparte que abre el correo (`mailto:`) para pedir que se borre la cuenta. Sin marcar: el mensaje B.3 en una
+  zona `aria-live` y **ninguna** petición. Si `/login/verify` responde el 403, vuelve a la casilla sin marcar. Como
+  `api.js` importa `react-native` y Node no puede cargarlo, las piezas que se prueban pasaron a JavaScript puro en
+  `src/utils/peticiones.js`: `errorDeApi` (el error lleva `status` y `requiereAutorizacion` solo si la API mandó
+  `requiere_autorizacion: true`; el 403 “Cuenta inactiva” no) y `cuerpoLogin` (`acepta_datos` solo con `true`).
+  `AuthContext.js` no cambió. Regresión: `tests/peticiones.test.mjs` (5) y `tests/casilla-autorizacion.test.mjs` (4,
+  leen el texto: “Soy mayor de 18 años” solo en el componente, las dos pantallas lo usan, la casilla empieza sin marcar
+  y el inicio de sesión tiene `requiereAutorizacion` y los textos de B.3). Contraprueba con `git stash` de `api.js` y
+  las dos pantallas y sin el componente: fallan 5 de las 9 nuevas; pasan a propósito las 4 que solo prueban el archivo
+  nuevo `peticiones.js` (sin él, fallan todas). `npm test` 16 de 16; `npx expo export --platform web` sin errores;
+  revisión a 375 px con la API simulada: sin marcar, 0 peticiones nuevas; marcada, 1 petición con `"acepta_datos":
+  true` y paso al código; 403 en `/login/verify` → casilla sin marcar; “Cancelar” deja la contraseña vacía; código
+  correcto → sesión iniciada; el registro conserva su casilla; sin desborde horizontal. `/impeccable audit` 14/20
+  (pulido opcional: el mensaje del 403 en gris sobre el fondo gris ≈ 4,3:1, enlaces de 44 px y no 48 dp, sin
+  `android_ripple`, colores fijos sin modo oscuro como toda la app). Prueba en el emulador con la API real: opcional,
+  pendiente del dueño (cuenta 17).
 
 #### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
 - **Solicitud de adopción** (`PetDetail.jsx:56-60`) y **Contacto** (`Contact.jsx:15-17`) piden nombre, correo, teléfono y
