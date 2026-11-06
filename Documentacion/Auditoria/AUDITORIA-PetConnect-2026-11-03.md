@@ -470,6 +470,26 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `seed.py:59` no coincide con las tuplas).
 - **Arreglo:** columnas reales (`vacunada`, `esterilizada`, `tamano`) o no mostrar el dato; corregir la semilla;
   pasar los textos por `/revision-contenido-mascotas` (regla 6: validación veterinaria).
+- **Estado: en curso (ítem 3.4 de PRIORIDADES). Parte 1 de 3 (backend) hecha el 06/11/2026.** Decisión del dueño:
+  opción (a), **no mostrar** vacunación, esterilización ni tamaño (descartadas: columnas nuevas, que obligan a validar
+  cada dato de salud y nadie las llenaría, y solo `tamano`, que cambia la estructura y deja la API rota en una BD sin
+  migrar). `api.py`: `_mascota_to_dict` ya no agrega `vaccinated`, `sterilized` ni `size`; las 3 rutas de mascotas
+  devuelven solo los 9 campos de la consulta. `seed.py`: `color` en `None` (no se inventa el color) y 10 textos marcados
+  `# REVISAR-VETERINARIO` (Luna, Milo, Nala, Max y Cleo; los dos alimentos, la cama “ortopédica”, el shampoo
+  hipoalergénico y el hueso dental); fotos anotadas como Unsplash. `/revision-contenido-mascotas`: sin datos personales
+  expuestos; **pendiente de validación veterinaria** antes de publicar. Hallazgo al aplicar: en la BD de desarrollo las 6
+  mascotas no venían de ningún `seed.py` del repositorio (textos sin tildes, `color` “Grande/Mediano/Pequenio”, Nala con
+  `edad_aprox = 6` siendo una gatita de 6 meses) y su dueño es el usuario 5, no la cuenta del refugio. Migración
+  `sql/migraciones/2026-11-06_mascotas_ejemplo.sql`: `color` → `NULL` y Nala 6 → 0, reconociendo las 6 mascotas de
+  ejemplo por nombre + especie + `en_adopcion` (no por id ni dueño); aplicada por el dueño con respaldo previo: 6 de 6
+  con `color` `NULL` y Nala en 0; la API devuelve `Nala, 0` y ningún campo inventado. Pruebas: `tests/test_ficha_mascota.py`
+  (3 rutas sin campos inventados, semilla sin tamaño en `color` y textos de salud marcados) y `tests/test_esquema.py`
+  (`PruebasMigracionEjemploSinBD`, `PruebasMigracionEjemploEnBD` con MariaDB temporal y
+  `test_seed_no_guarda_el_tamano_en_color`). Total 140 (120 OK + 20 omitidas sin MariaDB); con MariaDB, corridas por el
+dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contraprueba: con el `api.py`
+  y el `seed.py` viejos fallan las 6 pruebas nuevas de `test_ficha_mascota.py` (28 subcasos); sin el archivo de la
+  migración fallan sus pruebas. Pendiente: parte 2 (web: quitar el bloque ✓/✗ y la talla de `PetDetail.jsx` y
+  `Adoption.jsx`; edad “2 años / Menos de 1 año” y sexo con mayúscula) y parte 3 (móvil: `PetDetailScreen.js`).
 
 ### 3.4 Web (React)
 

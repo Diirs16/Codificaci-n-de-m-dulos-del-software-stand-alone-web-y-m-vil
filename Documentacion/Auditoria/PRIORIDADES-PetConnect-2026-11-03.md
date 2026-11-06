@@ -68,7 +68,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 3.1 | A-20 | NC-005 | Casilla de autorización **sin marcar** + enlace a política en web y móvil; la API rechaza sin ella; guardar fecha y versión; quitar `acepta_datos=True` por defecto | 🟡 | Registro sin casilla → 400; con casilla → `acepta_datos=1` y fecha guardada — *Parte 1 de 3 (API + BD) hecha el 05/11/2026: `api.py` (`VERSION_POLITICA_DATOS = "1.0"`, 400 sin `"acepta_datos": true`, fecha y versión en el pendiente y en el usuario), modelo y DAO, `schema.sql` + migración `2026-11-05_autorizacion_datos.sql` (aplicada por el dueño); `tests/test_registro_datos.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Borrador de la política en `Documentacion/Legal/`. Parte 2 de 3 (web) hecha el 05/11/2026: casilla sin marcar con +18 y enlace a la política en pestaña nueva, aviso corto, mensaje sin llamar a la API (`RegisterModal.jsx`), `acepta_datos` booleano (`api.js`), página `/politica-de-datos` (`PoliticaDatos.jsx`, borrador con “Por definir”) y enlace en el pie; probada por el dueño con la API real (conteo `0 \| 10 \| 0` y `1 \| 1 \| 1`). Parte 3 de 3 (móvil) hecha el 06/11/2026: casilla sin marcar con +18, enlace aparte “Leer los términos y condiciones que aceptas: Política…” (`Linking.openURL`), aviso corto y mensaje sin llamar a la API (`RegisterScreen.js`), `acepta_datos` booleano y `POLITICA_URL` (`api.js`); `npx expo export --platform web` OK y revisión a 375 px con la API simulada; probada por el dueño en el emulador con la API real (conteo `0 \| 5 \| 0` y `1 \| 1 \| 1`). NC-005 cerrada el 06/11/2026* |
 | [x] | 3.2 | A-21 | — | Formularios de adopción, contacto y checkout: implementar el envío **o** rotular “Demo — no se envía” y deshabilitar | 🟢 (rotular) / 🔴 (implementar) | Ningún formulario dice “enviado” si no envió nada — *Hecho el 06/11/2026 (camino “rotular”, solo web): componente `AvisoDemo.jsx`; en `PetDetail.jsx`, `Contact.jsx` y `Checkout.jsx` aviso “Demo — …”, campos en `<fieldset disabled>`, botón deshabilitado y sin pantallas de “enviado”; el checkout ya no vacía el carrito; `Confirmation.jsx` y la ruta `/confirmacion` borradas; Contacto muestra el correo de atención y Armenia (D.1) en lugar de datos inventados. Lint 0 errores, build OK, 375 px sin desbordes y 0 `POST` a `/api`; búsqueda de textos engañosos: 7 con el código viejo, 0 con el nuevo; `/impeccable audit` 16/20. El envío real es el 3.6* |
 | [x] | 3.3 | A-23 | NC-009 | Web: estados de carga/vacío/error en Catálogo, Adopción, detalles y Home; `data/*.js` solo para pruebas | 🟡 | Con la API apagada, la web muestra un error, no perritos falsos — *Hecho el 06/11/2026 (solo web): `api.js` (cada error trae `status`; 0 sin conexión), componente `EstadoCarga.jsx` (cargando / error con “Reintentar” / vacío), `Adoption.jsx`, `Catalog.jsx`, `PetDetail.jsx` (404 → “no encontrada”, otro fallo → error; nunca la ficha falsa), `ProductDetail.jsx` y `Home.jsx` (“Productos destacados” de la API en lugar de ofertas/nuevos inventados); `src/data/pets.js` y `products.js` borrados. Pruebas nuevas `npm test` (`node --test`, sin dependencias): `tests/api.test.js` y `tests/sin-datos-falsos.test.js` (fallan 5 de 6 con el código viejo, pasan 6 de 6 con el nuevo). Lint 0 errores, build OK, 375 px con la API apagada: error en las 5 páginas (contraprueba: el código viejo mostraba las 6 mascotas falsas); `/impeccable audit` 17/20. Probado por el dueño con la API real: 6 mascotas de la BD, `/adopcion/99999` → “Mascota no encontrada”, Home con productos reales. NC-009 cerrada* |
-| [ ] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` |
+| [ ] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` — *Opción (a) del dueño: no mostrar vacunación, esterilización ni tamaño. Parte 1 de 3 (backend) hecha el 06/11/2026: `api.py` ya no inventa `vaccinated`/`sterilized`/`size`; `seed.py` con `color` en `None` y 10 textos `# REVISAR-VETERINARIO`; migración `2026-11-06_mascotas_ejemplo.sql` (color con tamaño → `NULL`, Nala 6 → 0; reconoce las 6 de ejemplo por nombre + especie + `en_adopcion`), aplicada por el dueño; `tests/test_ficha_mascota.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Faltan la parte 2 (web) y la 3 (móvil)* |
 | [ ] | 3.5 | A-20 | — (R05) | Pedir la autorización de datos a las cuentas existentes (`acepta_datos = 0`) y a quienes aceptaron una versión vieja de la política, al iniciar sesión (API + web + móvil); si no autorizan, ofrecer borrar la cuenta. **Nunca** con un `UPDATE` que la invente. Después de la parte 3 del 3.1. Surgió el 05/11/2026 | 🔴 | Una cuenta en 0 que inicia sesión ve la casilla y, al marcarla, queda con fecha y versión; sin marcarla no entra |
 | [ ] | 3.6 | A-21 | — | Envío real de la solicitud de adopción y del mensaje de contacto: endpoint con `@require_auth` (y limitador), tabla nueva (migración + `schema.sql`), consentimiento para esa finalidad y **política v1.1** (Parte C, “Fuera del 3.1”; subir `VERSION_POLITICA_DATOS`), web y, si se decide, móvil. Quitar el `AvisoDemo` solo del formulario que ya envíe. El checkout real va aparte (A-26). Surgió en el 3.2 (06/11/2026) | 🔴 | Una solicitud enviada queda en la BD con el usuario, la fecha y la versión de la política, y la web dice “enviada” solo si la API respondió 201 |
 
@@ -145,8 +145,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 06/11/2026, actualizada al terminar el 3.3 (la web ya no esconde los fallos con datos falsos; NC-009
-cerrada): estado conocido al día y contexto del 3.4. Sin push hasta terminar toda la Fase 3. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 06/11/2026, actualizada al terminar la parte 1 de 3 del 3.4 (la API ya no inventa vacunación,
+esterilización ni tamaño): estado conocido al día y contexto de la parte 2 (web). Sin push hasta terminar toda la Fase 3. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -162,14 +162,15 @@ Lee primero:
 - git log --oneline -12 y git status -sb (qué se hizo en sesiones anteriores;
   el 05/11/2026 se subió todo hasta el botón web del 2.7, 6e0bbc5; desde ahí
   todo queda en local: 3.1 (31f005c, fa1dda3, 6f0bdc9), 0a5e1dd, b8d5ec2,
-  f40af07, 57e05c4 (3.2) y el commit del 3.3. REGLA DEL DUEÑO (06/11/2026): NO
+  f40af07, 57e05c4 (3.2), 6c9c0bf (3.3) y el commit de la parte 1 del 3.4.
+  REGLA DEL DUEÑO (06/11/2026): NO
   se hace push hasta terminar TODA la Fase 3 (3.1 a 3.6). No preguntes por el
   push antes; al marcar el último ítem de la fase, recuérdalo y pregunta)
 
 Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9), el 3.1 (3 partes: API +
-  BD, web y móvil; ver git log), el 3.2 y el 3.3. NC-005 y NC-009 cerradas el
-  06/11/2026.
+  BD, web y móvil; ver git log), el 3.2, el 3.3 y la parte 1 de 3 del 3.4
+  (backend). NC-005 y NC-009 cerradas el 06/11/2026.
 - Web sin datos falsos (3.3, A-23, hecho el 06/11/2026, solo web):
   src/data/pets.js y products.js BORRADOS; la prueba
   tests/sin-datos-falsos.test.js falla si algo de src/ vuelve a importar data/.
@@ -212,7 +213,7 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   El correo de atención está ahora en AvisoDemo.jsx, Contact.jsx,
   PoliticaDatos.jsx, RegisterModal.jsx, RegisterScreen.js y el borrador .md.
 - "Por actualizar" está vacía.
-- Pruebas: 125 (110 OK + 15 omitidas que necesitan MariaDB).
+- Pruebas: 140 (120 OK + 20 omitidas que necesitan MariaDB).
 - Autorización de datos (3.1 parte 1, NC-005 cerrada): api.py tiene
   VERSION_POLITICA_DATOS = "1.0" y _MENSAJE_SIN_AUTORIZACION. /register exige
   "acepta_datos": true (solo el booleano JSON, con `is True`) justo después de
@@ -260,8 +261,11 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   aceptaDatos === true y exporta POLITICA_URL (http://${HOST}:5173/
   politica-de-datos; solo desarrollo, 5.3). Probado por el dueño en el
   emulador: conteo 0 | 5 | 0 y 1 | 1 | 1 (el dueño borró sus cuentas de prueba
-  viejas el 06/11/2026; la cuenta del refugio de seed.py, dueña de las 6
-  mascotas, NO se debe borrar: ON DELETE CASCADE borraría las mascotas).
+  viejas el 06/11/2026). OJO: en la BD del dueño las 6 mascotas en adopción
+  son del USUARIO 5, no de la cuenta del refugio de seed.py (comprobado el
+  06/11/2026 con un conteo, sin mostrar correos): NO borrar la cuenta 5, ON
+  DELETE CASCADE borraría las mascotas. Esas 6 filas no salieron de ningún
+  seed.py del repositorio (textos sin tildes, ids 3 a 8).
   /impeccable audit 15/20 (foco a la casilla tras el error, android_ripple,
   48 dp en el enlace: pulido opcional).
 - Emulador Android (PC del dueño): AVD Pixel_7. Encenderlo sin depender de una
@@ -360,45 +364,55 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
 - La web (src/services/api.js:20) y el móvil (src/services/api.js:34) muestran
   data.error con cualquier respuesta que no sea ok.
 
-Contexto del próximo paso (3.4, A-22): la ficha de la mascota contradice su
-propia descripción (información de salud animal: regla 6 de CLAUDE.md).
-- api.py, _mascota_to_dict (~395): la API INVENTA vaccinated=False,
-  sterilized=False y size="Mediano" (setdefault), porque la tabla mascotas no
-  tiene esas columnas. La web (PetDetail.jsx: ✓/✗ "Vacunado/a" o "Pendiente de
-  vacunación", "Esterilizado/a" o "Pendiente de esterilización"; Adoption.jsx
-  muestra pet.size) y el móvil (PetDetailScreen.js:31-35: "Talla", Badge
-  Vacunada/Esterilizada) muestran "Pendiente de vacunación" a Luna, Milo y Max,
-  cuya descripción dice "Vacunada, esterilizada...".
-- seed.py:66-90 guarda "Tamaño Grande/Mediano/Pequeño" en la columna color (el
-  comentario de la línea 70 lo anuncia). La BD del dueño ya tiene esas 6 filas.
-- schema.sql: mascotas (id_mascota, nombre, especie, raza, sexo enum
-  macho/hembra/no_definido, fecha_nacimiento, edad_aprox int, color, peso,
-  foto, observaciones, estado). Hay tablas vacunas, carnets_vacunacion,
-  aplicaciones_vacuna e historial_salud, pero el carné es PRIVADO del dueño
-  (RS02, CP-012, NC-002): no derivar de ahí datos para la ficha pública sin
-  decidirlo con el dueño.
-- Opciones a explicar (decide el dueño): (a) no mostrar vacunación,
-  esterilización ni tamaño (quitar los setdefault de la API y esos bloques de
-  la web y del móvil): lo más simple; (b) columnas nuevas (vacunada,
-  esterilizada, tamano) con migración + schema.sql + seed.py + API + web +
-  móvil: toca la BD, va por partes como el 3.1; (c) una mezcla (tamaño real,
-  salud sin mostrar). En cualquier caso: corregir seed.py (color real o NULL)
-  y una migración para la BD existente que saque "Tamaño ..." de color (con
-  respaldo; la aplica el dueño, como 1.2 y 3.1).
-- Presentación (se puede incluir si el dueño quiere): la web muestra la edad
-  como número sin "años" (edad_aprox es int; Nala tiene 0) y el sexo en
-  minúscula ("hembra").
-- Regla 6: las descripciones de seed.py hablan de vacunas, esterilización,
-  desparasitación y cuidados ("Requiere cepillado regular"): marcarlas
-  # REVISAR-VETERINARIO, pasar /revision-contenido-mascotas y avisar al dueño
-  que debe validarlas un profesional antes de publicarlas. Las fotos son de
-  Unsplash (anotar la licencia si la skill lo pide).
-- Toca API, BD, web y móvil: plan obligatorio y, si se elige (b), una parte
-  por commit (regla 3). Pruebas: tests/test_mascotas.py es el modelo para la
-  API (BD simulada); tests/test_esquema.py para la migración (con MariaDB:
-  PETCONNECT_PRUEBA_BD=1, la corre el dueño); web: npm test, npm run lint,
-  npm run build y revisión a 375 px; móvil: npx expo export --platform web o
-  el emulador.
+3.4 parte 1 (backend, A-22, hecha el 06/11/2026; opción (a) del dueño: NO
+mostrar vacunación, esterilización ni tamaño, porque la tabla mascotas no
+tiene esas columnas y un dato de salud no se inventa):
+- api.py: _mascota_to_dict(row) solo hace _row_to_dict(row). Las 3 rutas de
+  mascotas devuelven exactamente id, name, species, breed, gender, age, image,
+  description, estado. Ya NO existen vaccinated, sterilized ni size.
+- seed.py: color en None en las 6 mascotas; 10 textos con la línea
+  "# REVISAR-VETERINARIO: motivo" justo encima de su tupla (Luna, Milo, Nala,
+  Max, Cleo; Alimento Premium, Cama Ortopédica, Shampoo Hipoalergénico,
+  Alimento para Gato, Hueso Dental); fotos anotadas como Unsplash. Pendiente
+  de validación veterinaria antes de publicar (avisado al dueño).
+- Migración sql/migraciones/2026-11-06_mascotas_ejemplo.sql (YA aplicada a la
+  BD del dueño): color con tamaño ("Grande", "Mediano", "Pequenio",
+  "Peque_o", "Tama_o %") → NULL y Nala (Gato, edad 6) → 0, solo en las 6
+  mascotas de ejemplo reconocidas por (nombre, especie) + estado en_adopcion,
+  sin usar id ni dueño. Resultado en la BD: 6 con color NULL, Nala con 0; la
+  API devuelve Nala con age 0. Explicada en sql/README.md.
+- Pruebas: tests/test_ficha_mascota.py (API con BD simulada; seed.py leído
+  con ast, sin importarlo, para no cargar el .env) y en test_esquema.py
+  PruebasMigracionEjemploSinBD / PruebasMigracionEjemploEnBD (base temporal
+  petconnect_prueba_ejemplo) y test_seed_no_guarda_el_tamano_en_color.
+- Pendiente sin ítem: la BD del dueño tiene descripciones distintas de
+  seed.py (solo la de Luna habla de vacunas); también deben pasar por un
+  veterinario antes de publicar.
+
+Contexto del próximo paso (3.4 parte 2, web; regla 3: solo web):
+- PetDetail.jsx (~105-131): quitar {pet.size} de la línea de datos y el
+  bloque ✓/✗ de vaccinated/sterilized (y los íconos Check y XIcon si quedan
+  sin uso). Adoption.jsx (~98-101): quitar <p>{pet.size}</p>.
+- Presentación (aprobada por el dueño en el plan): la edad hoy sale como
+  número suelto ("2"; edad_aprox es int y 0 = menos de 1 año). Mostrar
+  "1 año", "2 años" y "Menos de 1 año"; null → no mostrar. El sexo sale en
+  minúscula ("hembra"): mostrar "Hembra"/"Macho" y no mostrar "no_definido".
+  Una función de formato compartida (ej. src/utils/mascota.js) usada por
+  PetDetail.jsx y Adoption.jsx, con su prueba en tests/ (npm test, node
+  --test, sin dependencias).
+- Prueba de regresión: tests/ que falle si src/ vuelve a mencionar
+  vaccinated, sterilized, pet.size o "Pendiente de vacunación" (modelo:
+  tests/sin-datos-falsos.test.js), más las pruebas de la función de formato.
+  Contraprueba con git stash de las páginas.
+- Verificar: npm run lint, npm test, npm run build y revisión a 375 px con la
+  API real (la API del dueño ya corre el código nuevo, arrancada 09:15 del
+  06/11/2026). Luego /impeccable audit.
+- Parte 3 (móvil, después): PetDetailScreen.js:31-35 quitar "Talla" y las
+  insignias Vacunada/Esterilizada (hoy dirían "No"); misma presentación de
+  edad y sexo (AdoptionScreen.js:63 ya escribe "años" pero Nala con 0 sale
+  vacía); las Image no tienen accessibilityLabel (hallazgo de
+  /revision-contenido-mascotas). Verificar con npx expo export --platform web
+  y el emulador. Al terminar la parte 3: [x] en el 3.4.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -437,7 +451,7 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.4** (A-22): la ficha de la mascota dice “Pendiente de vacunación” a mascotas que su descripción da
-por vacunadas, y el tamaño vive en la columna `color`. El 3.3 quedó hecho el 06/11/2026 (la web ya no esconde los
-fallos con datos falsos; NC-009 cerrada). Después: el 3.5 (autorización de las cuentas existentes) y el 3.6. Sin push
-hasta terminar toda la Fase 3.
+**Próximo ítem: 3.4, parte 2 de 3 (web)** (A-22): la API ya no inventa vacunación, esterilización ni tamaño (parte 1
+hecha el 06/11/2026), pero `PetDetail.jsx` sigue mostrando la ✗ “Pendiente de vacunación” y `Adoption.jsx` la talla.
+Después: la parte 3 (móvil), el 3.5 (autorización de las cuentas existentes) y el 3.6. Sin push hasta terminar toda la
+Fase 3.

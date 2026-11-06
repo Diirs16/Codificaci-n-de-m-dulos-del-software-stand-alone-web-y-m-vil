@@ -392,11 +392,12 @@ _MENSAJE_MASCOTA_NO_ENCONTRADA = "Mascota no encontrada"
 
 
 def _mascota_to_dict(row):
-    m = _row_to_dict(row)
-    m.setdefault("vaccinated", False)
-    m.setdefault("sterilized", False)
-    m.setdefault("size", "Mediano")
-    return m
+    # A-22 (item 3.4): solo se devuelven los datos que estan en la BD. Antes se
+    # agregaban vaccinated=False, sterilized=False y size="Mediano" a todas las
+    # mascotas (la tabla no tiene esas columnas) y la ficha decia "Pendiente de
+    # vacunacion" a mascotas cuya descripcion las da por vacunadas. Un dato de
+    # salud animal no se inventa: si no esta registrado, no se muestra.
+    return _row_to_dict(row)
 
 
 @app.route("/api/mascotas/adopcion", methods=["GET"])

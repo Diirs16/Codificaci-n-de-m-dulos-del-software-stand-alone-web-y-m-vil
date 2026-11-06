@@ -112,6 +112,33 @@ mysql -u root -p -P 3310 petconnect -e "SELECT acepta_datos, COUNT(*) AS total, 
 Antes de la primera cuenta nueva, todas las filas deben estar en `acepta_datos = 0` con `con_fecha = 0`. La
 migración se puede ejecutar varias veces: quien autorizó después conserva su 1.
 
+## ¿Ya tenías las mascotas de ejemplo antes del 06/11/2026? (tamaño en `color` y edad de Nala, A-22)
+
+Las 6 mascotas de ejemplo (Luna, Milo, Rocky, Nala, Max y Cleo) tenían el **tamaño** guardado en la columna `color`:
+`seed.py` ponía “Tamaño Grande”, “Tamaño Mediano”…, y en la base de desarrollo, cargada por otra vía, dice “Grande”,
+“Mediano” o “Pequenio”. Además ahí **Nala** (una gatita de 6 meses) quedó con `edad_aprox = 6`, que la ficha muestra
+como 6 años. La migración `migraciones/2026-11-06_mascotas_ejemplo.sql`:
+
+- deja ese `color` en `NULL` (sin dato: el color real no se conoce y no se inventa);
+- cambia la edad de Nala de 6 a 0 (menos de 1 año), solo si sigue en 6.
+
+Reconoce las mascotas de ejemplo por **nombre y especie**, y solo si están en adopción. No usa el id ni el dueño,
+porque cambian de una base a otra. Una mascota con el mismo nombre pero otra especie u otro estado queda igual.
+No cambia la estructura de ninguna tabla y se puede ejecutar varias veces.
+
+Desde la carpeta `petconnect.Backend`, con un respaldo nuevo como el del paso 1 de arriba:
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "source sql/migraciones/2026-11-06_mascotas_ejemplo.sql"
+```
+
+**Comprobar** (solo muestra datos de las mascotas, no de personas). Después de migrar, `color` debe salir `NULL` en
+las 6 y Nala con `edad_aprox = 0`:
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SELECT id_mascota, nombre, edad_aprox, color FROM mascotas WHERE estado = 'en_adopcion'"
+```
+
 ## Prueba automática
 
 `tests/test_esquema.py` revisa este archivo sin conectarse a la base. Para probarlo de verdad contra MariaDB,

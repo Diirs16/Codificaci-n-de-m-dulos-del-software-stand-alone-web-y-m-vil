@@ -15,6 +15,10 @@ y modo estricto) y NC-010 (fechas de vacunas).
   acepta_datos no valga 1 por defecto y la regla chk_autorizacion_datos.
   PruebasMigracionDatosEnBD (PETCONNECT_PRUEBA_BD=1) aplica la migracion del
   05/11/2026 a una tabla vieja en "petconnect_prueba_autorizacion" y la borra al final.
+- A-22 (item 3.4): PruebasMigracionEjemploSinBD revisa la migracion del 06/11/2026
+  (tamano guardado en color y edad de Nala, solo en las 6 mascotas de ejemplo).
+  PruebasMigracionEjemploEnBD (PETCONNECT_PRUEBA_BD=1) la aplica en
+  "petconnect_prueba_ejemplo" y la borra al final.
   Ninguna toca la base "petconnect".
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
@@ -35,9 +39,11 @@ sys.path.insert(0, RAIZ)
 RUTA_ESQUEMA = os.path.join(RAIZ, "sql", "schema.sql")
 RUTA_MIGRACION = os.path.join(RAIZ, "sql", "migraciones", "2026-11-03_estado_en_adopcion.sql")
 RUTA_MIGRACION_DATOS = os.path.join(RAIZ, "sql", "migraciones", "2026-11-05_autorizacion_datos.sql")
+RUTA_MIGRACION_EJEMPLO = os.path.join(RAIZ, "sql", "migraciones", "2026-11-06_mascotas_ejemplo.sql")
 BD_PRUEBA = "petconnect_prueba"
 BD_PRUEBA_MIGRACION = "petconnect_prueba_migracion"
 BD_PRUEBA_AUTORIZACION = "petconnect_prueba_autorizacion"
+BD_PRUEBA_EJEMPLO = "petconnect_prueba_ejemplo"
 
 
 def _leer(ruta):
@@ -260,6 +266,10 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         self.assertEqual((codigo_ajena, r_ajena.get_json()), (404, {"error": "Mascota no encontrada"}))
         self.assertEqual(r_dueno.status_code, 200)
         self.assertEqual(r_dueno.get_json()["name"], "Privada")
+
+    def test_seed_no_guarda_el_tamano_en_color(self):
+        """A-22 (item 3.4): antes las 6 mascotas quedaban con el tamano en color."""
+        self.assertEqual(self._contar("SELECT COUNT(*) FROM mascotas WHERE color IS NOT NULL"), 0)
 
     def test_seed_no_duplica_al_repetirse(self):
         self._cargar_seed()
@@ -654,6 +664,164 @@ class PruebasMigracionDatosEnBD(unittest.TestCase):
             self._insertar_viejo("sin.fecha@ejemplo.test", 1)
         self._insertar_viejo("por.defecto@ejemplo.test")
         self.assertEqual(self._usuarios(), {"por.defecto@ejemplo.test": (0, None, None)})
+
+
+class PruebasMigracionEjemploSinBD(unittest.TestCase):
+    """A-22 (item 3.4): la migracion del 06/11/2026 solo corrige las 6 mascotas de ejemplo."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sentencias = [" ".join(s.split()) for s in _sentencias(_leer(RUTA_MIGRACION_EJEMPLO))]
+        cls.cambios = [s for s in cls.sentencias if not s.startswith("SET SESSION")]
+
+    def test_nunca_apaga_el_modo_estricto(self):
+        self.assertTrue(self.sentencias[0].startswith("SET SESSION sql_mode"))
+        for modo in (s for s in self.sentencias if "sql_mode" in s):
+            self.assertIn("STRICT_TRANS_TABLES", modo)
+
+    def test_solo_dos_cambios_color_en_null_y_edad_de_nala(self):
+        self.assertEqual(len(self.cambios), 2)
+        color, edad = self.cambios
+        self.assertTrue(color.startswith("UPDATE `mascotas` SET `color` = NULL WHERE"), color)
+        for tamano in ("`color` LIKE 'Tama_o %'", "'Grande'", "'Mediano'", "'Pequenio'",
+                       "`color` LIKE 'Peque_o'"):
+            self.assertIn(tamano, color)
+        self.assertTrue(edad.startswith(
+            "UPDATE `mascotas` SET `edad_aprox` = 0 WHERE `nombre` = 'Nala' "
+            "AND `especie` = 'Gato' AND `edad_aprox` = 6"), edad)
+
+    def test_no_borra_ni_cambia_la_estructura(self):
+        for sentencia in self.sentencias:
+            self.assertNotRegex(sentencia.upper(), r"\b(DELETE|DROP|ALTER|TRUNCATE|INSERT)\b")
+
+    def test_solo_toca_las_mascotas_de_ejemplo_en_adopcion(self):
+        """Las reconoce por nombre y especie de seed.py, no por id ni dueno (cambian entre bases)."""
+        import ast
+        with open(os.path.join(RAIZ, "seed.py"), encoding="utf-8") as f:
+            arbol = ast.parse(f.read())
+        lista = next(n.value for n in arbol.body if isinstance(n, ast.Assign)
+                     and getattr(n.targets[0], "id", None) == "MASCOTAS_ADOPCION")
+        de_la_semilla = {(m[0], m[1]) for m in ast.literal_eval(lista)}
+
+        color, _edad = self.cambios
+        self.assertEqual(set(re.findall(r"\('(\w+)', '(\w+)'\)", color)), de_la_semilla)
+        for cambio in self.cambios:
+            with self.subTest(cambio=cambio[:45]):
+                self.assertIn("`estado` = 'en_adopcion'", cambio)
+                self.assertNotRegex(cambio, r"id_usuario|id_mascota|correo")
+
+
+@unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",
+                     "Prueba con MariaDB real: activar con PETCONNECT_PRUEBA_BD=1")
+class PruebasMigracionEjemploEnBD(unittest.TestCase):
+    """A-22 (item 3.4): la migracion corrige solo las 6 mascotas de ejemplo en adopcion."""
+
+    @classmethod
+    def setUpClass(cls):
+        import mysql.connector
+        from config.db_config import DB_CONFIG
+
+        servidor = {k: v for k, v in DB_CONFIG.items() if k not in ("database", "sql_mode")}
+        try:
+            cls.conn = mysql.connector.connect(**servidor)
+        except mysql.connector.Error:
+            raise unittest.SkipTest("No hay conexion con MariaDB")
+        cls.conn.autocommit = True
+
+        cursor = cls.conn.cursor()
+        # Nombre constante del archivo: los identificadores no van como parametro.
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_EJEMPLO}`")
+        cursor.execute(f"CREATE DATABASE `{BD_PRUEBA_EJEMPLO}` "
+                       "CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci")
+        cls.addClassCleanup(cls._borrar_bd_prueba)
+        cursor.execute(f"USE `{BD_PRUEBA_EJEMPLO}`")
+        cursor.close()
+
+    @classmethod
+    def _borrar_bd_prueba(cls):
+        cursor = cls.conn.cursor()
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_EJEMPLO}`")
+        cursor.close()
+        cls.conn.close()
+
+    def setUp(self):
+        self.cursor = self.conn.cursor()
+        # Solo las columnas que usa la migracion
+        self.cursor.execute("DROP TABLE IF EXISTS mascotas")
+        self.cursor.execute(
+            "CREATE TABLE mascotas (id_mascota int AUTO_INCREMENT PRIMARY KEY, "
+            "id_usuario int NOT NULL, nombre varchar(80) NOT NULL, especie varchar(50) NOT NULL, "
+            "edad_aprox int DEFAULT NULL, color varchar(50) DEFAULT NULL, "
+            "estado varchar(20) DEFAULT 'activa') ENGINE=InnoDB"
+        )
+
+    def tearDown(self):
+        self.cursor.close()
+
+    def _insertar(self, nombre, especie, edad, color, estado="en_adopcion", id_usuario=5):
+        self.cursor.execute(
+            "INSERT INTO mascotas (id_usuario, nombre, especie, edad_aprox, color, estado) "
+            "VALUES (%s, %s, %s, %s, %s, %s)", (id_usuario, nombre, especie, edad, color, estado))
+
+    def _mascotas(self):
+        """{(nombre, especie, estado): (edad_aprox, color)}"""
+        self.cursor.execute("SELECT nombre, especie, estado, edad_aprox, color FROM mascotas")
+        return {f[:3]: f[3:] for f in self.cursor.fetchall()}
+
+    def _migrar(self):
+        for sentencia in _sentencias(_leer(RUTA_MIGRACION_EJEMPLO)):
+            self.cursor.execute(sentencia)
+
+    def test_corrige_las_6_de_ejemplo_sea_quien_sea_el_dueno(self):
+        # Como estaba la BD de desarrollo el 06/11/2026 (dueno: usuario 5, no el refugio)
+        self._insertar("Luna", "Perro", 2, "Grande")
+        self._insertar("Milo", "Gato", 1, "Mediano")
+        self._insertar("Rocky", "Perro", 3, "Pequenio")
+        self._insertar("Nala", "Gato", 6, "Pequenio")
+        # Valores de seed.py antes del 3.4, con otro dueno
+        self._insertar("Max", "Perro", 4, "Tamaño Grande", id_usuario=9)
+        self._insertar("Cleo", "Gato", 2, "Pequeño", id_usuario=9)
+
+        self._migrar()
+
+        self.assertEqual(self._mascotas(), {
+            ("Luna", "Perro", "en_adopcion"): (2, None),
+            ("Milo", "Gato", "en_adopcion"): (1, None),
+            ("Rocky", "Perro", "en_adopcion"): (3, None),
+            ("Nala", "Gato", "en_adopcion"): (0, None),
+            ("Max", "Perro", "en_adopcion"): (4, None),
+            ("Cleo", "Gato", "en_adopcion"): (2, None),
+        })
+
+    def test_no_toca_otras_mascotas(self):
+        self._insertar("Canela", "Perro", 5, "Grande")                  # no es de ejemplo
+        self._insertar("Luna", "Gato", 2, "Grande")                     # otra especie
+        self._insertar("Max", "Perro", 4, "Grande", estado="activa")    # no esta en adopcion
+        self._insertar("Nala", "Perro", 6, None)                        # otra especie
+        self._insertar("Nala", "Gato", 6, None, estado="adoptada")      # no esta en adopcion
+        self._insertar("Milo", "Gato", 1, "Café")                       # color real
+
+        self._migrar()
+
+        self.assertEqual(self._mascotas(), {
+            ("Canela", "Perro", "en_adopcion"): (5, "Grande"),
+            ("Luna", "Gato", "en_adopcion"): (2, "Grande"),
+            ("Max", "Perro", "activa"): (4, "Grande"),
+            ("Nala", "Perro", "en_adopcion"): (6, None),
+            ("Nala", "Gato", "adoptada"): (6, None),
+            ("Milo", "Gato", "en_adopcion"): (1, "Café"),
+        })
+
+    def test_no_cambia_una_edad_de_nala_distinta_de_6(self):
+        self._insertar("Nala", "Gato", 1, None)
+        self._migrar()
+        self.assertEqual(self._mascotas(), {("Nala", "Gato", "en_adopcion"): (1, None)})
+
+    def test_se_puede_ejecutar_dos_veces(self):
+        self._insertar("Nala", "Gato", 6, "Pequenio")
+        self._migrar()
+        self._migrar()
+        self.assertEqual(self._mascotas(), {("Nala", "Gato", "en_adopcion"): (0, None)})
 
 
 if __name__ == "__main__":
