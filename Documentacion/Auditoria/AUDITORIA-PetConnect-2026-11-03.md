@@ -559,9 +559,22 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   (en `test_login_datos.py`, una cuenta que aceptó la 1.0 ahora debe autorizar otra vez). Suite: 179 pruebas, 155
   correctas y 24 omitidas que necesitan MariaDB. Contraprueba (`git stash` de `api.py` y `schema.sql`): fallan 27
   (las 15 de las rutas, 4 del esquema, el límite, 4 del login y 3 del registro por la versión); pasan a propósito las
-  4 del DAO y 2 de la migración, que prueban archivos nuevos que no se guardaron en el stash. Falta: aplicar la
-  migración en la BD del dueño y reiniciar la API, la web (parte 2: formularios sin `AvisoDemo` y `/politica-de-datos`
-  en 1.1; hasta entonces esa página sigue mostrando la 1.0) y el móvil (parte 3).
+  4 del DAO y 2 de la migración, que prueban archivos nuevos que no se guardaron en el stash.
+  **Parte 2 de 3 (web), hecha el 07/11/2026:** componente nuevo `src/components/FormularioSolicitud.jsx`, el único
+  formulario de solicitudes de la web, que usan `PetDetail.jsx` (adopción, con teléfono opcional) y `Contact.jsx`
+  (contacto). Sin sesión no muestra campos: pide iniciar sesión o crear cuenta. Con sesión muestra “Envías como
+  {nombre} ({correo})”, el mensaje con contador, el aviso B.5 (enlace a la política y al correo de atención) y valida
+  en el navegador con `src/utils/solicitud.js` (las mismas reglas de la API) antes de llamar a `api.js`
+  (`enviarSolicitudAdopcion`, `enviarMensajeContacto`). Dice “Solicitud enviada” / “Mensaje enviado” **solo** tras la
+  respuesta 201; con un error lo muestra en `role="alert"` (con foco) sin borrar lo escrito, y con 401 o con el 403 de
+  autorización ofrece “Volver a iniciar sesión”. `AvisoDemo` queda solo en el checkout (A-26). `PoliticaDatos.jsx` pasa
+  a la versión 1.1 con los textos nuevos. Pruebas: `tests/solicitudes.test.js` (9), que también exige la misma versión
+  en la página, en `api.py` y en el borrador; con el código anterior fallan 5 (pasan a propósito 4 que prueban archivos
+  nuevos). `npm test` 29/29, lint 0 errores, build OK. Revisado a 375 px con la API simulada y datos inventados (vacío y
+  teléfono inválido → 0 peticiones; 403 → mensaje y botón, nada “enviada”; 201 → recuadro verde; 401 → cierra sesión y
+  abre el inicio de sesión) y sin desplazamiento horizontal. `/impeccable audit` 16/20 (pulido opcional: el foco cae
+  en `body` al abrir o cerrar el formulario de adopción, colores fijos sin modo oscuro). Falta: aplicar la migración en
+  la BD del dueño, reiniciar la API y probar con la API real, y el móvil (parte 3).
 
 #### A-22 · 🟡 Media · Información de salud contradictoria en la ficha de la mascota [N]
 - La API pone siempre `vaccinated=False`, `sterilized=False`, `size="Mediano"` (`api.py:215-220`), así que

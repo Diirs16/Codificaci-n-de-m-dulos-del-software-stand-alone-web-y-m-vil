@@ -7,7 +7,9 @@ import { AlertTriangle } from "lucide-react";
 // (VERSION_POLITICA_DATOS en petconnect.Backend/api.py): la versión es la prueba
 // de qué aceptó cada persona.
 // BORRADOR: lo deben validar el dueño del proyecto y el instructor antes de publicarlo.
-const VERSION_POLITICA = "1.0";
+// 1.1 (07/11/2026, ítem 3.6): agrega las solicitudes de adopción y los mensajes de contacto.
+// tests/solicitudes.test.js revisa que sea la misma versión de la API.
+const VERSION_POLITICA = "1.1";
 // Correo de atención del proyecto (decisión D.1, 06/11/2026). Es del proyecto, no de una persona.
 const CORREO_DATOS = "proyectopetconnect+atencion@gmail.com";
 
@@ -138,6 +140,10 @@ export default function PoliticaDatos() {
             <ul className="space-y-2 list-disc pl-5 marker:text-gray-400">
               <li>Para crear tu cuenta te pedimos tu nombre, tu correo y una contraseña que nunca guardamos tal cual.</li>
               <li>Los usamos solo para tu cuenta, para enviarte códigos de verificación y para mostrar tus mascotas.</li>
+              <li>
+                Si nos envías una solicitud de adopción o un mensaje de contacto, lo guardamos (con tu teléfono, si lo
+                escribes) para responderte. Solo lo lee el equipo de PetConnect.
+              </li>
               <li>No vendemos tus datos, no te enviamos publicidad y no usamos herramientas de seguimiento.</li>
               <li>
                 Puedes pedir ver, corregir o borrar tus datos cuando quieras: te explicamos cómo en la{" "}
@@ -229,6 +235,10 @@ export default function PoliticaDatos() {
                 Nombre, especie, raza, sexo, edad aproximada, color, foto y observaciones. Solo si registras mascotas
                 en tu cuenta. Opcionales.
               </Fila>
+              <Fila titulo="Mensajes que nos envías por los formularios de adopción y contacto">
+                Con la fecha y la mascota. Solo si los envías, con tu sesión iniciada. Opcionales.
+              </Fila>
+              <Fila titulo="Teléfono">Solo si lo escribes en una solicitud de adopción. Opcional.</Fila>
               <Fila titulo="Dirección IP desde la que te conectas">En cada petición, por razones técnicas.</Fila>
             </ul>
             <p>
@@ -260,6 +270,10 @@ export default function PoliticaDatos() {
                 registros técnicos del servidor no guardan tu correo ni tus códigos.
               </li>
               <li>Atender tus consultas, reclamos y solicitudes sobre tus datos.</li>
+              <li>
+                Gestionar tus solicitudes de adopción y responder tus mensajes de contacto. Solo los lee el equipo de
+                PetConnect; no se envían a quien publicó la mascota.
+              </li>
             </ol>
             <p>
               <strong>Lo que no hacemos:</strong> no vendemos ni alquilamos tus datos, no te enviamos publicidad y no
@@ -275,6 +289,11 @@ export default function PoliticaDatos() {
               del formulario de registro. La casilla viene sin marcar y no puedes crear la cuenta sin ella (Ley 1581,
               art. 9). Guardamos la fecha y la versión de esta política que aceptaste, como prueba (Decreto 1377,
               art. 8).
+            </p>
+            <p>
+              Los formularios de adopción y contacto no piden otra casilla: usan la autorización de tu cuenta con esta
+              versión de la política, y cada solicitud guarda la versión que tenías aceptada al enviarla. Si aceptaste
+              una versión anterior, te pediremos autorizar otra vez al iniciar sesión.
             </p>
             <p>
               No necesitamos tu autorización en los casos del artículo 10 de la Ley 1581, por ejemplo una orden
@@ -382,6 +401,9 @@ export default function PoliticaDatos() {
               </Fila>
               <Fila titulo="Prueba de tu autorización (fecha y versión)">
                 <PorDefinir>cuánto tiempo después de cerrar la cuenta</PorDefinir>.
+              </Fila>
+              <Fila titulo="Tus solicitudes de adopción y mensajes de contacto">
+                Mientras tu cuenta exista o hasta que pidas borrarlos.
               </Fila>
               <Fila titulo="Un registro que no terminaste">
                 Tus datos y el código se guardan solo en la memoria temporal del servidor, dejan de servir a los 10

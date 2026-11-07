@@ -1,13 +1,9 @@
 import { Mail, MapPin } from "lucide-react";
-import AvisoDemo from "../components/AvisoDemo";
+import FormularioSolicitud from "../components/FormularioSolicitud";
 
 // Correo de atención de la política de datos (D.1). Si cambia, cambiarlo también en
-// AvisoDemo.jsx, PoliticaDatos.jsx, RegisterModal.jsx, el móvil y el borrador .md.
+// AvisoDemo.jsx, FormularioSolicitud.jsx, PoliticaDatos.jsx, CasillaAutorizacion.jsx, el móvil y el borrador .md.
 const CORREO_ATENCION = "proyectopetconnect+atencion@gmail.com";
-
-// Clases de los campos bloqueados del formulario demo (3.2): no se puede escribir en ellos.
-const CAMPO_DEMO =
-  "w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-not-allowed";
 
 export default function Contact() {
   return (
@@ -15,71 +11,17 @@ export default function Contact() {
       <div className="text-center mb-10">
         <h1 className="text-2xl md:text-3xl font-bold mb-3">Contacto</h1>
         <p className="text-gray-500 max-w-xl mx-auto">
-          ¿Tienes alguna pregunta o sugerencia? Escríbenos a nuestro correo de
-          atención.
+          ¿Tienes alguna pregunta o sugerencia? Escríbenos con este formulario o a
+          nuestro correo de atención.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* 3.2 (A-21): el formulario todavía no envía nada a la API. Los campos van
-            bloqueados para no recoger datos personales que nadie recibe. */}
-        <form onSubmit={(e) => e.preventDefault()} className="space-y-4 min-w-0">
-          <AvisoDemo
-            id="contact-demo"
-            titulo="Demo — el mensaje no se envía"
-            invitacion="Para escribirnos, usa el correo"
-          >
-            Este formulario es una muestra y no se puede llenar.
-          </AvisoDemo>
-
-          <fieldset disabled aria-describedby="contact-demo" className="min-w-0 space-y-4">
-            <div>
-              <label htmlFor="contact-name" className="block text-sm font-medium mb-1">
-                Nombre
-              </label>
-              <input
-                id="contact-name"
-                name="name"
-                className={CAMPO_DEMO}
-                placeholder="Tu nombre"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="contact-email" className="block text-sm font-medium mb-1">
-                Correo electrónico
-              </label>
-              <input
-                id="contact-email"
-                name="email"
-                type="email"
-                className={CAMPO_DEMO}
-                placeholder="tu@correo.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="contact-message" className="block text-sm font-medium mb-1">
-                Mensaje
-              </label>
-              <textarea
-                id="contact-message"
-                name="message"
-                rows={5}
-                className={`${CAMPO_DEMO} resize-none`}
-                placeholder="Escribe tu mensaje..."
-              />
-            </div>
-          </fieldset>
-
-          <button
-            type="submit"
-            disabled
-            className="w-full min-h-11 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium cursor-not-allowed"
-          >
-            Envío no disponible (demo)
-          </button>
-        </form>
+        {/* 3.6 (A-21): el mensaje se envía de verdad a la API, con la sesión iniciada
+            (antes, en el 3.2, era una demo bloqueada). */}
+        <div className="min-w-0">
+          <FormularioSolicitud tipo="contacto" />
+        </div>
 
         <div className="space-y-6 min-w-0">
           <h2 className="text-lg font-semibold">Información de contacto</h2>

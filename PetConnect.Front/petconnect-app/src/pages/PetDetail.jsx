@@ -3,12 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Heart } from "lucide-react";
 import { getMascota } from "../services/api";
 import { datosMascota } from "../utils/mascota";
-import AvisoDemo from "../components/AvisoDemo";
+import FormularioSolicitud from "../components/FormularioSolicitud";
 import EstadoCarga from "../components/EstadoCarga";
-
-// Clases de los campos bloqueados del formulario demo (3.2): no se puede escribir en ellos.
-const CAMPO_DEMO =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-not-allowed";
 
 const VOLVER_ADOPCION = (
   <Link
@@ -114,76 +110,17 @@ export default function PetDetail() {
 
           {!showForm ? (
             <button
+              type="button"
               onClick={() => setShowForm(true)}
-              className="w-full md:w-auto flex items-center justify-center gap-2 bg-black text-white px-8 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+              className="w-full md:w-auto min-h-11 flex items-center justify-center gap-2 bg-black text-white px-8 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
             >
-              <Heart className="w-5 h-5" />
+              <Heart className="w-5 h-5" aria-hidden="true" />
               Solicitar Adopción
             </button>
           ) : (
-            <form
-              onSubmit={(e) => e.preventDefault()}
-              className="space-y-4 border border-gray-200 rounded-lg p-4"
-            >
-              <h3 className="font-semibold">Formulario de Adopción</h3>
-              {/* 3.2 (A-21): las solicitudes todavía no se envían a la API. Los campos van
-                  bloqueados para no recoger datos personales que nadie recibe. */}
-              <AvisoDemo
-                id="adopt-demo"
-                titulo="Demo — la solicitud no se envía"
-                invitacion={`Si te interesa adoptar a ${pet.name}, escríbenos a`}
-              >
-                Por ahora las solicitudes de adopción no están disponibles: este
-                formulario es una muestra y no se puede llenar.
-              </AvisoDemo>
-              <fieldset disabled aria-describedby="adopt-demo" className="min-w-0 space-y-4">
-                <div>
-                  <label htmlFor="adopt-name" className="block text-sm font-medium mb-1">
-                    Nombre completo
-                  </label>
-                  <input id="adopt-name" name="name" className={CAMPO_DEMO} />
-                </div>
-                <div>
-                  <label htmlFor="adopt-email" className="block text-sm font-medium mb-1">
-                    Correo electrónico
-                  </label>
-                  <input id="adopt-email" name="email" type="email" className={CAMPO_DEMO} />
-                </div>
-                <div>
-                  <label htmlFor="adopt-phone" className="block text-sm font-medium mb-1">
-                    Teléfono
-                  </label>
-                  <input id="adopt-phone" name="phone" type="tel" className={CAMPO_DEMO} />
-                </div>
-                <div>
-                  <label htmlFor="adopt-message" className="block text-sm font-medium mb-1">
-                    ¿Por qué quieres adoptar a {pet.name}?
-                  </label>
-                  <textarea
-                    id="adopt-message"
-                    name="message"
-                    rows={3}
-                    className={`${CAMPO_DEMO} resize-none`}
-                  />
-                </div>
-              </fieldset>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled
-                  className="flex-1 min-h-11 bg-gray-200 text-gray-700 py-2.5 px-4 rounded-lg font-medium cursor-not-allowed"
-                >
-                  No disponible (demo)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="min-h-11 px-4 py-2.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 transition-colors"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </form>
+            // 3.6 (A-21): la solicitud se envía de verdad a la API (antes, en el 3.2,
+            // el formulario era una demo bloqueada).
+            <FormularioSolicitud tipo="adopcion" mascota={pet} onCerrar={() => setShowForm(false)} />
           )}
         </div>
       </div>

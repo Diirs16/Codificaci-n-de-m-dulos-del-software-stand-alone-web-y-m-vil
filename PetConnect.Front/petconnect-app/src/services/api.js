@@ -100,3 +100,22 @@ export function getProducto(id) { return apiFetch(`/productos/${id}`); }
 // --- Mascotas ---
 export function getMascotasAdopcion() { return apiFetch("/mascotas/adopcion"); }
 export function getMascota(id) { return apiFetch(`/mascotas/${id}`); }
+
+// --- Solicitudes (ítem 3.6, A-21) ---
+// Necesitan la sesión iniciada: apiFetch manda el token. El nombre y el correo
+// NO viajan: la API los toma de la cuenta. Si la cuenta no aceptó la versión
+// vigente de la política, la API responde 403 y el error trae
+// requiereAutorizacion = true. La página dice "enviada" solo si esto no lanza error.
+export function enviarSolicitudAdopcion(idMascota, mensaje, telefono = "") {
+  return apiFetch("/solicitudes/adopcion", {
+    method: "POST",
+    body: JSON.stringify({ id_mascota: Number(idMascota), mensaje, telefono }),
+  });
+}
+
+export function enviarMensajeContacto(mensaje) {
+  return apiFetch("/solicitudes/contacto", {
+    method: "POST",
+    body: JSON.stringify({ mensaje }),
+  });
+}
