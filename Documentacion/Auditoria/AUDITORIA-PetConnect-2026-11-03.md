@@ -772,6 +772,17 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   OTP ni errores.
 - **Arreglo:** GitHub Actions con `unittest` + `npm run lint` + `npm run build`; pruebas de regresión para cada NC
   (p. ej. `/api/mascotas/<id>` sin token → 404; 6.º intento OTP → bloqueado; ruta inexistente → 404).
+- **Estado: integración continua creada el 07/11/2026 (ítem 4.3 de PRIORIDADES, commit `8802815`); la parte de
+  pruebas de endpoints sigue pendiente (ítem 4.4).** `.github/workflows/ci.yml` corre en GitHub Actions
+  (`ubuntu-latest`) en cada push y con el botón “Run workflow”, con un job por módulo: backend (Python 3.14,
+  `pip install -r requirements.txt` y `unittest`), web (Node 24: `npm ci`, `npm run lint`, `npm test` y
+  `npm run build`) y móvil (Node 24: `npm ci`, `npm test` y `npx expo export --platform web`). Solo lectura del
+  repositorio (`permissions: contents: read`, `persist-credentials: false`), acciones oficiales `@v7` y ningún
+  secreto: las pruebas ponen sus propias claves de prueba. Validado en local sin push: YAML revisado y los mismos
+  comandos corridos en una copia limpia del último commit (`git archive`, sin `.env` ni `node_modules`): backend
+  200 pruebas (176 correctas y 24 omitidas que requieren MariaDB), web lint sin errores + 42/42 + build, móvil
+  35/35 + export. Sin diferencias de mayúsculas en los imports (Linux las distingue). La primera ejecución en
+  GitHub queda pendiente del push, que se hace al terminar todo el plan.
 
 ### 3.8 Documentación y orden
 

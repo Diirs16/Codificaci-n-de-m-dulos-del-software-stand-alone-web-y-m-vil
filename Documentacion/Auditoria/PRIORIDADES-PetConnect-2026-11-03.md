@@ -80,7 +80,7 @@ se borra de aquí y se marca `[x]` en su fase.
 |---|---|---|---|---|---|
 | [x] | 4.1 | A-17 | NC-004 | Exigir minúscula en API, web y móvil (validación en un módulo común) — *Hecho el 07/11/2026 en 3 partes: API (`240116e`, `security/politica.py`), web (`680797e`, `src/utils/contrasena.js`) y móvil (`43fcfe1`, copia de la utilidad; `RegisterScreen.js` ya valida antes de enviar). `PETCONNECT1!` se rechaza en los tres. Regresión: `test_politica.py` (17), `contrasena.test.js` (13) y `contrasena.test.mjs` (8); la contraprueba falla con el código viejo. NC-004 cerrada* | 🟢 |
 | [x] | 4.2 | A-19 | NC-011 | `AND activo = TRUE` en `buscar_por_nombre` de proveedores — *Hecho el 07/11/2026 en una parte (`06a422d`, solo backend): `_BUSCAR_POR_NOMBRE` filtra `activo = TRUE` como la búsqueda por ciudad y, con el sí del dueño, escapa `!`, `%` y `_` (`ESCAPE '!'`). Regresión: `tests/test_proveedores.py` (5, BD simulada); con el DAO viejo fallan 3 y pasan a propósito 2. NC-011 cerrada; CP-013 sigue en seguimiento por el filtro por tipo, que no existe* | 🟢 |
-| [ ] | 4.3 | A-31 | — | GitHub Actions: `unittest` + `npm run lint` + `npm run build` en cada push | 🟡 |
+| [x] | 4.3 | A-31 | — | GitHub Actions: `unittest` + `npm run lint` + `npm run build` en cada push — *Hecho el 07/11/2026 en una parte (`8802815`): `.github/workflows/ci.yml`, en cada push y con “Run workflow”, un job por módulo en `ubuntu-latest`: backend (Python 3.14, `unittest`), web (Node 24: `npm ci`, lint, `npm test`, build) y móvil (Node 24: `npm ci`, `npm test` y `expo export --platform web`, con el sí del dueño). `permissions: contents: read`, `persist-credentials: false`, acciones `@v7`, sin secretos. Validado en local en una copia limpia del commit (sin `.env` ni `node_modules`): backend 200 (176 + 24 omitidas), web 0 errores de lint + 42/42 + build, móvil 35/35 + export; YAML revisado y sin diferencias de mayúsculas en los imports. **La primera ejecución en GitHub queda pendiente del push** (al terminar todo). No cierra NC* | 🟡 |
 | [ ] | 4.4 | A-31 | todas | Pruebas de endpoints con el cliente de Flask (mascotas, productos, auth, errores) | 🟡 |
 | [ ] | 4.5 | A-11 | NC-003 | Pool de conexiones + `try/finally` para cerrar cursores | 🟡 |
 | [ ] | 4.6 | A-12 | NC-003 | OTP en tabla de la BD (hash del código, intentos, expiración) o 1 worker con hilos; limpiar vencidos y acotar `_mx_cache` | 🟡 |
@@ -145,9 +145,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 07/11/2026, actualizada al terminar el 4.2 (A-19, NC-011: solo proveedores activos en la búsqueda por
-nombre, una parte, solo backend). El próximo ítem es el 4.3 (A-31: integración continua con GitHub Actions). Salta los
-ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 07/11/2026, actualizada al terminar el 4.3 (A-31, primera parte: integración continua con GitHub
+Actions, una parte). El próximo ítem es el 4.4 (A-31, segunda parte: pruebas de endpoints con el cliente de Flask).
+Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -172,6 +172,28 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.3 HECHO el 07/11/2026 (A-31, primera parte; commit 8802815; no cierra
+  NC). .github/workflows/ci.yml: on push (cualquier rama) + workflow_dispatch;
+  permissions: contents: read; 3 jobs en ubuntu-latest con timeout-minutes: 10
+  y working-directory propio: backend (setup-python@v7, "3.14", cache pip;
+  python -m pip install -r requirements.txt; python -m unittest discover -s
+  tests -v), web y movil (setup-node@v7, "24", cache npm con el
+  package-lock.json de cada uno; npm ci + lint + test + build en la web;
+  npm ci + test + npx expo export --platform web en el móvil). checkout@v7
+  con persist-credentials: false. Sin secretos ni .env. Se eligió v7 (y no
+  v4/v5 de la nota anterior) porque las v4/v5 usan Node 20, que GitHub retira;
+  las v7 salieron en junio-julio de 2026 sin cambios que afecten. Validado sin
+  push: YAML leído con el paquete yaml de PetConnect.Mobile/node_modules y
+  comandos corridos en una copia de git archive HEAD fuera del repo (venv
+  nuevo, npm ci desde cero): backend 200 (176 + 24 omitidas), web lint 0
+  errores (2 avisos only-export-components de siempre) + 42/42 + build, móvil
+  35/35 + export (~10 s). Los package-lock ya traen los binarios linux-x64
+  (oxlint, rolldown, tailwind, lightningcss). Revisión de mayúsculas de los
+  imports (JS relativos y Python locales): sin problemas. FALTA: la primera
+  ejecución real en GitHub, al hacer el push final; si falla, revisar la
+  pestaña Actions del repositorio (cada job dice qué paso falló). OJO: el hook
+  de secretos bloquea cualquier comando que contenga el texto ".env" (A-40);
+  para buscar esos archivos usar el patrón ".e*".
 - 4.2 HECHO el 07/11/2026 (A-19, NC-011 CERRADA; commit 06a422d, solo
   backend). dao/proveedor_dao.py: _BUSCAR_POR_NOMBRE lleva
   "nombre LIKE %s ESCAPE '!' AND activo = TRUE" y buscar_por_nombre escapa
@@ -827,35 +849,39 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.3, A-31: GitHub Actions en cada push):
-- No existe .github/workflows/. La carpeta .github/ solo tiene
-  modernize/java-upgrade/hooks (de una herramienta de actualización de Java,
-  ajena a este ítem: no tocarla). Crear .github/workflows/ci.yml en la RAÍZ
-  del repo (origin = github.com/Diirs16/Codificaci-n-de-m-dulos-del-software-
-  stand-alone-web-y-m-vil, rama main).
-- Qué debe correr (un "job" por módulo, para ver cuál falla):
-  - Backend: Python 3.14 (el del .venv), pip install -r
-    petconnect.Backend/requirements.txt y, desde petconnect.Backend,
-    python -m unittest discover -s tests -v. Sin MariaDB las 24 pruebas con
-    PETCONNECT_PRUEBA_BD se omiten (está bien). Las pruebas ponen claves de
-    prueba (FERNET_KEY, JWT_SECRET) con setdefault: NO hace falta ningún
-    secreto ni .env en GitHub; no agregar secretos al workflow.
-  - Web (PetConnect.Front/petconnect-app): Node 24 (el local es v24.14.0),
-    npm ci, npm run lint, npm test y npm run build.
-  - Móvil (PetConnect.Mobile): npm ci y npm test (expo export es lento:
-    preguntar si se incluye).
-- Riesgos a revisar: que npm ci funcione con los package-lock.json
-  versionados; que ninguna prueba dependa de rutas de Windows; fijar las
-  versiones de las acciones (actions/checkout@v4, setup-python@v5,
-  setup-node@v4) y poner "permissions: contents: read".
-- El workflow solo corre en GitHub al hacer push, y el push se hace al
-  terminar TODO (decisión del dueño). Mientras tanto: validar el YAML y
-  correr en local, uno por uno, los mismos comandos del workflow. Anotar en
-  la fila que la primera ejecución en GitHub queda pendiente del push.
-- No cierra ninguna NC (columna NC: —). En la GA9 sí se menciona la
-  "integración continua" del Sprint 1 y la tabla de herramientas: actualizar
-  esa mención con la fecha. A-31 tiene dos partes: 4.3 (CI) y 4.4 (pruebas
-  de endpoints); en la AUDITORÍA anota solo el avance de la CI.
+Contexto del próximo paso (4.4, A-31 segunda parte: pruebas de endpoints):
+- La fila dice "Pruebas de endpoints con el cliente de Flask (mascotas,
+  productos, auth, errores)" y la columna NC "todas": la idea de A-31 es que
+  cada NC tenga su prueba de regresión que pase por la API (p. ej.
+  /api/mascotas/<id> sin token -> 404; 6.º intento OTP -> bloqueado; ruta
+  inexistente -> 404).
+- MUCHO YA EXISTE: 13 archivos de tests/ usan app.test_client() (modelos:
+  test_errores.py con _importar_api() y BD simulada, test_mascotas.py para
+  @require_auth, test_logs.py para BD "encendida", test_limite.py para el
+  limitador). Revisión rápida por texto (07/11/2026): aparecen en las
+  pruebas /api/productos/, validar-correo, register/resend, login/verify,
+  auth/verify, solicitudes/adopcion y /contacto, /api/no-existe y
+  /api/mascotas/<id>; NO aparece /api/auth/me (puede estar armada en una
+  constante: verificarlo). Rutas de api.py: GET /api/productos,
+  /api/productos/<id>, /api/mascotas/adopcion, /api/mascotas/<id>,
+  /api/usuarios/me/mascotas/<id>, /api/auth/me; POST /api/utils/validar-
+  correo, /api/auth/login, /login/verify, /register, /register/resend,
+  /verify, /api/solicitudes/adopcion y /contacto.
+- PASO 1 propuesto: un INVENTARIO ruta x caso (éxito, 400, 401, 403, 404,
+  503 sin BD) y NC x prueba que la cubre (bitácora GA9), para escribir solo
+  los huecos y no duplicar. Mostrarlo al dueño antes de escribir pruebas.
+- Reglas: BD simulada (sin MariaDB ni el .env real; ver A-41 y 4.14), tokens
+  con api.generate_token dentro de la prueba, correos inventados, sin enviar
+  correos (mock de api.enviar_codigo y api._validar_correo).
+- Contraprueba: como las pruebas cubren código que ya funciona, para cada
+  prueba nueva demostrar que FALLA si se rompe a propósito la regla que
+  protege (p. ej. quitar @require_auth en una copia temporal) y dejar el
+  código como estaba.
+- La CI del 4.3 ya corre estas pruebas en cada push: no hay que tocar
+  ci.yml (salvo que el dueño quiera algo nuevo).
+- En la AUDITORÍA (A-31) anota el avance de las pruebas de endpoints y, si
+  queda todo cubierto, marca A-31 como resuelto. En la GA9, las NC cuya
+  regresión cambie.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -894,6 +920,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.3** (A-31): GitHub Actions que corra `unittest` del backend y `npm run lint`, `npm test` y
-`npm run build` de la web (y `npm test` del móvil) en cada push. El 4.2 quedó hecho el 07/11/2026 (NC-011 cerrada,
-una parte, solo backend, `06a422d`).
+**Próximo ítem: 4.4** (A-31, segunda parte): pruebas de endpoints con el cliente de Flask, empezando por un
+inventario de lo que ya cubren las pruebas para escribir solo los huecos. El 4.3 quedó hecho el 07/11/2026 (CI con
+GitHub Actions, una parte, `8802815`; la primera ejecución en GitHub queda pendiente del push).
