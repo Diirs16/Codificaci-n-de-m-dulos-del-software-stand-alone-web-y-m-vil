@@ -12,6 +12,12 @@ import {
 import { registerUser, verifyCode } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import CasillaAutorizacion from "../components/CasillaAutorizacion";
+// Ítem 4.1 (A-17, NC-004): las mismas reglas de contraseña que la API y la web
+import { validarContrasena, LARGO_MIN, LARGO_MAX, CARACTERES_ESPECIALES } from "../utils/contrasena";
+
+const PISTA_CONTRASENA =
+  `Entre ${LARGO_MIN} y ${LARGO_MAX} caracteres, con mayúscula, minúscula, número ` +
+  `y un carácter especial: ${CARACTERES_ESPECIALES}`;
 
 // NC-005 (ítem 3.1): textos de la Parte B de
 // Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md (los mismos de la web).
@@ -42,6 +48,12 @@ export default function RegisterScreen({ navigation }) {
 
   async function handleRegister() {
     setError(null);
+    // Antes solo la API revisaba la contraseña; ahora se avisa sin llamarla.
+    const errorContrasena = validarContrasena(password);
+    if (errorContrasena) {
+      setError(errorContrasena);
+      return;
+    }
     // Sin la casilla no se llama a la API (mensaje B.3).
     if (!aceptaDatos) {
       setError(MENSAJE_SIN_AUTORIZACION);
@@ -133,7 +145,9 @@ export default function RegisterScreen({ navigation }) {
             secureTextEntry
             value={password}
             onChangeText={setPassword}
+            accessibilityHint={PISTA_CONTRASENA}
           />
+          <Text style={styles.pista}>{PISTA_CONTRASENA}</Text>
 
           {/* NC-005: autorización previa, expresa e informada (Ley 1581, arts. 9 y 12) */}
           <CasillaAutorizacion
@@ -186,6 +200,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 15,
   },
+  // Debajo del campo de contraseña (gris #64748b sobre blanco: contraste 4.7:1, AA)
+  pista: { fontSize: 12, color: "#64748b", marginTop: -6, marginBottom: 12 },
   error: { color: "#b91c1c", marginBottom: 12, textAlign: "center" },
   button: { backgroundColor: "#0f766e", borderRadius: 10, padding: 14, alignItems: "center", marginTop: 8, minHeight: 48 },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 15 },
