@@ -613,6 +613,33 @@ class PruebasValidarCorreo(_BaseEndpoints):
         self.assertTrue(respuesta["valido"])
         self.assertNotIn("ejemplo.test", self.api._mx_cache)   # un fallo temporal no se guarda
 
+    # Item 4.6 (A-12): la memoria de dominios tiene tope (antes crecia sin limite)
+
+    def _llenar(self, cantidad, desde=0):
+        self.resolve.return_value = [object()]
+        for i in range(desde, desde + cantidad):
+            valido, _ = self.api._validar_correo(f"laura@dominio{i}.test")
+            self.assertTrue(valido)
+
+    def test_la_memoria_de_dominios_no_pasa_del_maximo(self):
+        maximo = self.api.MX_CACHE_MAXIMO
+        self.assertEqual(maximo, 1000)   # decision del dueno del 07/11/2026
+        self._llenar(maximo + 500)
+        self.assertEqual(len(self.api._mx_cache), maximo)
+        self.assertFalse("dominio0.test" in self.api._mx_cache)          # los mas viejos se olvidan
+        self.assertTrue(f"dominio{maximo + 499}.test" in self.api._mx_cache)  # los nuevos quedan
+
+    def test_olvida_el_dominio_que_lleva_mas_tiempo_sin_usarse(self):
+        maximo = self.api.MX_CACHE_MAXIMO
+        self._llenar(maximo)
+        self.resolve.reset_mock()
+        self._llenar(1, desde=0)                 # dominio0 se vuelve a usar: sale de la memoria
+        self.resolve.assert_not_called()
+        self._llenar(1, desde=maximo)            # uno nuevo: se olvida dominio1, no dominio0
+        self.assertTrue("dominio0.test" in self.api._mx_cache)
+        self.assertFalse("dominio1.test" in self.api._mx_cache)
+        self.assertEqual(len(self.api._mx_cache), maximo)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,7 +8,9 @@ import os
 import re
 import json
 import secrets
+import threading
 import traceback
+from collections import OrderedDict
 from datetime import datetime, date
 from functools import wraps
 
@@ -254,7 +256,32 @@ def _validar_nombre(nombre: str) -> str | None:
 
 
 _EMAIL_REGEX =re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
-_mx_cache: dict[str, bool] = {}
+
+# Item 4.6 (A-12): memoria de "este dominio tiene o no servidor de correo", para no
+# preguntar al DNS cada vez. Antes crecia sin limite (spam con dominios inventados).
+# Ahora guarda como mucho MX_CACHE_MAXIMO dominios: al llenarse olvida el que lleva
+# mas tiempo sin usarse (LRU). El candado evita que dos hilos la cambien a la vez.
+MX_CACHE_MAXIMO = 1000
+_mx_cache: "OrderedDict[str, bool]" = OrderedDict()
+_mx_cache_candado = threading.Lock()
+
+
+def _mx_guardado(dominio: str) -> bool | None:
+    """Respuesta guardada para `dominio` (y lo marca como recien usado), o None."""
+    with _mx_cache_candado:
+        if dominio not in _mx_cache:
+            return None
+        _mx_cache.move_to_end(dominio)
+        return _mx_cache[dominio]
+
+
+def _guardar_mx(dominio: str, tiene_mx: bool):
+    """Guarda la respuesta del DNS; si pasa del maximo, borra la menos usada."""
+    with _mx_cache_candado:
+        _mx_cache[dominio] = tiene_mx
+        _mx_cache.move_to_end(dominio)
+        while len(_mx_cache) > MX_CACHE_MAXIMO:
+            _mx_cache.popitem(last=False)
 
 
 def _validar_correo(email: str) -> tuple[bool, str]:
@@ -276,9 +303,8 @@ def _validar_correo(email: str) -> tuple[bool, str]:
 
     dominio = email.rsplit("@", 1)[-1].lower()
 
-    if dominio in _mx_cache:
-        tiene_mx = _mx_cache[dominio]
-    else:
+    tiene_mx = _mx_guardado(dominio)
+    if tiene_mx is None:
         try:
             respuestas = dns.resolver.resolve(dominio, "MX", lifetime=4)
             tiene_mx = len(respuestas) > 0
@@ -287,7 +313,7 @@ def _validar_correo(email: str) -> tuple[bool, str]:
         except Exception:
             # Fallo de red/DNS temporal: no bloqueamos el registro por esto.
             return True, "No se pudo verificar el dominio en este momento, pero el formato es valido"
-        _mx_cache[dominio] = tiene_mx
+        _guardar_mx(dominio, tiene_mx)
 
     if not tiene_mx:
         return False, f'El dominio "{dominio}" no tiene servidores de correo configurados'
