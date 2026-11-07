@@ -373,6 +373,11 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 
 #### A-19 · ⚪ Baja · Búsqueda de proveedores devuelve inactivos — NC-011
 - `dao/proveedor_dao.py:49-54` (falta `AND activo = TRUE`, que sí tiene `:56-62`). Una línea.
+- **Estado: resuelto el 07/11/2026 (ítem 4.2 de PRIORIDADES, commit `06a422d`; solo backend). NC-011 cerrada.**
+  `_BUSCAR_POR_NOMBRE` filtra `activo = TRUE`, como la búsqueda por ciudad. Mejora aprobada por el dueño:
+  `buscar_por_nombre` escapa `!`, `%` y `_` (`ESCAPE '!'`), así que `%` y `_` ya no actúan como comodines.
+  Regresión: `tests/test_proveedores.py` (5 pruebas, BD simulada); con el DAO anterior fallan 3 y pasan a propósito
+  2 (consulta parametrizada y mapeo de filas). Solo la usa la consola; la web y el móvil no cambian.
 
 ### 3.3 Datos personales (Ley 1581) y contenido
 

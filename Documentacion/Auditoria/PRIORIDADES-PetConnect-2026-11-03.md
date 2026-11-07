@@ -79,7 +79,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | ✔ | # | ID | NC | Qué | Esfuerzo |
 |---|---|---|---|---|---|
 | [x] | 4.1 | A-17 | NC-004 | Exigir minúscula en API, web y móvil (validación en un módulo común) — *Hecho el 07/11/2026 en 3 partes: API (`240116e`, `security/politica.py`), web (`680797e`, `src/utils/contrasena.js`) y móvil (`43fcfe1`, copia de la utilidad; `RegisterScreen.js` ya valida antes de enviar). `PETCONNECT1!` se rechaza en los tres. Regresión: `test_politica.py` (17), `contrasena.test.js` (13) y `contrasena.test.mjs` (8); la contraprueba falla con el código viejo. NC-004 cerrada* | 🟢 |
-| [ ] | 4.2 | A-19 | NC-011 | `AND activo = TRUE` en `buscar_por_nombre` de proveedores | 🟢 |
+| [x] | 4.2 | A-19 | NC-011 | `AND activo = TRUE` en `buscar_por_nombre` de proveedores — *Hecho el 07/11/2026 en una parte (`06a422d`, solo backend): `_BUSCAR_POR_NOMBRE` filtra `activo = TRUE` como la búsqueda por ciudad y, con el sí del dueño, escapa `!`, `%` y `_` (`ESCAPE '!'`). Regresión: `tests/test_proveedores.py` (5, BD simulada); con el DAO viejo fallan 3 y pasan a propósito 2. NC-011 cerrada; CP-013 sigue en seguimiento por el filtro por tipo, que no existe* | 🟢 |
 | [ ] | 4.3 | A-31 | — | GitHub Actions: `unittest` + `npm run lint` + `npm run build` en cada push | 🟡 |
 | [ ] | 4.4 | A-31 | todas | Pruebas de endpoints con el cliente de Flask (mascotas, productos, auth, errores) | 🟡 |
 | [ ] | 4.5 | A-11 | NC-003 | Pool de conexiones + `try/finally` para cerrar cursores | 🟡 |
@@ -145,9 +145,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 07/11/2026, actualizada al terminar el 4.1 (A-17, NC-004: minúscula en la contraseña, en 3 partes: API,
-web y móvil), el primer ítem de la Fase 4. El próximo ítem es el 4.2 (A-19, NC-011). Salta los ítems de “Por
-actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 07/11/2026, actualizada al terminar el 4.2 (A-19, NC-011: solo proveedores activos en la búsqueda por
+nombre, una parte, solo backend). El próximo ítem es el 4.3 (A-31: integración continua con GitHub Actions). Salta los
+ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -172,6 +172,17 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.2 HECHO el 07/11/2026 (A-19, NC-011 CERRADA; commit 06a422d, solo
+  backend). dao/proveedor_dao.py: _BUSCAR_POR_NOMBRE lleva
+  "nombre LIKE %s ESCAPE '!' AND activo = TRUE" y buscar_por_nombre escapa
+  !, % y _ con _escapar_like (se eligió '!' y no '\' por el modo
+  NO_BACKSLASH_ESCAPES de MariaDB). tests/test_proveedores.py (5) simula la
+  conexión (dao._conexion_bd = MagicMock) tras _importar_api(), así config/
+  no carga el .env. Suite backend: 200 pruebas (176 correctas, 24 omitidas
+  sin MariaDB). CP-013 sigue "en seguimiento": el filtro por tipo no existe
+  (ni columna ni rutas de proveedores en la API). Los otros DAO
+  (mascota, producto, usuario) también usan LIKE f"%{termino}%" sin escapar:
+  pendiente sin ítem, de baja prioridad (preguntar al dueño).
 - 4.1 HECHO el 07/11/2026 (A-17, NC-004 CERRADA, CP-003 aprobado). La
   política de contraseñas vive en petconnect.Backend/security/politica.py:
   validar_contrasena(password) -> mensaje | None, con LARGO_MIN = 8,
@@ -816,23 +827,35 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.2, A-19, NC-011: proveedores inactivos en la búsqueda):
-- petconnect.Backend/dao/proveedor_dao.py: _BUSCAR_POR_NOMBRE (cerca de la
-  línea 49) filtra solo "WHERE nombre LIKE %s"; _CONSULTAR_POR_CIUDAD (línea
-  56) sí lleva "AND activo = TRUE". Falta lo mismo en la búsqueda por nombre.
-- Lo usa solo la consola: vista/menu_proveedores.py (_buscar_por_nombre,
-  línea 131). La API no tiene rutas de proveedores, así que web y móvil no se
-  afectan: es un ítem de UNA parte (solo backend).
-- Prueba de regresión sin BD real: simular la conexión y comprobar el SQL
-  que llega a cursor.execute (lleva "activo = TRUE" y sigue parametrizado),
-  como test_registro_datos.py con UsuarioDAO.insertar. Si se quiere probar
-  contra MariaDB, solo con PETCONNECT_PRUEBA_BD=1 (bases temporales).
-- Ojo (opcional, preguntar): el término va en LIKE con f"%{termino}%", así
-  que "%" y "_" que escriba el usuario actúan como comodines. No es
-  inyección (va parametrizado), pero se podrían escapar.
-- El DAO imprime el error y devuelve [] si falla la BD (eso es del 4.15).
-- GA9: NC-011 (CP-013, AA2 CP-005) se cierra con este ítem (fecha y
-  evidencia, incluida la contraprueba).
+Contexto del próximo paso (4.3, A-31: GitHub Actions en cada push):
+- No existe .github/workflows/. La carpeta .github/ solo tiene
+  modernize/java-upgrade/hooks (de una herramienta de actualización de Java,
+  ajena a este ítem: no tocarla). Crear .github/workflows/ci.yml en la RAÍZ
+  del repo (origin = github.com/Diirs16/Codificaci-n-de-m-dulos-del-software-
+  stand-alone-web-y-m-vil, rama main).
+- Qué debe correr (un "job" por módulo, para ver cuál falla):
+  - Backend: Python 3.14 (el del .venv), pip install -r
+    petconnect.Backend/requirements.txt y, desde petconnect.Backend,
+    python -m unittest discover -s tests -v. Sin MariaDB las 24 pruebas con
+    PETCONNECT_PRUEBA_BD se omiten (está bien). Las pruebas ponen claves de
+    prueba (FERNET_KEY, JWT_SECRET) con setdefault: NO hace falta ningún
+    secreto ni .env en GitHub; no agregar secretos al workflow.
+  - Web (PetConnect.Front/petconnect-app): Node 24 (el local es v24.14.0),
+    npm ci, npm run lint, npm test y npm run build.
+  - Móvil (PetConnect.Mobile): npm ci y npm test (expo export es lento:
+    preguntar si se incluye).
+- Riesgos a revisar: que npm ci funcione con los package-lock.json
+  versionados; que ninguna prueba dependa de rutas de Windows; fijar las
+  versiones de las acciones (actions/checkout@v4, setup-python@v5,
+  setup-node@v4) y poner "permissions: contents: read".
+- El workflow solo corre en GitHub al hacer push, y el push se hace al
+  terminar TODO (decisión del dueño). Mientras tanto: validar el YAML y
+  correr en local, uno por uno, los mismos comandos del workflow. Anotar en
+  la fila que la primera ejecución en GitHub queda pendiente del push.
+- No cierra ninguna NC (columna NC: —). En la GA9 sí se menciona la
+  "integración continua" del Sprint 1 y la tabla de herramientas: actualizar
+  esa mención con la fecha. A-31 tiene dos partes: 4.3 (CI) y 4.4 (pruebas
+  de endpoints); en la AUDITORÍA anota solo el avance de la CI.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -871,5 +894,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.2** (A-19, NC-011): agregar `AND activo = TRUE` a la búsqueda de proveedores por nombre
-(`dao/proveedor_dao.py`), solo backend. El 4.1 quedó hecho el 07/11/2026 (NC-004 cerrada, 3 partes: API, web y móvil).
+**Próximo ítem: 4.3** (A-31): GitHub Actions que corra `unittest` del backend y `npm run lint`, `npm test` y
+`npm run build` de la web (y `npm test` del móvil) en cada push. El 4.2 quedó hecho el 07/11/2026 (NC-011 cerrada,
+una parte, solo backend, `06a422d`).
