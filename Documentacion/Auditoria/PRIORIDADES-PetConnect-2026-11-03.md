@@ -160,19 +160,13 @@ Lee primero:
 - Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md (borrador de la
   política: Parte B = textos de la casilla, el aviso y los mensajes; Parte C =
   especificación; Parte D = decisiones pendientes)
-- git log --oneline -12 y git status -sb (qué se hizo en sesiones anteriores;
-  el 05/11/2026 se subió todo hasta el botón web del 2.7, 6e0bbc5; desde ahí
-  todo queda en local: 3.1 (31f005c, fa1dda3, 6f0bdc9), 0a5e1dd, b8d5ec2,
-  f40af07, 57e05c4 (3.2), 6c9c0bf (3.3), 47ae96d, b398126 y f441696 (3.4,
-  3 partes), 03925c5 y fdaf59b (3.5 partes 1 y 2), 09fe293 (Cancelar +
-  prueba web con la API real), eaf0cdd y 095c112 (3.5 parte 3, móvil),
-  13b02eb (3.6 parte 1, API + BD), 486f270 y 0b1ceb0 (3.6 parte 2, web +
-  prueba con la API real), 2b8bc59 (3.6 parte 3, móvil) y el commit que
-  anota la prueba del móvil en el emulador (07/11/2026).
-  REGLA DEL DUEÑO (06/11/2026): no se hacía push hasta terminar TODA la Fase 3.
-  La Fase 3 terminó el 07/11/2026 y se le preguntó por el push al cerrarla: si
-  git status -sb todavía dice "ahead", pregúntale UNA vez si quiere subirlo
-  antes de seguir; push solo con su sí, nunca --force)
+- git log --oneline -12 y git status -sb (qué se hizo en sesiones anteriores).
+  PUSH: el 07/11/2026, al cerrar la Fase 3 y con el sí del dueño, se subió a
+  origin/main TODO hasta el commit que actualiza este prompt (incluye 3.1 a
+  3.6; los últimos: 2b8bc59, 3.6 parte 3 móvil, y e978419, prueba del móvil
+  en el emulador). Desde ahí los commits nuevos quedan en local: NO hagas
+  push por tu cuenta; pregunta al dueño cuándo subir (push normal, nunca
+  --force).
 
 Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9), el 3.1 (3 partes: API +
