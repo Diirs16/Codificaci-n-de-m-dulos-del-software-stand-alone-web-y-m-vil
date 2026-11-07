@@ -78,7 +78,7 @@ se borra de aquí y se marca `[x]` en su fase.
 
 | ✔ | # | ID | NC | Qué | Esfuerzo |
 |---|---|---|---|---|---|
-| [ ] | 4.1 | A-17 | NC-004 | Exigir minúscula en API, web y móvil (validación en un módulo común) | 🟢 |
+| [x] | 4.1 | A-17 | NC-004 | Exigir minúscula en API, web y móvil (validación en un módulo común) — *Hecho el 07/11/2026 en 3 partes: API (`240116e`, `security/politica.py`), web (`680797e`, `src/utils/contrasena.js`) y móvil (`43fcfe1`, copia de la utilidad; `RegisterScreen.js` ya valida antes de enviar). `PETCONNECT1!` se rechaza en los tres. Regresión: `test_politica.py` (17), `contrasena.test.js` (13) y `contrasena.test.mjs` (8); la contraprueba falla con el código viejo. NC-004 cerrada* | 🟢 |
 | [ ] | 4.2 | A-19 | NC-011 | `AND activo = TRUE` en `buscar_por_nombre` de proveedores | 🟢 |
 | [ ] | 4.3 | A-31 | — | GitHub Actions: `unittest` + `npm run lint` + `npm run build` en cada push | 🟡 |
 | [ ] | 4.4 | A-31 | todas | Pruebas de endpoints con el cliente de Flask (mascotas, productos, auth, errores) | 🟡 |
@@ -145,9 +145,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 07/11/2026, actualizada al terminar el 3.6 parte 3 de 3 (móvil: adopción y pestaña Contacto envían a la
-API). Con eso el 3.6 y **toda la Fase 3** quedaron hechos; el próximo ítem es el 4.1 (A-17, NC-004). Salta los ítems de
-“Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 07/11/2026, actualizada al terminar el 4.1 (A-17, NC-004: minúscula en la contraseña, en 3 partes: API,
+web y móvil), el primer ítem de la Fase 4. El próximo ítem es el 4.2 (A-19, NC-011). Salta los ítems de “Por
+actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -166,9 +166,27 @@ Lee primero:
   3.6; los últimos: 2b8bc59, 3.6 parte 3 móvil, y e978419, prueba del móvil
   en el emulador). Desde ahí los commits nuevos quedan en local: NO hagas
   push por tu cuenta; pregunta al dueño cuándo subir (push normal, nunca
-  --force).
+  --force). Sin subir todavía (07/11/2026): los 3 commits del 4.1
+  (240116e, 680797e, 43fcfe1) y el que actualiza la documentación.
 
-Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el git log):
+Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.1 HECHO el 07/11/2026 (A-17, NC-004 CERRADA, CP-003 aprobado). La
+  política de contraseñas vive en petconnect.Backend/security/politica.py:
+  validar_contrasena(password) -> mensaje | None, con LARGO_MIN = 8,
+  LARGO_MAX = 64 (y 72 bytes), mayúscula A-Z, minúscula a-z, número y un
+  especial de CARACTERES_ESPECIALES = '@ # ! " $ & ? ¡ - _ * .' (mensajes sin
+  tildes). api.py la importa; _validate_password queda como alias porque lo
+  llama Documentacion/Evidencias-GA9-AA2-EV01/pruebas_aa2.py. Importar
+  security/ exige FERNET_KEY y JWT_SECRET (crypto.py y jwt_helper.py):
+  tests/test_politica.py pone claves de prueba antes. La consola (4.11) debe
+  usar esta misma función. Web: src/utils/contrasena.js (REGLAS_CONTRASENA
+  {id, label, mensaje, test} y validarContrasena); RegisterModal.jsx muestra
+  6 reglas. Móvil: copia en src/utils/contrasena.js (la prueba exige que sea
+  igual a la de la web y compara límites con politica.py); RegisterScreen.js
+  valida antes de registerUser y muestra la pista bajo el campo. Las utilidades
+  JS cuentan con [...p].length (un emoji = 1, como Python) y usan TextEncoder
+  para los bytes (Hermes lo trae desde RN 0.74). Revisado a 375 px en la web
+  y en el export web del móvil; con la API real y en el emulador es opcional.
 - Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9), el 3.1 (3 partes: API +
   BD, web y móvil; ver git log), el 3.2, el 3.3 y el 3.4 (3 partes: backend,
   web y móvil; A-22 resuelto). NC-005 y NC-009 cerradas el 06/11/2026.
@@ -796,20 +814,23 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.1, A-17, NC-004: exigir minúscula):
-- api.py: _validate_password (cerca de la línea 227) exige 8 a 64
-  caracteres (y MAX_BYTES_BCRYPT), mayúscula, número y especial, pero NO
-  minúscula: acepta PETCONNECT1!. Los mensajes van sin tildes.
-- Web: RegisterModal.jsx tiene una lista de reglas ({id, label, test}, ej.
-  "Al menos una mayúscula"): falta la de minúscula.
-- Móvil: RegisterScreen.js NO valida la contraseña antes de enviar (solo la
-  API la revisa).
-- La fila pide "validación en un módulo común": en el backend, un módulo
-  (ej. security/politica.py) que también pueda usar la consola (4.11, A-18);
-  en web y móvil, una utilidad JS pura (como utils/solicitud.js) que Node
-  pueda probar. Toca 3 módulos: proponer el plan por partes (regla 3).
-- GA9: NC-004 (H-03, CP-003) se cierra con este ítem (fecha y evidencia,
-  incluida la contraprueba).
+Contexto del próximo paso (4.2, A-19, NC-011: proveedores inactivos en la búsqueda):
+- petconnect.Backend/dao/proveedor_dao.py: _BUSCAR_POR_NOMBRE (cerca de la
+  línea 49) filtra solo "WHERE nombre LIKE %s"; _CONSULTAR_POR_CIUDAD (línea
+  56) sí lleva "AND activo = TRUE". Falta lo mismo en la búsqueda por nombre.
+- Lo usa solo la consola: vista/menu_proveedores.py (_buscar_por_nombre,
+  línea 131). La API no tiene rutas de proveedores, así que web y móvil no se
+  afectan: es un ítem de UNA parte (solo backend).
+- Prueba de regresión sin BD real: simular la conexión y comprobar el SQL
+  que llega a cursor.execute (lleva "activo = TRUE" y sigue parametrizado),
+  como test_registro_datos.py con UsuarioDAO.insertar. Si se quiere probar
+  contra MariaDB, solo con PETCONNECT_PRUEBA_BD=1 (bases temporales).
+- Ojo (opcional, preguntar): el término va en LIKE con f"%{termino}%", así
+  que "%" y "_" que escriba el usuario actúan como comodines. No es
+  inyección (va parametrizado), pero se podrían escapar.
+- El DAO imprime el error y devuelve [] si falla la BD (eso es del 4.15).
+- GA9: NC-011 (CP-013, AA2 CP-005) se cierra con este ítem (fecha y
+  evidencia, incluida la contraprueba).
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -848,5 +869,5 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.1** (A-17, NC-004): exigir al menos una minúscula en la contraseña en la API, la web y el móvil, con
-la validación en un módulo común. La Fase 3 quedó completa el 07/11/2026 (3.6 parte 3, móvil).
+**Próximo ítem: 4.2** (A-19, NC-011): agregar `AND activo = TRUE` a la búsqueda de proveedores por nombre
+(`dao/proveedor_dao.py`), solo backend. El 4.1 quedó hecho el 07/11/2026 (NC-004 cerrada, 3 partes: API, web y móvil).

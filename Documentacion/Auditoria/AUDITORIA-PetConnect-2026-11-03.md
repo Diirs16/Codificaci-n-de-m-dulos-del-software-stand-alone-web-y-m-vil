@@ -354,6 +354,16 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 #### A-17 · 🟡 Media · Política de contraseña sin minúscula — NC-004 [A]
 - `api.py:66-77` y `RegisterModal.jsx:8-11`. **Evidencia:** `PETCONNECT1!` es aceptada.
 - **Arreglo:** `re.search(r'[a-z]', ...)` en API, web y móvil.
+- **Estado: resuelto el 07/11/2026 (ítem 4.1 de PRIORIDADES, en tres partes). NC-004 cerrada.** API (`240116e`): la
+  política vive en `security/politica.py` (`validar_contrasena`, un módulo común que la consola podrá usar en el 4.11,
+  A-18) y exige la minúscula; `api.py` la importa (el nombre `_validate_password` queda como alias porque lo usa la
+  evidencia del AA2) y `/register` responde 400 a `PETCONNECT1!` antes de la BD, el hash y el correo. El mensaje del
+  carácter especial ahora nombra los 12 aceptados (antes omitía `- _ * .`). Web (`680797e`): `RegisterModal.jsx` usa
+  `src/utils/contrasena.js` (agrega minúscula y máximo 64). Móvil (`43fcfe1`): `RegisterScreen.js` valida con la copia
+  `src/utils/contrasena.js` antes de enviar y muestra los requisitos. Mayúscula y minúscula son solo `A-Z`/`a-z`, y las
+  utilidades JS cuentan los emojis como Python. Regresión: `tests/test_politica.py` (17), `contrasena.test.js` (13) y
+  `contrasena.test.mjs` (8). Contraprueba con `git stash`: con el código anterior fallan 2 en la API, 1 en la web y 2
+  en el móvil; las de la utilidad pasan a propósito. Detalle en la GA9 (NC-004).
 
 #### A-18 · 🟡 Media · La consola registra usuarios saltándose las reglas [N]
 - `vista/menu_usuarios.py:61` usa `input()` para la contraseña (**se ve en pantalla**; usar `getpass`), le hace
