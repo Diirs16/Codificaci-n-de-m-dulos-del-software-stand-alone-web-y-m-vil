@@ -1,0 +1,105 @@
+# Integración continua de PetConnect (ítem 4.3 de la auditoría, A-31).
+# En cada push, GitHub corre en un computador limpio con Linux las mismas
+# verificaciones que se corren en local, con un job por módulo para ver cuál falla.
+# No usa secretos ni .env: las pruebas ponen sus propias claves de prueba.
+
+name: CI
+
+on:
+  push:              # en cada push, a cualquier rama
+  workflow_dispatch: # botón "Run workflow" para correrlo a mano en GitHub
+
+# El robot de GitHub solo puede leer el repositorio.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Python 3.14, unittest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: petconnect.Backend
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Instalar Python 3.14
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: petconnect.Backend/requirements.txt
+
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements.txt
+
+      # Sin MariaDB, las pruebas que piden PETCONNECT_PRUEBA_BD se omiten solas.
+      - name: Pruebas (unittest)
+        run: python -m unittest discover -s tests -v
+
+  web:
+    name: Web (Node 24, lint, pruebas y build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: PetConnect.Front/petconnect-app
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Instalar Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: PetConnect.Front/petconnect-app/package-lock.json
+
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Pruebas
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  movil:
+    name: Móvil (Node 24, pruebas y expo export)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: PetConnect.Mobile
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Instalar Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: PetConnect.Mobile/package-lock.json
+
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      - name: Pruebas
+        run: npm test
+
+      # Arma las pantallas para la web: falla si alguna importa algo que no existe.
+      # El resultado (carpeta dist) se descarta.
+      - name: Verificar que la app se arma (expo export)
+        run: npx expo export --platform web
