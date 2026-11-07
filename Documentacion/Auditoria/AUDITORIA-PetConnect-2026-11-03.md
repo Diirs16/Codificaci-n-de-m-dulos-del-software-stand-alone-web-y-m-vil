@@ -772,8 +772,27 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   OTP ni errores.
 - **Arreglo:** GitHub Actions con `unittest` + `npm run lint` + `npm run build`; pruebas de regresión para cada NC
   (p. ej. `/api/mascotas/<id>` sin token → 404; 6.º intento OTP → bloqueado; ruta inexistente → 404).
-- **Estado: integración continua creada el 07/11/2026 (ítem 4.3 de PRIORIDADES, commit `8802815`); la parte de
-  pruebas de endpoints sigue pendiente (ítem 4.4).** `.github/workflows/ci.yml` corre en GitHub Actions
+- **Estado: resuelto el 07/11/2026 (ítems 4.3 y 4.4 de PRIORIDADES; solo falta ver la primera ejecución de la CI
+  en GitHub, que llega con el push final).**
+- **Pruebas de endpoints (ítem 4.4, commit `37f8126`):** antes de escribir pruebas se hizo un inventario de las 14
+  rutas de `api.py` × caso (éxito, 400, 401, 403, 404, 503 sin BD) y de cada NC × la prueba que la cubre. Ya había
+  15 archivos de pruebas con el cliente de Flask (mascotas, solicitudes, login, registro, OTP, límite, errores);
+  faltaban `GET /api/auth/me` completa, el éxito y el 404 de productos, el filtro de la lista de adopción sin
+  MariaDB, campos vacíos, correo inexistente, 409, 503 de login/verify, verify y registro, el código vencido o sin
+  pendiente por la API, y la respuesta normal de `validar-correo`. También faltaba probar por la API la migración
+  del hash de NC-001 y la ruta real de NC-008 (solo había una ruta falsa). `tests/test_endpoints.py` (31 pruebas,
+  BD, DNS y correo simulados, tokens firmados con la clave de pruebas, correos `@ejemplo.test`, sin `.env`) cubre
+  esos huecos y agrega un **inventario vivo**: la lista de rutas de la API debe ser la anotada en la prueba, cada
+  ruta debe aparecer en el código (no en comentarios) de sus archivos de pruebas y toda ruta privada responde 401
+  sin token y sin tocar la BD. Si alguien agrega una ruta sin pruebas, la CI falla. Suite: 231 pruebas (207
+  correctas y 24 omitidas que requieren MariaDB). Contraprueba en una copia temporal fuera del repositorio: 28
+  roturas a propósito (quitar `@require_auth` de `/me`, `sub` entero, quitar los filtros `activo` y
+  `en_adopcion`, quitar o estropear la migración del hash, revelar si un correo existe, gastar el código antes de
+  revisar la BD, quitar el 409, aceptar dominios sin MX, agregar una ruta sin pruebas, etc.): las 28 detectadas y
+  cada una de las 31 pruebas falla con al menos una. Hallazgo nuevo: `GET /api/productos/<id>` no filtra
+  `activo = TRUE` (un producto descontinuado se ve por su URL); por decisión del dueño no se tocó `api.py` y quedó
+  como ítem 4.16.
+- **Integración continua (ítem 4.3, commit `8802815`):** `.github/workflows/ci.yml` corre en GitHub Actions
   (`ubuntu-latest`) en cada push y con el botón “Run workflow”, con un job por módulo: backend (Python 3.14,
   `pip install -r requirements.txt` y `unittest`), web (Node 24: `npm ci`, `npm run lint`, `npm test` y
   `npm run build`) y móvil (Node 24: `npm ci`, `npm test` y `npx expo export --platform web`). Solo lectura del

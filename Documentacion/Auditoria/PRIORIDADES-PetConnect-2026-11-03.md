@@ -81,7 +81,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.1 | A-17 | NC-004 | Exigir minúscula en API, web y móvil (validación en un módulo común) — *Hecho el 07/11/2026 en 3 partes: API (`240116e`, `security/politica.py`), web (`680797e`, `src/utils/contrasena.js`) y móvil (`43fcfe1`, copia de la utilidad; `RegisterScreen.js` ya valida antes de enviar). `PETCONNECT1!` se rechaza en los tres. Regresión: `test_politica.py` (17), `contrasena.test.js` (13) y `contrasena.test.mjs` (8); la contraprueba falla con el código viejo. NC-004 cerrada* | 🟢 |
 | [x] | 4.2 | A-19 | NC-011 | `AND activo = TRUE` en `buscar_por_nombre` de proveedores — *Hecho el 07/11/2026 en una parte (`06a422d`, solo backend): `_BUSCAR_POR_NOMBRE` filtra `activo = TRUE` como la búsqueda por ciudad y, con el sí del dueño, escapa `!`, `%` y `_` (`ESCAPE '!'`). Regresión: `tests/test_proveedores.py` (5, BD simulada); con el DAO viejo fallan 3 y pasan a propósito 2. NC-011 cerrada; CP-013 sigue en seguimiento por el filtro por tipo, que no existe* | 🟢 |
 | [x] | 4.3 | A-31 | — | GitHub Actions: `unittest` + `npm run lint` + `npm run build` en cada push — *Hecho el 07/11/2026 en una parte (`8802815`): `.github/workflows/ci.yml`, en cada push y con “Run workflow”, un job por módulo en `ubuntu-latest`: backend (Python 3.14, `unittest`), web (Node 24: `npm ci`, lint, `npm test`, build) y móvil (Node 24: `npm ci`, `npm test` y `expo export --platform web`, con el sí del dueño). `permissions: contents: read`, `persist-credentials: false`, acciones `@v7`, sin secretos. Validado en local en una copia limpia del commit (sin `.env` ni `node_modules`): backend 200 (176 + 24 omitidas), web 0 errores de lint + 42/42 + build, móvil 35/35 + export; YAML revisado y sin diferencias de mayúsculas en los imports. **La primera ejecución en GitHub queda pendiente del push** (al terminar todo). No cierra NC* | 🟡 |
-| [ ] | 4.4 | A-31 | todas | Pruebas de endpoints con el cliente de Flask (mascotas, productos, auth, errores) | 🟡 |
+| [x] | 4.4 | A-31 | todas | Pruebas de endpoints con el cliente de Flask (mascotas, productos, auth, errores) — *Hecho el 07/11/2026 en una parte (`37f8126`, solo pruebas; `api.py` sin tocar). Primero un inventario ruta × caso y NC × prueba: de 14 rutas, 6 tenían huecos (`/api/auth/me` sin ninguna prueba) y NC-001, NC-008 y NC-009 no tenían regresión por la API. `tests/test_endpoints.py` (31, BD/DNS/correo simulados, sin `.env`): inventario vivo de rutas (ruta nueva sin pruebas → falla; privadas → 401 sin token), productos, filtro de adopción, `/me` con token real, migración del hash, login, verificación del código, registro y `validar-correo`. Suite 231 (207 + 24 omitidas). Contraprueba en una copia temporal: 28 roturas, todas detectadas; cada prueba falla con al menos una. A-31 resuelto (falta ver la CI en GitHub con el push). Hallazgo → 4.16* | 🟡 |
 | [ ] | 4.5 | A-11 | NC-003 | Pool de conexiones + `try/finally` para cerrar cursores | 🟡 |
 | [ ] | 4.6 | A-12 | NC-003 | OTP en tabla de la BD (hash del código, intentos, expiración) o 1 worker con hilos; limpiar vencidos y acotar `_mx_cache` | 🟡 |
 | [ ] | 4.7 | A-24 | — | Web: validar sesión con `/auth/me` al iniciar y cerrar sesión ante 401 | 🟢 |
@@ -93,6 +93,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5.** No reemplaza 2.2 | 🟡 |
 | [ ] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` | 🟢 |
 | [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Hacerlo junto con 4.5 (pool y `try/finally`). Surgió en el 2.9 | 🟡 |
+| [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
 
 ---
 
@@ -145,8 +146,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 07/11/2026, actualizada al terminar el 4.3 (A-31, primera parte: integración continua con GitHub
-Actions, una parte). El próximo ítem es el 4.4 (A-31, segunda parte: pruebas de endpoints con el cliente de Flask).
+*Versión del 07/11/2026, actualizada al terminar el 4.4 (A-31, segunda parte: pruebas de endpoints con el cliente
+de Flask, una parte). El próximo ítem es el 4.5 (A-11, NC-003: pool de conexiones + `try/finally`).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -172,6 +173,27 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.4 HECHO el 07/11/2026 (A-31 segunda parte; A-31 RESUELTO; commit
+  37f8126, solo tests/test_endpoints.py; api.py sin tocar). Inventario
+  ruta x caso y NC x prueba antes de escribir: huecos en /api/auth/me (sin
+  ninguna prueba), productos (200 y 404), filtro de la lista de adopción
+  sin MariaDB, login (vacíos, correo inexistente = contraseña mala,
+  migración del hash NC-001), login/verify y verify (sin pendiente,
+  vencido, 404, 503 sin gastar el código, 500 al crear), register (vacíos,
+  409, 503) y validar-correo. 31 pruebas con BD, DNS y correo simulados
+  (_BaseEndpoints: parchea _conexion_bd.obtener_conexion, api.UsuarioDAO,
+  enviar_codigo y enviar_bienvenida). Inventario vivo: RUTAS_PUBLICAS y
+  RUTAS_PRIVADAS deben ser iguales a app.url_map (/api/...), cada ruta debe
+  aparecer en el código (ast, sin docstrings ni comentarios) de los
+  archivos de pruebas anotados, y las privadas responden 401 sin token. OJO:
+  TODA RUTA NUEVA debe anotarse ahí con sus pruebas o la CI falla.
+  Suite 231 (207 + 24 omitidas). Contraprueba: script en el scratchpad que
+  copia el backend con git archive y aplica 28 roturas de a una (todas
+  detectadas). NC-001, NC-008 y NC-009 con nota de regresión en la GA9
+  (siguen cerradas). Hallazgo: /api/productos/<id> no filtra activo →
+  ítem 4.16 (decisión del dueño: no tocar api.py en el 4.4). Para correr
+  un solo archivo: python -m unittest discover -s tests -p "test_x.py"
+  (con "python -m unittest tests.test_x" no encuentra test_errores).
 - 4.3 HECHO el 07/11/2026 (A-31, primera parte; commit 8802815; no cierra
   NC). .github/workflows/ci.yml: on push (cualquier rama) + workflow_dispatch;
   permissions: contents: read; 3 jobs en ubuntu-latest con timeout-minutes: 10
@@ -849,39 +871,37 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.4, A-31 segunda parte: pruebas de endpoints):
-- La fila dice "Pruebas de endpoints con el cliente de Flask (mascotas,
-  productos, auth, errores)" y la columna NC "todas": la idea de A-31 es que
-  cada NC tenga su prueba de regresión que pase por la API (p. ej.
-  /api/mascotas/<id> sin token -> 404; 6.º intento OTP -> bloqueado; ruta
-  inexistente -> 404).
-- MUCHO YA EXISTE: 13 archivos de tests/ usan app.test_client() (modelos:
-  test_errores.py con _importar_api() y BD simulada, test_mascotas.py para
-  @require_auth, test_logs.py para BD "encendida", test_limite.py para el
-  limitador). Revisión rápida por texto (07/11/2026): aparecen en las
-  pruebas /api/productos/, validar-correo, register/resend, login/verify,
-  auth/verify, solicitudes/adopcion y /contacto, /api/no-existe y
-  /api/mascotas/<id>; NO aparece /api/auth/me (puede estar armada en una
-  constante: verificarlo). Rutas de api.py: GET /api/productos,
-  /api/productos/<id>, /api/mascotas/adopcion, /api/mascotas/<id>,
-  /api/usuarios/me/mascotas/<id>, /api/auth/me; POST /api/utils/validar-
-  correo, /api/auth/login, /login/verify, /register, /register/resend,
-  /verify, /api/solicitudes/adopcion y /contacto.
-- PASO 1 propuesto: un INVENTARIO ruta x caso (éxito, 400, 401, 403, 404,
-  503 sin BD) y NC x prueba que la cubre (bitácora GA9), para escribir solo
-  los huecos y no duplicar. Mostrarlo al dueño antes de escribir pruebas.
-- Reglas: BD simulada (sin MariaDB ni el .env real; ver A-41 y 4.14), tokens
-  con api.generate_token dentro de la prueba, correos inventados, sin enviar
-  correos (mock de api.enviar_codigo y api._validar_correo).
-- Contraprueba: como las pruebas cubren código que ya funciona, para cada
-  prueba nueva demostrar que FALLA si se rompe a propósito la regla que
-  protege (p. ej. quitar @require_auth en una copia temporal) y dejar el
-  código como estaba.
-- La CI del 4.3 ya corre estas pruebas en cada push: no hay que tocar
-  ci.yml (salvo que el dueño quiera algo nuevo).
-- En la AUDITORÍA (A-31) anota el avance de las pruebas de endpoints y, si
-  queda todo cubierto, marca A-31 como resuelto. En la GA9, las NC cuya
-  regresión cambie.
+Contexto del próximo paso (4.5, A-11, NC-003: pool de conexiones):
+- La fila dice "Pool de conexiones + try/finally para cerrar cursores".
+  A-11: conexion/conexion_bd.py es un Singleton con UNA conexión que
+  comparten todos los hilos de Flask (con 500 usuarios falló el 56 %:
+  'MySQL Connection not available', 'bytearray index out of range').
+  Arreglo propuesto: mysql.connector.pooling.MySQLConnectionPool, una
+  conexión por petición devuelta al pool (try/finally) y cursores que
+  siempre se cierran.
+- QUIÉN LA USA (revisado el 07/11/2026): api.py (_conexion_bd =
+  ConexionBD(); _get_conn() la pide y lanza BDNoDisponible → 503), los 5
+  DAO (usuario, mascota, producto, proveedor, solicitud: cada método llama
+  self._conexion_bd.obtener_conexion()), main.py (consola) y seed.py.
+  ConexionBD también tiene commit() y rollback() de la conexión única.
+- OJO CON LAS PRUEBAS: 13 archivos de tests/ parchean
+  _conexion_bd.obtener_conexion (BD "apagada" = None, "encendida" =
+  MagicMock). Si cambia la forma de pedir o devolver la conexión, hay que
+  conservar ese punto de parche o adaptar las pruebas sin perder lo que
+  prueban; el inventario de tests/test_endpoints.py y la suite (231, 207 +
+  24 omitidas) deben seguir pasando. Las 24 omitidas usan MariaDB real con
+  PETCONNECT_PRUEBA_BD=1: para el pool conviene que el dueño las corra
+  (bases temporales).
+- Decisiones para el dueño antes de tocar código: tamaño del pool (p. ej.
+  5, por variable en .env.example), si la consola y seed.py también pasan
+  al pool o siguen con una conexión, y si 4.15 (SQL de productos/mascotas
+  a dao/ + DAO que propaguen errores) va junto (la fila de 4.15 lo sugiere)
+  o aparte. Es un cambio de varios archivos y de la BD: PLAN PRIMERO
+  (CLAUDE.md, regla 2) y quizá por partes.
+- La medición de carga (CP-008/CP-017) es el 4.12, después de 4.5 y 4.6.
+- obtener_conexion() hoy imprime str(e) del error de conexión: revisar que
+  no muestre datos de la configuración (host, usuario) y pasarlo al logger
+  sin el mensaje, como _registrar_error.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -920,6 +940,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.4** (A-31, segunda parte): pruebas de endpoints con el cliente de Flask, empezando por un
-inventario de lo que ya cubren las pruebas para escribir solo los huecos. El 4.3 quedó hecho el 07/11/2026 (CI con
-GitHub Actions, una parte, `8802815`; la primera ejecución en GitHub queda pendiente del push).
+**Próximo ítem: 4.5** (A-11, NC-003): pool de conexiones + `try/finally` para cerrar cursores; plan primero
+(varios archivos y la BD). El 4.4 quedó hecho el 07/11/2026 (pruebas de endpoints, `37f8126`; A-31 resuelto) y
+dejó el ítem nuevo 4.16 (detalle de producto sin filtro `activo`).
