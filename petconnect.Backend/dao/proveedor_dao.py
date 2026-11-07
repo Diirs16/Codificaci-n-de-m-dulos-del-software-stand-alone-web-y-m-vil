@@ -1,10 +1,13 @@
 """
 DAO (Data Access Object) para la entidad ProveedorServicio.
 Implementa operaciones CRUD sobre la tabla 'proveedores_servicio'.
+Item 4.5 (A-11, NC-003): cada metodo pide una conexion del pool con
+conexion_y_cursor y, al salir del with, cierra el cursor y la devuelve.
+Si la BD falla, imprime y devuelve None, [] o False (item 4.15: propagar).
 """
 
 from mysql.connector import Error
-from conexion.conexion_bd import ConexionBD
+from conexion.conexion_bd import ConexionBD, conexion_y_cursor
 from modelo.proveedor_servicio import ProveedorServicio
 
 
@@ -86,40 +89,35 @@ class ProveedorDAO:
 
     def insertar(self, proveedor):
         """Registra un nuevo proveedor de servicios."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            valores = (
-                proveedor.nombre, proveedor.tipo_documento,
-                proveedor.numero_documento, proveedor.telefono,
-                proveedor.correo, proveedor.direccion, proveedor.ciudad,
-                proveedor.descripcion, proveedor.horario,
-                proveedor.atiende_24_7, proveedor.latitud,
-                proveedor.longitud, proveedor.activo
-            )
-            cursor.execute(self._INSERTAR, valores)
-            self._conexion_bd.commit()
-            proveedor.id_proveedor = cursor.lastrowid
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                valores = (
+                    proveedor.nombre, proveedor.tipo_documento,
+                    proveedor.numero_documento, proveedor.telefono,
+                    proveedor.correo, proveedor.direccion, proveedor.ciudad,
+                    proveedor.descripcion, proveedor.horario,
+                    proveedor.atiende_24_7, proveedor.latitud,
+                    proveedor.longitud, proveedor.activo
+                )
+                try:
+                    cursor.execute(self._INSERTAR, valores)
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                proveedor.id_proveedor = cursor.lastrowid
             return True
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al insertar proveedor: {e}")
             return False
 
     def consultar_todos(self):
         """Retorna la lista de todos los proveedores."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_TODOS)
-            filas = cursor.fetchall()
-            proveedores = [self._mapear_proveedor(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_TODOS)
+                filas = cursor.fetchall()
+                proveedores = [self._mapear_proveedor(fila) for fila in filas]
             return proveedores
         except Error as e:
             print(f"[ERROR] Al consultar proveedores: {e}")
@@ -127,14 +125,10 @@ class ProveedorDAO:
 
     def consultar_por_id(self, id_proveedor):
         """Busca un proveedor por su ID."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return None
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_POR_ID, (id_proveedor,))
-            fila = cursor.fetchone()
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_POR_ID, (id_proveedor,))
+                fila = cursor.fetchone()
             return self._mapear_proveedor(fila) if fila else None
         except Error as e:
             print(f"[ERROR] Al consultar proveedor por ID: {e}")
@@ -142,43 +136,41 @@ class ProveedorDAO:
 
     def actualizar(self, proveedor):
         """Actualiza la información de un proveedor existente."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            valores = (
-                proveedor.nombre, proveedor.tipo_documento,
-                proveedor.numero_documento, proveedor.telefono,
-                proveedor.correo, proveedor.direccion, proveedor.ciudad,
-                proveedor.descripcion, proveedor.horario,
-                proveedor.atiende_24_7, proveedor.latitud,
-                proveedor.longitud, proveedor.activo, proveedor.id_proveedor
-            )
-            cursor.execute(self._ACTUALIZAR, valores)
-            self._conexion_bd.commit()
-            filas_afectadas = cursor.rowcount
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                valores = (
+                    proveedor.nombre, proveedor.tipo_documento,
+                    proveedor.numero_documento, proveedor.telefono,
+                    proveedor.correo, proveedor.direccion, proveedor.ciudad,
+                    proveedor.descripcion, proveedor.horario,
+                    proveedor.atiende_24_7, proveedor.latitud,
+                    proveedor.longitud, proveedor.activo, proveedor.id_proveedor
+                )
+                try:
+                    cursor.execute(self._ACTUALIZAR, valores)
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                filas_afectadas = cursor.rowcount
             return filas_afectadas > 0
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al actualizar proveedor: {e}")
             return False
 
     def eliminar(self, id_proveedor):
         """Elimina un proveedor por su ID."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._ELIMINAR, (id_proveedor,))
-            self._conexion_bd.commit()
-            filas_afectadas = cursor.rowcount
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                try:
+                    cursor.execute(self._ELIMINAR, (id_proveedor,))
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                filas_afectadas = cursor.rowcount
             return filas_afectadas > 0
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al eliminar proveedor: {e}")
             return False
 
@@ -194,16 +186,12 @@ class ProveedorDAO:
 
     def buscar_por_nombre(self, termino):
         """Busca proveedores activos cuyo nombre contenga el término (NC-011)."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._BUSCAR_POR_NOMBRE,
-                           (f"%{self._escapar_like(termino)}%",))
-            filas = cursor.fetchall()
-            proveedores = [self._mapear_proveedor(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._BUSCAR_POR_NOMBRE,
+                               (f"%{self._escapar_like(termino)}%",))
+                filas = cursor.fetchall()
+                proveedores = [self._mapear_proveedor(fila) for fila in filas]
             return proveedores
         except Error as e:
             print(f"[ERROR] Al buscar proveedores: {e}")
@@ -211,15 +199,11 @@ class ProveedorDAO:
 
     def consultar_por_ciudad(self, ciudad):
         """Retorna los proveedores activos de una ciudad."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_POR_CIUDAD, (ciudad,))
-            filas = cursor.fetchall()
-            proveedores = [self._mapear_proveedor(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_POR_CIUDAD, (ciudad,))
+                filas = cursor.fetchall()
+                proveedores = [self._mapear_proveedor(fila) for fila in filas]
             return proveedores
         except Error as e:
             print(f"[ERROR] Al consultar proveedores por ciudad: {e}")

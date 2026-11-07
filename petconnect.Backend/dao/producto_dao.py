@@ -1,10 +1,13 @@
 """
 DAO (Data Access Object) para la entidad Producto.
 Implementa operaciones CRUD sobre la tabla 'productos'.
+Item 4.5 (A-11, NC-003): cada metodo pide una conexion del pool con
+conexion_y_cursor y, al salir del with, cierra el cursor y la devuelve.
+Si la BD falla, imprime y devuelve None, [] o False (item 4.15: propagar).
 """
 
 from mysql.connector import Error
-from conexion.conexion_bd import ConexionBD
+from conexion.conexion_bd import ConexionBD, conexion_y_cursor
 from modelo.producto import Producto
 
 
@@ -70,37 +73,32 @@ class ProductoDAO:
 
     def insertar(self, producto):
         """Registra un nuevo producto en la base de datos."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            valores = (
-                producto.id_categoria_producto, producto.nombre,
-                producto.descripcion, producto.precio, producto.stock,
-                producto.imagen_url, producto.activo
-            )
-            cursor.execute(self._INSERTAR, valores)
-            self._conexion_bd.commit()
-            producto.id_producto = cursor.lastrowid
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                valores = (
+                    producto.id_categoria_producto, producto.nombre,
+                    producto.descripcion, producto.precio, producto.stock,
+                    producto.imagen_url, producto.activo
+                )
+                try:
+                    cursor.execute(self._INSERTAR, valores)
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                producto.id_producto = cursor.lastrowid
             return True
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al insertar producto: {e}")
             return False
 
     def consultar_todos(self):
         """Retorna la lista de todos los productos."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_TODOS)
-            filas = cursor.fetchall()
-            productos = [self._mapear_producto(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_TODOS)
+                filas = cursor.fetchall()
+                productos = [self._mapear_producto(fila) for fila in filas]
             return productos
         except Error as e:
             print(f"[ERROR] Al consultar productos: {e}")
@@ -108,14 +106,10 @@ class ProductoDAO:
 
     def consultar_por_id(self, id_producto):
         """Busca un producto por su ID."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return None
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_POR_ID, (id_producto,))
-            fila = cursor.fetchone()
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_POR_ID, (id_producto,))
+                fila = cursor.fetchone()
             return self._mapear_producto(fila) if fila else None
         except Error as e:
             print(f"[ERROR] Al consultar producto por ID: {e}")
@@ -123,15 +117,11 @@ class ProductoDAO:
 
     def consultar_por_categoria(self, id_categoria):
         """Retorna los productos de una categoría específica."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_POR_CATEGORIA, (id_categoria,))
-            filas = cursor.fetchall()
-            productos = [self._mapear_producto(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_POR_CATEGORIA, (id_categoria,))
+                filas = cursor.fetchall()
+                productos = [self._mapear_producto(fila) for fila in filas]
             return productos
         except Error as e:
             print(f"[ERROR] Al consultar productos por categoría: {e}")
@@ -139,54 +129,48 @@ class ProductoDAO:
 
     def actualizar(self, producto):
         """Actualiza la información de un producto existente."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            valores = (
-                producto.id_categoria_producto, producto.nombre,
-                producto.descripcion, producto.precio, producto.stock,
-                producto.imagen_url, producto.activo, producto.id_producto
-            )
-            cursor.execute(self._ACTUALIZAR, valores)
-            self._conexion_bd.commit()
-            filas_afectadas = cursor.rowcount
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                valores = (
+                    producto.id_categoria_producto, producto.nombre,
+                    producto.descripcion, producto.precio, producto.stock,
+                    producto.imagen_url, producto.activo, producto.id_producto
+                )
+                try:
+                    cursor.execute(self._ACTUALIZAR, valores)
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                filas_afectadas = cursor.rowcount
             return filas_afectadas > 0
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al actualizar producto: {e}")
             return False
 
     def eliminar(self, id_producto):
         """Elimina un producto por su ID."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._ELIMINAR, (id_producto,))
-            self._conexion_bd.commit()
-            filas_afectadas = cursor.rowcount
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                try:
+                    cursor.execute(self._ELIMINAR, (id_producto,))
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                filas_afectadas = cursor.rowcount
             return filas_afectadas > 0
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al eliminar producto: {e}")
             return False
 
     def buscar_por_nombre(self, termino):
         """Busca productos cuyo nombre contenga el término."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._BUSCAR_POR_NOMBRE, (f"%{termino}%",))
-            filas = cursor.fetchall()
-            productos = [self._mapear_producto(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._BUSCAR_POR_NOMBRE, (f"%{termino}%",))
+                filas = cursor.fetchall()
+                productos = [self._mapear_producto(fila) for fila in filas]
             return productos
         except Error as e:
             print(f"[ERROR] Al buscar productos: {e}")

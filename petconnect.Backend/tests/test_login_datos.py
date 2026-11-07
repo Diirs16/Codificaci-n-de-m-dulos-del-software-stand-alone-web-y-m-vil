@@ -278,7 +278,10 @@ class PruebasDAOAutorizacion(unittest.TestCase):
         self.assertIn("WHERE id_usuario = %s", sql)
         self.assertEqual(sql.count("%s"), len(valores))      # todo parametrizado
         self.assertEqual(valores, (fecha, VERSION, ID_USUARIO))
-        dao._conexion_bd.commit.assert_called_once()
+        # Item 4.5: se confirma y se devuelve la conexion prestada por el pool
+        conexion = dao._conexion_bd.obtener_conexion.return_value
+        conexion.commit.assert_called_once()
+        conexion.close.assert_called_once()
 
 
 if __name__ == "__main__":

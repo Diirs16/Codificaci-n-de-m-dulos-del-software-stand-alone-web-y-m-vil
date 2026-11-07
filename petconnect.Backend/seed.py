@@ -115,8 +115,22 @@ def seed():
     if conn is None:
         print("[ERROR] No se pudo conectar a la base de datos.")
         sys.exit(1)
+    # Item 4.5 (A-11): la conexion es prestada por el pool; los finally cierran el
+    # cursor y la devuelven aunque alguna insercion falle.
+    try:
+        cursor = conn.cursor()
+        try:
+            _cargar_datos(cursor)
+            conn.commit()
+        finally:
+            cursor.close()
+    finally:
+        conn.close()
+    print("\n✓ Seed completado exitosamente.")
 
-    cursor = conn.cursor()
+
+def _cargar_datos(cursor):
+    """Inserta categorias, productos, la cuenta del refugio y las mascotas de ejemplo."""
 
     # --- Categorías de producto (la tabla la crea sql/schema.sql) ---
     print("\n→ Insertando categorías...")
@@ -162,10 +176,6 @@ def seed():
         """, (id_refugio, nombre, especie, raza, sexo, edad_aprox, color, foto, observaciones, nombre))
         insertadas += cursor.rowcount
     print(f"  [OK] {insertadas} mascotas insertadas (los duplicados se omitieron).")
-
-    conn.commit()
-    cursor.close()
-    print("\n✓ Seed completado exitosamente.")
 
 
 if __name__ == "__main__":

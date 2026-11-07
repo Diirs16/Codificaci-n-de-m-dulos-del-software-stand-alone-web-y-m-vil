@@ -26,7 +26,7 @@ from flask_limiter.util import get_remote_address
 from mysql.connector.errors import InterfaceError, OperationalError
 from werkzeug.exceptions import BadRequest, HTTPException
 
-from conexion.conexion_bd import ConexionBD
+from conexion.conexion_bd import ConexionBD, conexion_y_cursor
 from dao.usuario_dao import UsuarioDAO
 from dao.solicitud_dao import SolicitudDAO
 from modelo.usuario import Usuario
@@ -189,12 +189,17 @@ def _avisar_fallo_envio(e, codigo=None) -> bool:
 _MENSAJE_FALLO_CORREO = "No pudimos enviar el código a tu correo. Intenta de nuevo en unos minutos"
 
 
-def _get_conn():
-    """Conexion a la BD; si no responde lanza BDNoDisponible (la API contesta 503)."""
-    conn = _conexion_bd.obtener_conexion()
-    if conn is None:
+def _verificar_bd():
+    """
+    Comprueba que la BD responde; si no, lanza BDNoDisponible (la API contesta 503).
+    Va antes de los DAO viejos, que sin BD devuelven None y pareceria "no encontrado".
+    Item 4.5 (A-11, NC-003): la conexion se pide al pool y se devuelve enseguida.
+    Antes se pedia y nunca se devolvia: con el pool, eso lo habria agotado.
+    """
+    conexion = _conexion_bd.obtener_conexion()
+    if conexion is None:
         raise BDNoDisponible()
-    return conn
+    conexion.close()
 
 
 def _cuerpo_json() -> dict:
@@ -342,19 +347,17 @@ _SQL_PRODUCTO_BY_ID = """
 
 @app.route("/api/productos", methods=["GET"])
 def get_productos():
-    cursor = _get_conn().cursor(dictionary=True)
-    cursor.execute(_SQL_PRODUCTOS)
-    rows = cursor.fetchall()
-    cursor.close()
+    with conexion_y_cursor(_conexion_bd, dictionary=True) as (_, cursor):
+        cursor.execute(_SQL_PRODUCTOS)
+        rows = cursor.fetchall()
     return jsonify([_row_to_dict(r) for r in rows])
 
 
 @app.route("/api/productos/<int:id_producto>", methods=["GET"])
 def get_producto(id_producto):
-    cursor = _get_conn().cursor(dictionary=True)
-    cursor.execute(_SQL_PRODUCTO_BY_ID, (id_producto,))
-    row = cursor.fetchone()
-    cursor.close()
+    with conexion_y_cursor(_conexion_bd, dictionary=True) as (_, cursor):
+        cursor.execute(_SQL_PRODUCTO_BY_ID, (id_producto,))
+        row = cursor.fetchone()
     if row is None:
         return jsonify({"error": "Producto no encontrado"}), 404
     return jsonify(_row_to_dict(row))
@@ -404,19 +407,17 @@ def _mascota_to_dict(row):
 
 @app.route("/api/mascotas/adopcion", methods=["GET"])
 def get_mascotas_adopcion():
-    cursor = _get_conn().cursor(dictionary=True)
-    cursor.execute(_SQL_MASCOTAS_ADOPCION)
-    rows = cursor.fetchall()
-    cursor.close()
+    with conexion_y_cursor(_conexion_bd, dictionary=True) as (_, cursor):
+        cursor.execute(_SQL_MASCOTAS_ADOPCION)
+        rows = cursor.fetchall()
     return jsonify([_mascota_to_dict(r) for r in rows])
 
 
 def _consultar_mascota(sql, params):
     """Devuelve la fila de la mascota (o None) con la consulta parametrizada dada."""
-    cursor = _get_conn().cursor(dictionary=True)
-    cursor.execute(sql, params)
-    row = cursor.fetchone()
-    cursor.close()
+    with conexion_y_cursor(_conexion_bd, dictionary=True) as (_, cursor):
+        cursor.execute(sql, params)
+        row = cursor.fetchone()
     return row
 
 
@@ -496,7 +497,7 @@ def login():
         return jsonify({"error": "Correo y contrasena son requeridos"}), 400
 
     # Sin BD el DAO devuelve None y pareceria "credenciales incorrectas": mejor 503
-    _get_conn()
+    _verificar_bd()
     dao = UsuarioDAO()
     usuario = dao.consultar_por_correo(email)
 
@@ -562,7 +563,7 @@ def login_verify():
     if error == "incorrecto":
         return jsonify({"error": "Codigo incorrecto"}), 400
 
-    _get_conn()   # 503 antes de gastar el codigo si la BD no responde
+    _verificar_bd()   # 503 antes de gastar el codigo si la BD no responde
     _otp_login.descartar(email)
 
     dao = UsuarioDAO()
@@ -621,7 +622,7 @@ def register():
     if error_pw:
         return jsonify({"error": error_pw}), 400
 
-    _get_conn()
+    _verificar_bd()
     dao = UsuarioDAO()
     if dao.consultar_por_correo(email) is not None:
         return jsonify({"error": "El correo ya esta registrado"}), 409
@@ -737,7 +738,7 @@ def verify():
         version_politica_datos=version_politica,
     )
 
-    _get_conn()
+    _verificar_bd()
     dao = UsuarioDAO()
     if not dao.insertar(usuario):
         return jsonify({"error": "Error al crear el usuario"}), 500
@@ -804,7 +805,7 @@ def _cuenta_que_envia():
     cuenta se bloqueara o de que subiera la version de la politica (vale 24 h).
     Devuelve (usuario, None) o (None, respuesta de error).
     """
-    _get_conn()
+    _verificar_bd()
     usuario = UsuarioDAO().consultar_por_id(request.current_user_id)
     if usuario is None:
         return None, (jsonify({"error": "Usuario no encontrado"}), 404)
@@ -876,7 +877,7 @@ def enviar_mensaje_contacto():
 @require_auth
 def me():
     """Endpoint protegido - valida que el token JWT es valido."""
-    _get_conn()
+    _verificar_bd()
     dao = UsuarioDAO()
     usuario = dao.consultar_por_id(request.current_user_id)
     if not usuario:
@@ -894,7 +895,7 @@ def me():
 
 if __name__ == "__main__":
     try:
-        _get_conn()
+        _verificar_bd()
     except BDNoDisponible:
         print("[ERROR] No se pudo conectar a la base de datos.")
         sys.exit(1)

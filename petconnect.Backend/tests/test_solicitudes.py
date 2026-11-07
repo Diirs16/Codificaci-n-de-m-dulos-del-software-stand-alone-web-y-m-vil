@@ -309,16 +309,19 @@ class PruebasSolicitudDAO(unittest.TestCase):
         self.assertNotIn(MENSAJE, sql)
         self.assertEqual(params, (ID_USUARIO, "adopcion", ID_MASCOTA, TELEFONO, MENSAJE,
                                   VERSION, fecha))
-        self.conexion_bd.commit.assert_called_once()
+        # Item 4.5: commit sobre la conexion prestada, que despues se devuelve al pool
+        self.conexion.commit.assert_called_once()
         self.cursor.close.assert_called_once()
+        self.conexion.close.assert_called_once()
 
     def test_insertar_deshace_y_deja_subir_el_error(self):
         self.cursor.execute.side_effect = errores_bd.IntegrityError("falla de prueba")
         with self.assertRaises(errores_bd.IntegrityError):
             self.dao.insertar(ID_USUARIO, "contacto", None, None, MENSAJE, VERSION, datetime.now())
-        self.conexion_bd.rollback.assert_called_once()
-        self.conexion_bd.commit.assert_not_called()
+        self.conexion.rollback.assert_called_once()
+        self.conexion.commit.assert_not_called()
         self.cursor.close.assert_called_once()
+        self.conexion.close.assert_called_once()      # devuelta aunque haya error
 
     def test_dueno_solo_de_mascotas_en_adopcion(self):
         self.cursor.fetchone.return_value = (ID_DUENO,)

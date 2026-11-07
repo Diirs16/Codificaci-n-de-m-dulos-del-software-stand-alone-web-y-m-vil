@@ -57,25 +57,33 @@ ID_USUARIO = 7
 # con sus pruebas. Asi el inventario del 4.4 no se queda viejo.
 
 RUTAS_PUBLICAS = {
-    ("GET", "/api/productos"): ("test_endpoints.py", "test_errores.py", "test_limite.py"),
-    ("GET", "/api/productos/<int:id_producto>"): ("test_endpoints.py", "test_errores.py"),
-    ("GET", "/api/mascotas/adopcion"): ("test_endpoints.py", "test_ficha_mascota.py", "test_errores.py"),
-    ("GET", "/api/mascotas/<int:id_mascota>"): ("test_mascotas.py", "test_ficha_mascota.py"),
-    ("POST", "/api/utils/validar-correo"): ("test_endpoints.py", "test_errores.py", "test_limite.py"),
-    ("POST", "/api/auth/login"): ("test_endpoints.py", "test_login_datos.py", "test_logs.py"),
-    ("POST", "/api/auth/login/verify"): ("test_endpoints.py", "test_login_datos.py", "test_otp.py"),
+    ("GET", "/api/productos"): ("test_endpoints.py", "test_errores.py", "test_limite.py",
+                                "test_pool.py"),
+    ("GET", "/api/productos/<int:id_producto>"): ("test_endpoints.py", "test_errores.py",
+                                                  "test_pool.py"),
+    ("GET", "/api/mascotas/adopcion"): ("test_endpoints.py", "test_ficha_mascota.py", "test_errores.py",
+                                        "test_pool.py"),
+    ("GET", "/api/mascotas/<int:id_mascota>"): ("test_mascotas.py", "test_ficha_mascota.py",
+                                                "test_pool.py"),
+    ("POST", "/api/utils/validar-correo"): ("test_endpoints.py", "test_errores.py", "test_limite.py",
+                                            "test_pool.py"),
+    ("POST", "/api/auth/login"): ("test_endpoints.py", "test_login_datos.py", "test_logs.py",
+                                  "test_pool.py"),
+    ("POST", "/api/auth/login/verify"): ("test_endpoints.py", "test_login_datos.py", "test_otp.py",
+                                         "test_pool.py"),
     ("POST", "/api/auth/register"): ("test_endpoints.py", "test_registro.py", "test_registro_datos.py",
-                                     "test_politica.py"),
-    ("POST", "/api/auth/register/resend"): ("test_registro.py",),
+                                     "test_politica.py", "test_pool.py"),
+    ("POST", "/api/auth/register/resend"): ("test_registro.py", "test_pool.py"),
     ("POST", "/api/auth/verify"): ("test_endpoints.py", "test_registro_datos.py", "test_otp.py",
-                                   "test_logs.py"),
+                                   "test_logs.py", "test_pool.py"),
 }
 
 RUTAS_PRIVADAS = {   # llevan @require_auth: sin token, 401
-    ("GET", "/api/usuarios/me/mascotas/<int:id_mascota>"): ("test_mascotas.py", "test_ficha_mascota.py"),
-    ("GET", "/api/auth/me"): ("test_endpoints.py",),
-    ("POST", "/api/solicitudes/adopcion"): ("test_solicitudes.py", "test_limite.py"),
-    ("POST", "/api/solicitudes/contacto"): ("test_solicitudes.py", "test_limite.py"),
+    ("GET", "/api/usuarios/me/mascotas/<int:id_mascota>"): ("test_mascotas.py", "test_ficha_mascota.py",
+                                                            "test_pool.py"),
+    ("GET", "/api/auth/me"): ("test_endpoints.py", "test_pool.py"),
+    ("POST", "/api/solicitudes/adopcion"): ("test_solicitudes.py", "test_limite.py", "test_pool.py"),
+    ("POST", "/api/solicitudes/contacto"): ("test_solicitudes.py", "test_limite.py", "test_pool.py"),
 }
 
 

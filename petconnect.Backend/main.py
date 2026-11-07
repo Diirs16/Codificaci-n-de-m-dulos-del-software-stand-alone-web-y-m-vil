@@ -37,8 +37,11 @@ def main():
     if conexion is None:
         print("  [ERROR] No se pudo establecer conexion con la base de datos.")
         print("  Verifique que MySQL este ejecutandose y los datos")
-        print("  de conexion en config/db_config.py sean correctos.")
+        print("  de conexion del archivo .env sean correctos.")
         sys.exit(1)
+    # Item 4.5: era solo una prueba; la conexion vuelve al pool. Los DAO piden
+    # la suya en cada operacion y la devuelven al terminar.
+    conexion.close()
 
     print("  [OK] Conexion establecida exitosamente.\n")
 
@@ -48,8 +51,8 @@ def main():
     except KeyboardInterrupt:
         print("\n\n  Aplicacion interrumpida por el usuario.")
     finally:
-        conexion_bd.cerrar_conexion()
-        print("  [OK] Conexion a la base de datos cerrada.")
+        conexion_bd.cerrar_conexion()     # cierra las conexiones del pool
+        print("  [OK] Conexiones a la base de datos cerradas.")
 
 
 if __name__ == "__main__":

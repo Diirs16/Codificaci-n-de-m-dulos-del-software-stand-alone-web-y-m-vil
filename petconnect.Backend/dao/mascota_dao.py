@@ -1,10 +1,13 @@
 """
 DAO (Data Access Object) para la entidad Mascota.
 Implementa operaciones CRUD sobre la tabla 'mascotas'.
+Item 4.5 (A-11, NC-003): cada metodo pide una conexion del pool con
+conexion_y_cursor y, al salir del with, cierra el cursor y la devuelve.
+Si la BD falla, imprime y devuelve None, [] o False (item 4.15: propagar).
 """
 
 from mysql.connector import Error
-from conexion.conexion_bd import ConexionBD
+from conexion.conexion_bd import ConexionBD, conexion_y_cursor
 from modelo.mascota import Mascota
 
 
@@ -82,38 +85,33 @@ class MascotaDAO:
 
     def insertar(self, mascota):
         """Registra una nueva mascota en la base de datos."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            valores = (
-                mascota.id_usuario, mascota.nombre, mascota.especie,
-                mascota.raza, mascota.sexo, mascota.fecha_nacimiento,
-                mascota.edad_aprox, mascota.color, mascota.peso,
-                mascota.foto, mascota.observaciones, mascota.estado
-            )
-            cursor.execute(self._INSERTAR, valores)
-            self._conexion_bd.commit()
-            mascota.id_mascota = cursor.lastrowid
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                valores = (
+                    mascota.id_usuario, mascota.nombre, mascota.especie,
+                    mascota.raza, mascota.sexo, mascota.fecha_nacimiento,
+                    mascota.edad_aprox, mascota.color, mascota.peso,
+                    mascota.foto, mascota.observaciones, mascota.estado
+                )
+                try:
+                    cursor.execute(self._INSERTAR, valores)
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                mascota.id_mascota = cursor.lastrowid
             return True
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al insertar mascota: {e}")
             return False
 
     def consultar_todos(self):
         """Retorna la lista de todas las mascotas registradas."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_TODOS)
-            filas = cursor.fetchall()
-            mascotas = [self._mapear_mascota(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_TODOS)
+                filas = cursor.fetchall()
+                mascotas = [self._mapear_mascota(fila) for fila in filas]
             return mascotas
         except Error as e:
             print(f"[ERROR] Al consultar mascotas: {e}")
@@ -121,14 +119,10 @@ class MascotaDAO:
 
     def consultar_por_id(self, id_mascota):
         """Busca una mascota por su ID."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return None
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_POR_ID, (id_mascota,))
-            fila = cursor.fetchone()
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_POR_ID, (id_mascota,))
+                fila = cursor.fetchone()
             return self._mapear_mascota(fila) if fila else None
         except Error as e:
             print(f"[ERROR] Al consultar mascota por ID: {e}")
@@ -136,15 +130,11 @@ class MascotaDAO:
 
     def consultar_por_usuario(self, id_usuario):
         """Retorna las mascotas de un usuario específico."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._CONSULTAR_POR_USUARIO, (id_usuario,))
-            filas = cursor.fetchall()
-            mascotas = [self._mapear_mascota(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._CONSULTAR_POR_USUARIO, (id_usuario,))
+                filas = cursor.fetchall()
+                mascotas = [self._mapear_mascota(fila) for fila in filas]
             return mascotas
         except Error as e:
             print(f"[ERROR] Al consultar mascotas por usuario: {e}")
@@ -152,55 +142,49 @@ class MascotaDAO:
 
     def actualizar(self, mascota):
         """Actualiza la información de una mascota existente."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            valores = (
-                mascota.nombre, mascota.especie, mascota.raza, mascota.sexo,
-                mascota.fecha_nacimiento, mascota.edad_aprox, mascota.color,
-                mascota.peso, mascota.foto, mascota.observaciones,
-                mascota.estado, mascota.id_mascota
-            )
-            cursor.execute(self._ACTUALIZAR, valores)
-            self._conexion_bd.commit()
-            filas_afectadas = cursor.rowcount
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                valores = (
+                    mascota.nombre, mascota.especie, mascota.raza, mascota.sexo,
+                    mascota.fecha_nacimiento, mascota.edad_aprox, mascota.color,
+                    mascota.peso, mascota.foto, mascota.observaciones,
+                    mascota.estado, mascota.id_mascota
+                )
+                try:
+                    cursor.execute(self._ACTUALIZAR, valores)
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                filas_afectadas = cursor.rowcount
             return filas_afectadas > 0
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al actualizar mascota: {e}")
             return False
 
     def eliminar(self, id_mascota):
         """Elimina una mascota por su ID."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return False
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._ELIMINAR, (id_mascota,))
-            self._conexion_bd.commit()
-            filas_afectadas = cursor.rowcount
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                try:
+                    cursor.execute(self._ELIMINAR, (id_mascota,))
+                    conexion.commit()
+                except Error:
+                    conexion.rollback()
+                    raise
+                filas_afectadas = cursor.rowcount
             return filas_afectadas > 0
         except Error as e:
-            self._conexion_bd.rollback()
             print(f"[ERROR] Al eliminar mascota: {e}")
             return False
 
     def buscar_por_nombre(self, termino):
         """Busca mascotas cuyo nombre contenga el término."""
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            return []
         try:
-            cursor = conexion.cursor()
-            cursor.execute(self._BUSCAR_POR_NOMBRE, (f"%{termino}%",))
-            filas = cursor.fetchall()
-            mascotas = [self._mapear_mascota(fila) for fila in filas]
-            cursor.close()
+            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+                cursor.execute(self._BUSCAR_POR_NOMBRE, (f"%{termino}%",))
+                filas = cursor.fetchall()
+                mascotas = [self._mapear_mascota(fila) for fila in filas]
             return mascotas
         except Error as e:
             print(f"[ERROR] Al buscar mascotas: {e}")

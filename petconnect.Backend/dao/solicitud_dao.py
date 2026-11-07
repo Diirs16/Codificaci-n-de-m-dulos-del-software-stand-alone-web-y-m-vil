@@ -8,9 +8,7 @@ no un "todo bien" falso. Es lo que pide el item 4.15 para los demas DAO.
 Nunca imprime el mensaje ni el telefono (son datos personales, Ley 1581).
 """
 
-from mysql.connector.errors import InterfaceError
-
-from conexion.conexion_bd import ConexionBD
+from conexion.conexion_bd import ConexionBD, conexion_y_cursor
 
 
 class SolicitudDAO:
@@ -32,33 +30,22 @@ class SolicitudDAO:
     def __init__(self):
         self._conexion_bd = ConexionBD()
 
-    def _conexion(self):
-        conexion = self._conexion_bd.obtener_conexion()
-        if conexion is None:
-            # La API la responde como 503 (manejador de InterfaceError)
-            raise InterfaceError("No hay conexion con la base de datos")
-        return conexion
-
     def dueno_de_mascota_en_adopcion(self, id_mascota):
         """id_usuario del dueno si la mascota existe y esta en adopcion; None si no."""
-        cursor = self._conexion().cursor()
-        try:
+        # Sin BD, conexion_y_cursor lanza InterfaceError (la API contesta 503)
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
             cursor.execute(self._DUENO_MASCOTA_EN_ADOPCION, (id_mascota,))
             fila = cursor.fetchone()
-        finally:
-            cursor.close()
         return fila[0] if fila else None
 
     def insertar(self, id_usuario, tipo, id_mascota, telefono, mensaje, version, fecha):
         """Guarda la solicitud y devuelve su id. Si la BD falla, deshace y deja subir el error."""
-        cursor = self._conexion().cursor()
-        try:
-            cursor.execute(self._INSERTAR, (id_usuario, tipo, id_mascota, telefono, mensaje,
-                                            version, fecha))
-            self._conexion_bd.commit()
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            try:
+                cursor.execute(self._INSERTAR, (id_usuario, tipo, id_mascota, telefono, mensaje,
+                                                version, fecha))
+                conexion.commit()
+            except Exception:
+                conexion.rollback()
+                raise
             return cursor.lastrowid
-        except Exception:
-            self._conexion_bd.rollback()
-            raise
-        finally:
-            cursor.close()
