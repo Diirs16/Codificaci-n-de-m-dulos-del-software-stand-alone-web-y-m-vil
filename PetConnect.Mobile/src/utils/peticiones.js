@@ -26,3 +26,16 @@ export function cuerpoLogin(email, password, aceptaDatos) {
   if (aceptaDatos === true) cuerpo.acepta_datos = true;
   return cuerpo;
 }
+
+// --- Solicitudes (ítem 3.6 parte 3, A-21): los mismos cuerpos que manda la web ---
+// El nombre y el correo NO viajan: la API los toma de la cuenta del token (C.13, C.14).
+
+/** Cuerpo de POST /solicitudes/adopcion. La mascota va como número; el teléfono es opcional. */
+export function cuerpoSolicitudAdopcion(idMascota, mensaje, telefono = "") {
+  return { id_mascota: Number(idMascota), mensaje, telefono };
+}
+
+/** Cuerpo de POST /solicitudes/contacto: solo el mensaje (sin mascota ni teléfono). */
+export function cuerpoMensajeContacto(mensaje) {
+  return { mensaje };
+}

@@ -70,7 +70,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 3.3 | A-23 | NC-009 | Web: estados de carga/vacío/error en Catálogo, Adopción, detalles y Home; `data/*.js` solo para pruebas | 🟡 | Con la API apagada, la web muestra un error, no perritos falsos — *Hecho el 06/11/2026 (solo web): `api.js` (cada error trae `status`; 0 sin conexión), componente `EstadoCarga.jsx` (cargando / error con “Reintentar” / vacío), `Adoption.jsx`, `Catalog.jsx`, `PetDetail.jsx` (404 → “no encontrada”, otro fallo → error; nunca la ficha falsa), `ProductDetail.jsx` y `Home.jsx` (“Productos destacados” de la API en lugar de ofertas/nuevos inventados); `src/data/pets.js` y `products.js` borrados. Pruebas nuevas `npm test` (`node --test`, sin dependencias): `tests/api.test.js` y `tests/sin-datos-falsos.test.js` (fallan 5 de 6 con el código viejo, pasan 6 de 6 con el nuevo). Lint 0 errores, build OK, 375 px con la API apagada: error en las 5 páginas (contraprueba: el código viejo mostraba las 6 mascotas falsas); `/impeccable audit` 17/20. Probado por el dueño con la API real: 6 mascotas de la BD, `/adopcion/99999` → “Mascota no encontrada”, Home con productos reales. NC-009 cerrada* |
 | [x] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` — *Opción (a) del dueño: no mostrar vacunación, esterilización ni tamaño. Parte 1 de 3 (backend) hecha el 06/11/2026: `api.py` ya no inventa `vaccinated`/`sterilized`/`size`; `seed.py` con `color` en `None` y 10 textos `# REVISAR-VETERINARIO`; migración `2026-11-06_mascotas_ejemplo.sql` (color con tamaño → `NULL`, Nala 6 → 0; reconoce las 6 de ejemplo por nombre + especie + `en_adopcion`), aplicada por el dueño; `tests/test_ficha_mascota.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Parte 2 de 3 (web) hecha el 06/11/2026: `src/utils/mascota.js` (edad “2 años” / “Menos de 1 año”, sexo “Hembra”/“Macho”, línea sin datos desconocidos); `PetDetail.jsx` sin el bloque ✓/✗ ni la talla y `Adoption.jsx` sin la talla; `tests/mascota.test.js` y `tests/sin-salud-inventada.test.js` (con las páginas viejas falla 1 de 12, que nombra las dos páginas; pasan 12 de 12 con las nuevas); lint 0 errores, build OK, 375 px con la API real; `/impeccable audit` 16/20. Parte 3 de 3 (móvil) hecha el 06/11/2026: `src/utils/mascota.js` (copia de la web); `PetDetailScreen.js` sin las insignias Vacunada/Esterilizada, sin `Badge` y sin “Talla undefined”; `AdoptionScreen.js` con la misma línea “Raza · Edad · Sexo”; fotos con `role="img"` y `aria-label`; `tests/mascota.test.mjs` y `tests/sin-salud-inventada.test.mjs` (`npm test` del móvil, `node --test`; con las pantallas viejas fallan 2 de 7, pasan 7 de 7 con las nuevas); `npx expo export --platform web` OK y 375 px con la API simulada; probado por el dueño en el emulador con la API real (6 mascotas, Nala “Menos de 1 año”); `/impeccable audit` 14/20. A-22 resuelto. Falta la validación veterinaria de los textos marcados antes de publicar* |
 | [x] | 3.5 | A-20 | — (R05) | Pedir la autorización de datos a las cuentas existentes (`acepta_datos = 0`) y a quienes aceptaron una versión vieja de la política, al iniciar sesión (API + web + móvil); si no autorizan, ofrecer borrar la cuenta. **Nunca** con un `UPDATE` que la invente. Después de la parte 3 del 3.1. Surgió el 05/11/2026 | 🔴 | Una cuenta en 0 que inicia sesión ve la casilla y, al marcarla, queda con fecha y versión; sin marcarla no entra — *Opción (a) del dueño; si no autorizan, enlace al correo de atención para borrar la cuenta (proceso manual, C.8). Parte 1 de 3 (API + DAO) hecha el 06/11/2026: `api.py` (`_autorizacion_vigente`: `acepta_datos` = 1 y versión actual; `/login` responde 403 `"requiere_autorizacion": true` tras la contraseña y sin enviar código; con `"acepta_datos": true` la fecha y la versión van en el pendiente; `/login/verify` las escribe solo con el código correcto y sin prueba válida responde 403 sin token), `dao/usuario_dao.py` (los `SELECT` leen fecha y versión; `registrar_autorizacion`, `UPDATE` parametrizado de las tres columnas); `tests/test_login_datos.py` (12) y `test_esquema.py` (1 con MariaDB); con el `api.py` anterior fallan 5 de 9, con el DAO anterior 3 de 3. Parte 2 de 3 (web) hecha el 06/11/2026: componente `CasillaAutorizacion.jsx` (texto B.1 + B.2 en un solo lugar, lo usan el registro y el inicio de sesión); `LoginModal.jsx` muestra el paso “Autoriza el uso de tus datos” con el 403 (casilla sin marcar, “Autorizar y continuar”, “Cancelar” y `mailto` B.3 para pedir borrar la cuenta; sin marcar, mensaje B.3 y 0 peticiones; un 403 en `/login/verify` vuelve a la casilla); `api.js` (`acepta_datos` solo con `true`, error con `requiereAutorizacion`) y `AuthContext.jsx`; `tests/api.test.js` (+5) y `tests/casilla-autorizacion.test.js` (3): con el código anterior fallan 7 de 8; `npm test` 20/20, lint y build OK, 375 px con la API simulada; `/impeccable audit` 16/20. Arreglo de la auditoría del 06/11/2026: “Cancelar” desactivado mientras se envía (si no, al llegar la respuesta salía igual la pantalla del código). Probada por el dueño con la API real el 06/11/2026: la cuenta 18 (`acepta_datos = 0`) inició sesión en la web, vio “Autoriza el uso de tus datos”, marcó la casilla, escribió el código y quedó con `acepta_datos = 1` y fecha; el caso “sin marcar” quedó probado con las pruebas automáticas y la API simulada. Parte 3 de 3 (móvil) hecha el 06/11/2026: componente `src/components/CasillaAutorizacion.js` (texto B.1 + enlace aparte + B.2 en un solo lugar; lo usan `RegisterScreen.js`, sin cambio visible, y `LoginScreen.js`); `LoginScreen.js` muestra el paso “Autoriza el uso de tus datos” con el 403 (casilla sin marcar, “Autorizar y continuar”, “Cancelar” desactivado mientras se envía y que borra la contraseña, línea B.3 con enlace aparte `mailto`; sin marcar, mensaje B.3 en `aria-live` y 0 peticiones; un 403 en `/login/verify` vuelve a la casilla); `src/utils/peticiones.js` (`errorDeApi` con `status` y `requiereAutorizacion`, `cuerpoLogin` con `acepta_datos` solo con `true`) que usa `api.js`; `AuthContext.js` sin cambios. `tests/peticiones.test.mjs` (5) y `tests/casilla-autorizacion.test.mjs` (4): con el código anterior fallan las 9 nuevas (5 si se deja `peticiones.js`: pasan a propósito las 4 que solo prueban ese archivo nuevo); `npm test` 16/16; `npx expo export --platform web` OK; 375 px con la API simulada (sin marcar 0 peticiones, marcada 1 con `"acepta_datos": true`, 403 en verify → casilla, Cancelar borra la contraseña, registro igual); `/impeccable audit` 14/20. Probado por el dueño en el emulador con la API real el 07/11/2026: la cuenta 17 (`acepta_datos = 0`) vio la casilla, la marcó, escribió el código y quedó con `acepta_datos = 1` y fecha 2026-11-07 01:32:37 (consulta por `id_usuario`, sin correos; las 18 y 19 siguen en 1 con su fecha). A-20 y R05: contingencia completa* |
-| [ ] | 3.6 | A-21 | — | Envío real de la solicitud de adopción y del mensaje de contacto: endpoint con `@require_auth` (y limitador), tabla nueva (migración + `schema.sql`), consentimiento para esa finalidad y **política v1.1** (Parte C, “Fuera del 3.1”; subir `VERSION_POLITICA_DATOS`), web y, si se decide, móvil. Quitar el `AvisoDemo` solo del formulario que ya envíe. El checkout real va aparte (A-26). Surgió en el 3.2 (06/11/2026) | 🔴 | Una solicitud enviada queda en la BD con el usuario, la fecha y la versión de la política, y la web dice “enviada” solo si la API respondió 201 — *Decisiones del dueño (07/11/2026): adopción y contacto; solo con sesión; solo en la BD (el equipo las lee con SQL); mensaje + teléfono opcional (solo adopción); sin casilla aparte, aviso corto B.5 (vale la autorización de la cuenta con la política 1.1, cuya versión se copia a cada solicitud); `VERSION_POLITICA_DATOS` = `"1.1"` desde la parte 1; móvil como parte 3. Parte 1 de 3 (API + BD) hecha el 07/11/2026: tabla `solicitudes` (`schema.sql` + migración `2026-11-07_solicitudes.sql`, regla `chk_solicitud_tipo`, `ON DELETE CASCADE`), `dao/solicitud_dao.py`, `POST /api/solicitudes/adopcion` y `/contacto` (limitador + `@require_auth`; 400 / 403 con `requiere_autorizacion` / 404 / 201 solo si se guardó), política 1.1 en el borrador .md; `tests/test_solicitudes.py` (19) y `test_esquema.py` (+7); con el código anterior fallan 27. Parte 2 de 3 (web) hecha el 07/11/2026: componente `FormularioSolicitud.jsx` (sin sesión, “Inicia sesión para enviar”; con sesión, teléfono opcional, mensaje y aviso B.5; “enviada” solo con el 201; 401/403 → “Volver a iniciar sesión”), `utils/solicitud.js`, `api.js` (`enviarSolicitudAdopcion`, `enviarMensajeContacto`), `PetDetail.jsx` y `Contact.jsx` sin `AvisoDemo` (sigue en Checkout), `PoliticaDatos.jsx` en 1.1; `tests/solicitudes.test.js` (9; con el código anterior fallan 5), `npm test` 29/29, lint y build OK, 375 px con la API simulada; `/impeccable audit` 16/20. Migración aplicada en la BD del dueño y probado con la API real el 07/11/2026: solicitud de adopción de Luna → “Solicitud enviada… número 1” (201, cuenta ya con la 1.1). Pendiente: parte 3 (móvil)* |
+| [x] | 3.6 | A-21 | — | Envío real de la solicitud de adopción y del mensaje de contacto: endpoint con `@require_auth` (y limitador), tabla nueva (migración + `schema.sql`), consentimiento para esa finalidad y **política v1.1** (Parte C, “Fuera del 3.1”; subir `VERSION_POLITICA_DATOS`), web y, si se decide, móvil. Quitar el `AvisoDemo` solo del formulario que ya envíe. El checkout real va aparte (A-26). Surgió en el 3.2 (06/11/2026) | 🔴 | Una solicitud enviada queda en la BD con el usuario, la fecha y la versión de la política, y la web dice “enviada” solo si la API respondió 201 — *Decisiones del dueño (07/11/2026): adopción y contacto; solo con sesión; solo en la BD (el equipo las lee con SQL); mensaje + teléfono opcional (solo adopción); sin casilla aparte, aviso corto B.5 (vale la autorización de la cuenta con la política 1.1, cuya versión se copia a cada solicitud); `VERSION_POLITICA_DATOS` = `"1.1"` desde la parte 1; móvil como parte 3. Parte 1 de 3 (API + BD) hecha el 07/11/2026: tabla `solicitudes` (`schema.sql` + migración `2026-11-07_solicitudes.sql`, regla `chk_solicitud_tipo`, `ON DELETE CASCADE`), `dao/solicitud_dao.py`, `POST /api/solicitudes/adopcion` y `/contacto` (limitador + `@require_auth`; 400 / 403 con `requiere_autorizacion` / 404 / 201 solo si se guardó), política 1.1 en el borrador .md; `tests/test_solicitudes.py` (19) y `test_esquema.py` (+7); con el código anterior fallan 27. Parte 2 de 3 (web) hecha el 07/11/2026: componente `FormularioSolicitud.jsx` (sin sesión, “Inicia sesión para enviar”; con sesión, teléfono opcional, mensaje y aviso B.5; “enviada” solo con el 201; 401/403 → “Volver a iniciar sesión”), `utils/solicitud.js`, `api.js` (`enviarSolicitudAdopcion`, `enviarMensajeContacto`), `PetDetail.jsx` y `Contact.jsx` sin `AvisoDemo` (sigue en Checkout), `PoliticaDatos.jsx` en 1.1; `tests/solicitudes.test.js` (9; con el código anterior fallan 5), `npm test` 29/29, lint y build OK, 375 px con la API simulada; `/impeccable audit` 16/20. Migración aplicada en la BD del dueño y probado con la API real el 07/11/2026: solicitud de adopción de Luna → “Solicitud enviada… número 1” (201, cuenta ya con la 1.1). Parte 3 de 3 (móvil) hecha el 07/11/2026: Contacto como **pestaña nueva** (decisión del dueño); `FormularioSolicitud.js` (mismo comportamiento que la web) en `PetDetailScreen.js` y `ContactScreen.js`; el inicio de sesión se abre como modal `IniciarSesion` encima del formulario (no se pierde lo escrito); `utils/solicitud.js` (copia de la web, una prueba exige que sean iguales), `peticiones.js` y `api.js` con las dos funciones; `tests/solicitudes.test.mjs` (11; con el código anterior fallan 4), `npm test` 27/27, `expo export --platform web` OK, 375 px con la API simulada; `/impeccable audit` 14/20. **Fase 3 completa.** Pendiente (opcional): prueba del dueño en el emulador con la API real* |
 
 ---
 
@@ -145,9 +145,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 07/11/2026, actualizada al terminar el 3.6 parte 2 de 3 (web: los formularios de adopción y contacto
-envían a la API y `/politica-de-datos` está en 1.1): estado conocido al día y contexto de la parte 3 (móvil).
-El 3.6 es el último ítem de la Fase 3. Sin push hasta terminar toda la Fase 3. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 07/11/2026, actualizada al terminar el 3.6 parte 3 de 3 (móvil: adopción y pestaña Contacto envían a la
+API). Con eso el 3.6 y **toda la Fase 3** quedaron hechos; el próximo ítem es el 4.1 (A-17, NC-004). Salta los ítems de
+“Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -166,11 +166,12 @@ Lee primero:
   f40af07, 57e05c4 (3.2), 6c9c0bf (3.3), 47ae96d, b398126 y f441696 (3.4,
   3 partes), 03925c5 y fdaf59b (3.5 partes 1 y 2), 09fe293 (Cancelar +
   prueba web con la API real), eaf0cdd y 095c112 (3.5 parte 3, móvil),
-  13b02eb (3.6 parte 1, API + BD) y el commit del 3.6 parte 2 (web,
-  07/11/2026).
-  REGLA DEL DUEÑO (06/11/2026): NO
-  se hace push hasta terminar TODA la Fase 3 (3.1 a 3.6). No preguntes por el
-  push antes; al marcar el último ítem de la fase, recuérdalo y pregunta)
+  13b02eb (3.6 parte 1, API + BD), 486f270 y 0b1ceb0 (3.6 parte 2, web +
+  prueba con la API real) y el commit del 3.6 parte 3 (móvil, 07/11/2026).
+  REGLA DEL DUEÑO (06/11/2026): no se hacía push hasta terminar TODA la Fase 3.
+  La Fase 3 terminó el 07/11/2026 y se le preguntó por el push al cerrarla: si
+  git status -sb todavía dice "ahead", pregúntale UNA vez si quiere subirlo
+  antes de seguir; push solo con su sí, nunca --force)
 
 Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - Hechos: 0.1, 1.1, 1.2, toda la fase 2 (2.1 a 2.9), el 3.1 (3 partes: API +
@@ -179,8 +180,8 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   El 3.5 está HECHO (3 partes el 06/11/2026: API + DAO, web y móvil; A-20 y
   R05 con la contingencia completa). La web la probó el dueño con la API
   real (cuenta 18) y el móvil en el emulador (cuenta 17, 07/11/2026). El
-  3.6 (último de la Fase 3) va por la parte 3 de 3 (móvil): la parte 1 (API +
-  BD) y la parte 2 (web) quedaron hechas el 07/11/2026. Cuentas 17, 18 y 19 del dueño: las tres en
+  3.6 está HECHO (3 partes el 07/11/2026: API + BD, web y móvil) y con él
+  TODA la Fase 3. Cuentas 17, 18 y 19 del dueño: las tres en
   acepta_datos = 1 con fecha, pero con la versión 1.0: desde que el dueño
   reinicie la API con el código del 3.6, TODAS las cuentas deben autorizar
   otra vez (1.1) al iniciar sesión. Eso es lo esperado, no un error.
@@ -214,7 +215,7 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   apagada: el proxy de Vite responde 502 sin cuerpo.
 - Pruebas móvil (desde el 3.4 parte 3): npm test en PetConnect.Mobile
   ("node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test", sin
-  dependencias; 16 pruebas en tests/*.test.mjs desde el 3.5). Las pruebas son .mjs y el
+  dependencias; 27 pruebas en tests/*.test.mjs desde el 3.6 parte 3). Las pruebas son .mjs y el
   package.json NO tiene "type": "module" (cambiarlo puede romper Expo/Metro);
   Node 24 importa los .js de src/ con import y la bandera calla el aviso.
   Solo sirven para código JS puro (src/utils/) o para leer el texto de las
@@ -741,24 +742,70 @@ por el dueño: API + BD, web, móvil):
   sigue pendiente de validación veterinaria (3.4). El pie de la web sigue
   con el contacto inventado (pendiente sin ítem).
 
-Contexto del próximo paso (3.6 parte 3 de 3: móvil):
-- ANTES de empezar, preguntar al dueño dónde va Contacto: el móvil no tiene
-  esa pantalla (AppNavigator.js: pestañas Catalogo, Adopcion y Perfil;
-  Login, Register, ProductDetail y PetDetail en el Stack).
-- PetDetailScreen.js: botón "Solicitar adopción" + formulario como el de la
-  web (sin sesión → ir a iniciar sesión; con sesión: "Envías como...",
-  teléfono opcional, mensaje 10 a 1000, aviso B.5 con enlace aparte a la
-  política (Linking.openURL(POLITICA_URL)) y mailto, "enviada" solo con 201,
-  401/403 → volver a iniciar sesión). Mejor un componente
-  src/components/FormularioSolicitud.js reutilizable para Contacto.
-- src/utils/solicitud.js = COPIA de la web; src/utils/peticiones.js (o
-  api.js) con las dos funciones; api.js del móvil manda el token desde
-  AsyncStorage (ver cómo lo hace hoy).
-- Pruebas .mjs (Node no entiende JSX: leer el texto de las pantallas),
-  contraprueba, npx expo export --platform web, 375 px con la API simulada,
-  /impeccable audit y prueba del dueño en el emulador.
-- Al terminar el 3.6: marcar [x], y como es el último de la Fase 3,
-  RECORDAR EL PUSH y preguntar (regla del dueño).
+3.6 parte 3 (móvil, A-21, hecha el 07/11/2026):
+- Decisión del dueño (07/11/2026): Contacto como PESTAÑA NUEVA. Pestañas:
+  Catalogo (Tienda), Adopcion, Contacto y Perfil.
+- src/components/FormularioSolicitud.js (props tipo "adopcion" | "contacto",
+  mascota {id, name} solo adopción, onCerrar opcional): ÚNICO formulario de
+  solicitudes del móvil y único lugar con el aviso B.5 (una prueba lo exige).
+  Sin sesión: texto + "Inicia sesión para enviar" y "Crear cuenta". Con
+  sesión: "Envías como {nombre} ({correo})", teléfono opcional (solo
+  adopción, phone-pad, máx. 20), mensaje multiline con contador n/1000,
+  aviso B.5 y dos filas de enlace aparte (política con
+  Linking.openURL(POLITICA_URL) y mailto al correo de atención). Valida con
+  utils/solicitud.js antes de llamar a la API (0 peticiones si falla; borde
+  rojo en el campo). "enviada" SOLO tras el 201 (recuadro verde con el
+  número). 401 → "Tu sesión venció..." y 403 con requiereAutorizacion →
+  mensaje de la API; los dos con "Volver a iniciar sesión" (logout y abre el
+  modal). Sin status (fetch falló) → mensaje en español. Nunca borra lo
+  escrito. Botones de 48 px; error en aria-live="polite" con role="alert".
+- AppNavigator.js: pestaña Contacto (ContactScreen.js) y pantalla
+  "IniciarSesion" en el Stack raíz con presentation "modal": muestra el
+  mismo LoginStack (Login + Register) ENCIMA de la ficha o de Contacto y se
+  cierra sola (goBack) cuando hay user. Mandar a la pestaña Perfil se
+  descartó: cerraba la ficha de la mascota y se perdía lo escrito.
+- utils/solicitud.js = COPIA de la web (tests/solicitudes.test.mjs compara
+  el código sin los comentarios //: si cambia una regla, cambiar api.py, la
+  web y el móvil). utils/peticiones.js: cuerpoSolicitudAdopcion y
+  cuerpoMensajeContacto (sin nombre ni correo). api.js:
+  enviarSolicitudAdopcion y enviarMensajeContacto (token desde AsyncStorage
+  en apiFetch).
+- tests/solicitudes.test.mjs (11): validación, copia igual a la web,
+  cuerpos, api.js, "enviada" solo tras el await, el catch no borra campos,
+  401/403 y modal (no navega a Perfil ni a Main), B.5 completo y sin
+  casilla, B.5 solo en el componente, ficha/Contacto/navegador lo usan.
+  Contraprueba (git stash de api.js, peticiones.js, PetDetailScreen.js y
+  AppNavigator.js): fallan 4; pasan a propósito 7 (archivos nuevos). npm
+  test 27/27. npx expo export --platform web OK.
+- Revisado a 375 px con la API simulada (http.server de launch.json
+  "movil-web-export", puerto 8090; window.fetch reemplazado DESPUÉS de
+  cargar, sesión inventada ana@ejemplo.test por el modal): sin sesión,
+  vacío, teléfono con guiones (0 peticiones), 401 en Contacto → modal y el
+  texto conservado, 403 en adopción (mensaje + botón, nada "enviada"), 201
+  en las dos; sin desplazamiento horizontal. En la web exportada el enlace
+  a la política abrió en la MISMA pestaña del panel (se pierde el estado de
+  la app): solo afecta la web; en Android abre el navegador.
+  /impeccable audit 14/20 (pulido opcional, igual que el resto del móvil:
+  colores fijos sin modo oscuro, iconos emoji en las pestañas, enlaces de
+  44 px y no 48 dp, sin android_ripple).
+- Prueba en el emulador con la API real: la hace el dueño (comandos en el
+  chat del 07/11/2026). Si no se anotó, es opcional (pruebas automáticas y
+  API simulada ya lo cubren).
+
+Contexto del próximo paso (4.1, A-17, NC-004: exigir minúscula):
+- api.py: _validate_password (cerca de la línea 227) exige 8 a 64
+  caracteres (y MAX_BYTES_BCRYPT), mayúscula, número y especial, pero NO
+  minúscula: acepta PETCONNECT1!. Los mensajes van sin tildes.
+- Web: RegisterModal.jsx tiene una lista de reglas ({id, label, test}, ej.
+  "Al menos una mayúscula"): falta la de minúscula.
+- Móvil: RegisterScreen.js NO valida la contraseña antes de enviar (solo la
+  API la revisa).
+- La fila pide "validación en un módulo común": en el backend, un módulo
+  (ej. security/politica.py) que también pueda usar la consola (4.11, A-18);
+  en web y móvil, una utilidad JS pura (como utils/solicitud.js) que Node
+  pueda probar. Toca 3 módulos: proponer el plan por partes (regla 3).
+- GA9: NC-004 (H-03, CP-003) se cierra con este ítem (fecha y evidencia,
+  incluida la contraprueba).
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -797,6 +844,5 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.6, parte 3 de 3 (móvil)** (A-21): formulario de solicitud de adopción y de contacto en el móvil
-(las partes 1, API + BD, y 2, web, quedaron hechas el 07/11/2026). Antes, preguntar al dueño dónde va Contacto. Es el
-último de la Fase 3: al terminarlo, recordar el push (regla del dueño: sin push hasta cerrar la Fase 3).
+**Próximo ítem: 4.1** (A-17, NC-004): exigir al menos una minúscula en la contraseña en la API, la web y el móvil, con
+la validación en un módulo común. La Fase 3 quedó completa el 07/11/2026 (3.6 parte 3, móvil).

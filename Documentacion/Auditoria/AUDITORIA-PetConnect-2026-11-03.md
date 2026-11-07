@@ -534,7 +534,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `/confirmacion` ya no muestra nada. `/impeccable audit` 16/20 (detector sin hallazgos); queda como pulido, ya
   existente antes: al abrir el formulario de adopción el foco cae en `body`, el horario de atención de `Contact.jsx` es
   inventado y la web no tiene modo oscuro ni tokens de color.
-- **Envío real (ítem 3.6, en curso; 3 partes: API + BD, web y móvil).** Decisiones del dueño (07/11/2026): adopción
+- **Envío real (ítem 3.6, hecho el 07/11/2026; 3 partes: API + BD, web y móvil).** Decisiones del dueño (07/11/2026): adopción
   **y** contacto; solo con sesión iniciada (el nombre y el correo salen de la cuenta); las solicitudes solo se guardan
   en la BD y el equipo las lee con SQL (no van por correo ni a quien publicó la mascota); mensaje y **teléfono
   opcional** (solo adopción); **sin casilla aparte**, con un aviso corto (B.5), porque vale la autorización de la
@@ -579,7 +579,28 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   código nuevo y atendía el puerto 5000; al cerrarla, la ruta sin token respondió 401. Luego, con su sesión, envió una
   solicitud de adopción para Luna y la web mostró “Solicitud enviada… número 1”. Como la API solo responde 201 tras
   guardar la fila y con la autorización 1.1, eso confirma la fila y el cambio de versión (C.9) con datos reales. El
-  mensaje de contacto y el conteo no se capturaron (lo cubren las pruebas automáticas). Falta el móvil (parte 3).
+  mensaje de contacto y el conteo no se capturaron (lo cubren las pruebas automáticas).
+  **Parte 3 de 3 (móvil), hecha el 07/11/2026:** el dueño eligió poner Contacto como **pestaña nueva** (Tienda,
+  Adopción, Contacto, Perfil). Componente nuevo `src/components/FormularioSolicitud.js`, el único formulario de
+  solicitudes del móvil y el único lugar con el aviso B.5, que usan `PetDetailScreen.js` (botón “Solicitar adopción”,
+  con teléfono opcional) y la pantalla nueva `ContactScreen.js`. Hace lo mismo que el de la web: sin sesión no muestra
+  campos (“Inicia sesión para enviar” / “Crear cuenta”); con sesión, “Envías como {nombre} ({correo})”, contador del
+  mensaje, aviso B.5 con la política (`Linking.openURL(POLITICA_URL)`) y el correo de atención en filas aparte (para
+  que TalkBack los active solos); valida antes con `src/utils/solicitud.js`, **copia** de la web; dice “enviada” solo
+  tras el 201; con 401 o con el 403 de autorización ofrece “Volver a iniciar sesión”, y sin conexión muestra un
+  mensaje en español (no el “Network request failed” de React Native). Para no perder lo escrito, el inicio de sesión
+  se abre como **modal** encima de la ficha o de Contacto (pantalla `IniciarSesion` en `AppNavigator.js`, con el mismo
+  Login y Registro) y se cierra solo al entrar; mandar a la pestaña Perfil habría cerrado la ficha de la mascota.
+  `api.js` y `utils/peticiones.js`: `enviarSolicitudAdopcion` / `enviarMensajeContacto` con los mismos cuerpos que la
+  web (sin nombre ni correo; el token lo pone `apiFetch`). Pruebas: `tests/solicitudes.test.mjs` (11; `npm test`
+  27/27), una de ellas exige que la copia de `solicitud.js` sea igual a la de la web. Contraprueba (`git stash` de
+  `api.js`, `peticiones.js`, `PetDetailScreen.js` y `AppNavigator.js`): fallan 4; pasan a propósito 7 que prueban
+  archivos nuevos. `npx expo export --platform web` OK. Revisado a 375 px con la API simulada y datos inventados: sin
+  sesión, vacío y teléfono con guiones (0 peticiones), 401 → “Volver a iniciar sesión” abre el modal y, al entrar, el
+  texto sigue ahí; 403 → mensaje y botón, nada “enviada”; 201 → recuadro verde con el número, en adopción y contacto;
+  sin desplazamiento horizontal. `/impeccable audit` 14/20 (pulido opcional, como el resto del móvil: colores fijos sin
+  modo oscuro, iconos emoji en las pestañas, enlaces de 44 px y no 48 dp, sin `android_ripple`). La prueba en el
+  emulador con la API real la hace el dueño.
 
 #### A-22 · 🟡 Media · Información de salud contradictoria en la ficha de la mascota [N]
 - La API pone siempre `vaccinated=False`, `sterilized=False`, `size="Mediano"` (`api.py:215-220`), así que

@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import { errorDeApi, cuerpoLogin } from "../utils/peticiones";
+import { errorDeApi, cuerpoLogin, cuerpoSolicitudAdopcion, cuerpoMensajeContacto } from "../utils/peticiones";
 
 /**
  * URL base de la API PetConnect (mismo backend Flask que usan el módulo
@@ -95,6 +95,24 @@ export function verifyLoginCode(email, code) {
 
 export function getPerfil() {
   return apiFetch("/auth/me");
+}
+
+// --- Solicitudes (ítem 3.6 parte 3, A-21) ---
+// Necesitan la sesión iniciada: apiFetch manda el token. Si la cuenta no aceptó la
+// versión vigente de la política, la API responde 403 y el error trae
+// requiereAutorizacion = true. El formulario dice "enviada" solo si esto no lanza error.
+export function enviarSolicitudAdopcion(idMascota, mensaje, telefono = "") {
+  return apiFetch("/solicitudes/adopcion", {
+    method: "POST",
+    body: JSON.stringify(cuerpoSolicitudAdopcion(idMascota, mensaje, telefono)),
+  });
+}
+
+export function enviarMensajeContacto(mensaje) {
+  return apiFetch("/solicitudes/contacto", {
+    method: "POST",
+    body: JSON.stringify(cuerpoMensajeContacto(mensaje)),
+  });
 }
 
 export async function saveToken(token) {

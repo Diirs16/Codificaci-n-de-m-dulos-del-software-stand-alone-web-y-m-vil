@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -12,6 +13,7 @@ import PetDetailScreen from "../screens/PetDetailScreen";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import ContactScreen from "../screens/ContactScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -34,6 +36,12 @@ function MainTabs() {
         component={AdoptionScreen}
         options={{ title: "Adopción", tabBarIcon: () => <TabIcon emoji="🐾" /> }}
       />
+      {/* Ítem 3.6 parte 3: pestaña nueva (decisión del dueño, 07/11/2026) */}
+      <Tab.Screen
+        name="Contacto"
+        component={ContactScreen}
+        options={{ title: "Contacto", tabBarIcon: () => <TabIcon emoji="✉️" /> }}
+      />
       <Tab.Screen
         name="Perfil"
         component={user ? ProfileScreen : LoginStack}
@@ -50,6 +58,18 @@ function LoginStack() {
       <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
   );
+}
+
+// Ítem 3.6 parte 3: el mismo inicio de sesión (y registro) que la pestaña Perfil, pero
+// abierto ENCIMA de la pantalla actual. Así, desde el formulario de adopción o de
+// contacto, la pantalla de abajo no se cierra y lo escrito no se pierde. Cuando la
+// sesión queda iniciada, se cierra sola y vuelve al formulario.
+function IniciarSesionModal({ navigation }) {
+  const { user } = useAuth();
+  useEffect(() => {
+    if (user && navigation.canGoBack()) navigation.goBack();
+  }, [user, navigation]);
+  return <LoginStack />;
 }
 
 export default function AppNavigator() {
@@ -70,6 +90,11 @@ export default function AppNavigator() {
           name="PetDetail"
           component={PetDetailScreen}
           options={{ title: "Mascota" }}
+        />
+        <Stack.Screen
+          name="IniciarSesion"
+          component={IniciarSesionModal}
+          options={{ title: "Iniciar sesión", presentation: "modal" }}
         />
       </Stack.Navigator>
     </NavigationContainer>
