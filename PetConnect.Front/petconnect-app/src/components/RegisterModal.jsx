@@ -3,19 +3,14 @@ import { X, Check, AlertCircle, Loader2, RotateCw, MailCheck } from "lucide-reac
 import CasillaAutorizacion from "./CasillaAutorizacion";
 import { useAuth } from "../context/AuthContext";
 import { esFormatoCorreoValido } from "../utils/validarCorreo";
+// Ítem 4.1 (A-17, NC-004): las reglas de la contraseña son las mismas de la API
+import { REGLAS_CONTRASENA } from "../utils/contrasena";
 import { validarCorreo, resendRegisterCode } from "../services/api";
 
 // Mismas reglas que el servidor (otp/servicio.py, ítem 2.7): 60 s entre correos
 // y máximo 3 reenvíos por código. El servidor las aplica igual aunque esto se salte.
 const ESPERA_REENVIO_MS = 60_000;
 const MAX_REENVIOS = 3;
-
-const RULES = [
-  { id: "len",     label: "Mínimo 8 caracteres",               test: (p) => p.length >= 8 },
-  { id: "upper",   label: "Al menos una mayúscula",             test: (p) => /[A-Z]/.test(p) },
-  { id: "number",  label: "Al menos un número",                 test: (p) => /[0-9]/.test(p) },
-  { id: "special", label: 'Al menos un carácter especial: @ # ! " $ & ? ¡', test: (p) => /[@#!"$&?¡\-_*.]/.test(p) },
-];
 
 // NC-005 (ítem 3.1): la casilla de autorización empieza SIN marcar (Ley 1581, art. 9).
 // Su texto (B.1 y B.2) vive en CasillaAutorizacion.jsx; el mensaje es el de B.3 de
@@ -49,7 +44,7 @@ export default function RegisterModal() {
   const [showRules, setShowRules] = useState(false);
 
   const ruleResults = useMemo(
-    () => RULES.map((r) => ({ ...r, ok: r.test(form.password) })),
+    () => REGLAS_CONTRASENA.map((r) => ({ ...r, ok: r.test(form.password) })),
     [form.password]
   );
   const allRulesOk = ruleResults.every((r) => r.ok);
