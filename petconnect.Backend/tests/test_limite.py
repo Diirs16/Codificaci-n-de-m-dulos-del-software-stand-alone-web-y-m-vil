@@ -22,13 +22,16 @@ IP_OTRA = "203.0.113.20"
 CORREO_PRUEBA = "laura@ejemplo.test"        # inventado
 MENSAJE_429 = "Demasiadas peticiones. Espera un minuto e intenta de nuevo"
 
-# Con cuerpo vacio todas responden 400 sin tocar BD, DNS ni correo
+# Con cuerpo vacio todas responden 400 sin tocar BD, DNS ni correo (las de
+# solicitudes, 401 por no traer token: el limite se cuenta antes de revisarlo)
 RUTAS_LIMITADAS = (
     "/api/auth/login",
     "/api/auth/login/verify",
     "/api/auth/register",
     "/api/auth/verify",
     "/api/utils/validar-correo",
+    "/api/solicitudes/adopcion",     # item 3.6 (A-21)
+    "/api/solicitudes/contacto",     # item 3.6 (A-21)
 )
 
 

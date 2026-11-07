@@ -33,7 +33,7 @@ from test_errores import _importar_api  # noqa: E402
 # Datos inventados (Ley 1581)
 CORREO = "cuenta.vieja@ejemplo.test"
 CLAVE = "Firulais2026!"
-VERSION = "1.0"
+VERSION = "1.1"   # item 3.6 (07/11/2026): la politica subio de 1.0 a 1.1
 ID_USUARIO = 7
 MENSAJE_403 = "Para seguir usando tu cuenta debes autorizar el tratamiento de tus datos personales"
 FECHA_VIEJA = datetime(2026, 11, 5, 10, 30, 0)
@@ -57,6 +57,8 @@ def _usuario(acepta_datos=False, fecha=None, version=None):
 SIN_AUTORIZACION = {
     "cuenta en 0": lambda: _usuario(),
     "otra version": lambda: _usuario(True, FECHA_VIEJA, "0.9"),
+    # Item 3.6: quien acepto la 1.0 debe autorizar otra vez la 1.1
+    "version 1.0": lambda: _usuario(True, FECHA_VIEJA, "1.0"),
 }
 
 

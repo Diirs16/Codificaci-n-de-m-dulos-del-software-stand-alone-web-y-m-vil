@@ -273,6 +273,32 @@ CREATE TABLE IF NOT EXISTS `adopciones` (
   CONSTRAINT `fk_adopcion_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
+-- Item 3.6 (A-21, 07/11/2026): solicitudes de adopcion y mensajes de
+-- contacto que una persona envia con su sesion iniciada. NO es la tabla
+-- adopciones (esa es la publicacion de una mascota). El nombre y el correo
+-- salen de la cuenta y no se repiten aqui. version_politica_datos es la
+-- version de la politica que la cuenta tenia aceptada al enviar (prueba de
+-- la autorizacion, Ley 1581 art. 17 b). Si se borra la cuenta o la mascota,
+-- se borran sus solicitudes (politica v1.1, A.11). La regla
+-- chk_solicitud_tipo exige la mascota solo en adopcion y deja el telefono
+-- solo para adopcion. Misma definicion en migraciones/2026-11-07_solicitudes.sql
+CREATE TABLE IF NOT EXISTS `solicitudes` (
+  `id_solicitud` int(11) NOT NULL AUTO_INCREMENT,
+  `id_usuario` int(11) NOT NULL,
+  `tipo` enum('adopcion','contacto') NOT NULL,
+  `id_mascota` int(11) DEFAULT NULL,
+  `telefono` varchar(20) DEFAULT NULL,
+  `mensaje` varchar(1000) NOT NULL,
+  `version_politica_datos` varchar(20) NOT NULL,
+  `fecha_envio` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id_solicitud`),
+  KEY `fk_solicitud_usuario` (`id_usuario`),
+  KEY `fk_solicitud_mascota` (`id_mascota`),
+  CONSTRAINT `fk_solicitud_mascota` FOREIGN KEY (`id_mascota`) REFERENCES `mascotas` (`id_mascota`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_solicitud_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_solicitud_tipo` CHECK (`tipo` = 'adopcion' AND `id_mascota` IS NOT NULL OR `tipo` = 'contacto' AND `id_mascota` IS NULL AND `telefono` IS NULL)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+
 CREATE TABLE IF NOT EXISTS `vacunas` (
   `id_vacuna` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(100) NOT NULL,

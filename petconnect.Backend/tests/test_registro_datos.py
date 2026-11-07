@@ -32,7 +32,7 @@ from test_errores import _importar_api  # noqa: E402
 CORREO = "titular.prueba@ejemplo.test"
 NOMBRE = "Titular Prueba"
 CLAVE = "Firulais2026!"
-VERSION = "1.0"
+VERSION = "1.1"   # item 3.6 (07/11/2026): la politica subio de 1.0 a 1.1
 MENSAJE_400 = "Debes autorizar el tratamiento de tus datos personales para registrarte"
 
 _SIN_CAMPO = object()   # marca: el cuerpo no trae "acepta_datos"

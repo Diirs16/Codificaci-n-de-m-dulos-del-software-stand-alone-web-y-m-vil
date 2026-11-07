@@ -2,7 +2,7 @@
 
 | Archivo | Qué hace |
 |---|---|
-| `schema.sql` | Crea las 32 tablas y los catálogos fijos (roles y planes). **Solo estructura, sin datos personales.** |
+| `schema.sql` | Crea las 33 tablas y los catálogos fijos (roles y planes). **Solo estructura, sin datos personales.** |
 | `../seed.py` | Inserta datos de ejemplo: categorías, 12 productos, una cuenta ficticia de refugio y 6 mascotas en adopción. |
 
 Motor probado: **MariaDB 10.4.32** (XAMPP) en el puerto **3310**. También sirve en MySQL 8.0.16 o superior
@@ -47,6 +47,9 @@ pasos no borra nada.
   `fecha_aplicacion` (NC-010).
 - **`usuarios`**: `acepta_datos` vale 0 por defecto y la regla `chk_autorizacion_datos` exige que un 1 tenga
   `fecha_autorizacion_datos` y `version_politica_datos` (NC-005, Ley 1581).
+- **`solicitudes`** (desde el 07/11/2026, ítem 3.6): la regla `chk_solicitud_tipo` exige la mascota en una
+  solicitud de `adopcion` y prohíbe la mascota y el teléfono en un mensaje de `contacto`. `mensaje` tiene máximo
+  1000 caracteres. Si se borra la cuenta o la mascota, se borran sus solicitudes.
 
 ## ¿Ya tenías la base creada antes del 03/11/2026?
 
@@ -137,6 +140,37 @@ las 6 y Nala con `edad_aprox = 0`:
 
 ```bash
 mysql -u root -p -P 3310 petconnect -e "SELECT id_mascota, nombre, edad_aprox, color FROM mascotas WHERE estado = 'en_adopcion'"
+```
+
+## ¿Ya tenías la base creada antes del 07/11/2026? (solicitudes de adopción y contacto, A-21)
+
+Desde el ítem 3.6 la API guarda las solicitudes de adopción y los mensajes de contacto que se envían con la sesión
+iniciada, en la tabla nueva `solicitudes`. **No** es la tabla `adopciones` (esa es la publicación de una mascota).
+La migración `migraciones/2026-11-07_solicitudes.sql` solo crea esa tabla: no cambia ni borra nada más y se puede
+ejecutar varias veces.
+
+**Hazlo antes de arrancar la API nueva:** sin la tabla, enviar una solicitud falla con 500. Desde la carpeta
+`petconnect.Backend`, con un respaldo nuevo como el del paso 1 de arriba:
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "source sql/migraciones/2026-11-07_solicitudes.sql"
+```
+
+**Comprobar** (solo muestra la estructura y un conteo, no datos personales):
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SHOW COLUMNS FROM solicitudes"
+```
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SELECT tipo, COUNT(*) AS total FROM solicitudes GROUP BY tipo"
+```
+
+Para **leer** las solicitudes (lo hace el equipo; muestra mensajes y teléfonos, que son datos personales: no los
+copies en capturas ni documentos):
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SELECT id_solicitud, tipo, id_mascota, id_usuario, fecha_envio, mensaje FROM solicitudes ORDER BY fecha_envio DESC"
 ```
 
 ## Prueba automática

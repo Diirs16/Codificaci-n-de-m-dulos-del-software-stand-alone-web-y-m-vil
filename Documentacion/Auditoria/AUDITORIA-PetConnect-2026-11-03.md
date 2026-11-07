@@ -534,6 +534,34 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `/confirmacion` ya no muestra nada. `/impeccable audit` 16/20 (detector sin hallazgos); queda como pulido, ya
   existente antes: al abrir el formulario de adopción el foco cae en `body`, el horario de atención de `Contact.jsx` es
   inventado y la web no tiene modo oscuro ni tokens de color.
+- **Envío real (ítem 3.6, en curso; 3 partes: API + BD, web y móvil).** Decisiones del dueño (07/11/2026): adopción
+  **y** contacto; solo con sesión iniciada (el nombre y el correo salen de la cuenta); las solicitudes solo se guardan
+  en la BD y el equipo las lee con SQL (no van por correo ni a quien publicó la mascota); mensaje y **teléfono
+  opcional** (solo adopción); **sin casilla aparte**, con un aviso corto (B.5), porque vale la autorización de la
+  cuenta con la política **1.1**, que nombra esta finalidad; `VERSION_POLITICA_DATOS` sube a `"1.1"` en la parte 1
+  (toda cuenta que aceptó la 1.0 autoriza otra vez al iniciar sesión, ítem 3.5); el móvil entra como parte 3.
+  **Parte 1 de 3 (API + BD), hecha el 07/11/2026:** tabla nueva `solicitudes` (`id_usuario`, `tipo`
+  adopcion/contacto, `id_mascota`, `telefono`, `mensaje` de máximo 1000, `version_politica_datos`, `fecha_envio`;
+  regla `chk_solicitud_tipo`; `ON DELETE CASCADE` desde la cuenta y la mascota; no repite nombre ni correo) en
+  `sql/schema.sql` y en la migración `sql/migraciones/2026-11-07_solicitudes.sql` (solo crea la tabla), explicada en
+  `sql/README.md`. `dao/solicitud_dao.py` (SQL parametrizado; a diferencia de los DAO viejos deja subir los errores de
+  la BD, como pide el 4.15). `api.py`: `POST /api/solicitudes/adopcion` (`id_mascota`, `mensaje`, `telefono`
+  opcional) y `POST /api/solicitudes/contacto` (`mensaje`), con el limitador (5 por minuto por IP) y `@require_auth`;
+  validan el mensaje (10 a 1000 caracteres), la mascota (entero) y el teléfono (números, espacios y un `+` al inicio,
+  7 a 15 dígitos) antes de tocar la BD; después revisan la cuenta en la BD (activa y con la autorización de la versión
+  vigente: un token de antes de la 1.1 vale 24 h; si no, 403 con `"requiere_autorizacion": true`), que la mascota esté
+  en adopción (si no, el mismo 404 de la ficha) y que no sea la propia (400). Responden 201 solo si la fila se guardó,
+  con el usuario del token (nunca del cuerpo), la versión que aceptó la cuenta y la fecha; contacto no guarda mascota
+  ni teléfono. Los registros técnicos no llevan el mensaje ni el teléfono. Borrador de la política en versión 1.1
+  (A.4, A.5 punto 7, A.6, A.11, A.14, B.3, B.5, C.12 a C.15 y una fila en la Parte E). Pruebas: `tests/test_solicitudes.py`
+  (19: 15 de las rutas con la BD simulada y 4 del DAO), `test_esquema.py` (+7: tabla y migración sin BD, y 3 con
+  MariaDB que corre el dueño), `test_limite.py` (las 2 rutas nuevas) y las de los ítems 3.1 y 3.5 ajustadas a la 1.1
+  (en `test_login_datos.py`, una cuenta que aceptó la 1.0 ahora debe autorizar otra vez). Suite: 179 pruebas, 155
+  correctas y 24 omitidas que necesitan MariaDB. Contraprueba (`git stash` de `api.py` y `schema.sql`): fallan 27
+  (las 15 de las rutas, 4 del esquema, el límite, 4 del login y 3 del registro por la versión); pasan a propósito las
+  4 del DAO y 2 de la migración, que prueban archivos nuevos que no se guardaron en el stash. Falta: aplicar la
+  migración en la BD del dueño y reiniciar la API, la web (parte 2: formularios sin `AvisoDemo` y `/politica-de-datos`
+  en 1.1; hasta entonces esa página sigue mostrando la 1.0) y el móvil (parte 3).
 
 #### A-22 · 🟡 Media · Información de salud contradictoria en la ficha de la mascota [N]
 - La API pone siempre `vaccinated=False`, `sterilized=False`, `size="Mediano"` (`api.py:215-220`), así que

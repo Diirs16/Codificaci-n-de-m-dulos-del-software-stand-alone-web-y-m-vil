@@ -19,6 +19,11 @@ y modo estricto) y NC-010 (fechas de vacunas).
   (tamano guardado en color y edad de Nala, solo en las 6 mascotas de ejemplo).
   PruebasMigracionEjemploEnBD (PETCONNECT_PRUEBA_BD=1) la aplica en
   "petconnect_prueba_ejemplo" y la borra al final.
+- A-21 (item 3.6): PruebasEsquemaSinBD y PruebasMigracionSolicitudesSinBD revisan la
+  tabla solicitudes y su migracion del 07/11/2026. PruebasEsquemaEnBD prueba
+  SolicitudDAO y la regla chk_solicitud_tipo con la base real, y
+  PruebasMigracionSolicitudesEnBD (PETCONNECT_PRUEBA_BD=1) aplica la migracion en
+  "petconnect_prueba_solicitudes" y la borra al final.
   Ninguna toca la base "petconnect".
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
@@ -44,6 +49,12 @@ BD_PRUEBA = "petconnect_prueba"
 BD_PRUEBA_MIGRACION = "petconnect_prueba_migracion"
 BD_PRUEBA_AUTORIZACION = "petconnect_prueba_autorizacion"
 BD_PRUEBA_EJEMPLO = "petconnect_prueba_ejemplo"
+RUTA_MIGRACION_SOLICITUDES = os.path.join(RAIZ, "sql", "migraciones", "2026-11-07_solicitudes.sql")
+BD_PRUEBA_SOLICITUDES = "petconnect_prueba_solicitudes"
+
+# Item 3.6 (A-21): regla de la tabla solicitudes, igual en schema.sql y en la migracion
+REGLA_SOLICITUDES = ("(`tipo` = 'adopcion' AND `id_mascota` IS NOT NULL OR `tipo` = 'contacto' "
+                     "AND `id_mascota` IS NULL AND `telefono` IS NULL)")
 
 
 def _leer(ruta):
@@ -123,8 +134,29 @@ class PruebasEsquemaSinBD(unittest.TestCase):
             "AND `version_politica_datos` IS NOT NULL))",
         )
 
-    def test_tiene_las_32_tablas(self):
-        self.assertEqual(len(_tablas_del_esquema(self.sql)), 32)
+    def test_tiene_las_33_tablas(self):
+        # 32 hasta el 07/11/2026, + solicitudes (item 3.6)
+        self.assertEqual(len(_tablas_del_esquema(self.sql)), 33)
+
+    def test_solicitudes_guardan_la_prueba_y_no_repiten_datos_de_la_cuenta(self):
+        """A-21 (item 3.6): usuario, version de la politica y fecha; nombre y correo no."""
+        bloque = _bloque_tabla(self.sql, "solicitudes")
+        for columna in ("`id_usuario` int(11) NOT NULL",
+                        "`tipo` enum('adopcion','contacto') NOT NULL",
+                        "`id_mascota` int(11) DEFAULT NULL",
+                        "`telefono` varchar(20) DEFAULT NULL",
+                        "`mensaje` varchar(1000) NOT NULL",
+                        "`version_politica_datos` varchar(20) NOT NULL",
+                        "`fecha_envio` datetime NOT NULL DEFAULT current_timestamp()"):
+            with self.subTest(columna=columna):
+                self.assertIn(columna, bloque)
+        self.assertNotRegex(bloque, r"`(nombres?|apellidos|correo)`")
+        self.assertEqual(_regla_solicitudes(bloque), REGLA_SOLICITUDES)
+        # Si se borra la cuenta o la mascota, se borran sus solicitudes (politica v1.1, A.11)
+        for clave in ("FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE",
+                      "FOREIGN KEY (`id_mascota`) REFERENCES `mascotas` (`id_mascota`) ON DELETE CASCADE"):
+            with self.subTest(clave=clave):
+                self.assertIn(clave, bloque)
 
     def test_no_trae_datos_personales_ni_contadores(self):
         self.assertNotRegex(self.sql, r"INSERT[^;]*INTO `?(usuarios|mascotas|direcciones|metodos_pago)")
@@ -395,6 +427,71 @@ class PruebasEsquemaEnBD(unittest.TestCase):
                 self.assertEqual((despues.acepta_datos, despues.fecha_autorizacion_datos,
                                   despues.version_politica_datos), (True, fecha, "1.0"))
 
+    def test_solicitudes_con_la_base_real(self):
+        """Item 3.6 (A-21): SolicitudDAO, la regla chk_solicitud_tipo y el borrado en cascada."""
+        from dao.solicitud_dao import SolicitudDAO
+        from dao.usuario_dao import UsuarioDAO
+        from modelo.usuario import Usuario
+
+        correo = "envia.solicitud@ejemplo.test"     # inventado (Ley 1581)
+        telefono = "3000000000"                     # inventado
+        mensaje = "Mensaje de prueba para la solicitud"
+
+        def borrar():
+            c = self.conn.cursor()
+            c.execute("DELETE FROM usuarios WHERE correo = %s", (correo,))
+            self.conn.commit()
+            c.close()
+        self.addCleanup(borrar)
+
+        usuarios = UsuarioDAO()
+        fecha = datetime.datetime(2026, 11, 7, 10, 0, 0)
+        self.assertTrue(usuarios.insertar(Usuario(
+            nombres="Prueba", correo=correo, password_hash="hash-falso", verificado=True,
+            acepta_datos=True, fecha_autorizacion_datos=fecha, version_politica_datos="1.1")))
+        id_usuario = usuarios.consultar_por_correo(correo).id_usuario
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id_mascota, id_usuario FROM mascotas "
+                       "WHERE estado = 'en_adopcion' ORDER BY id_mascota LIMIT 1")
+        id_mascota, id_dueno = cursor.fetchone()
+
+        dao = SolicitudDAO()
+        self.assertEqual(dao.dueno_de_mascota_en_adopcion(id_mascota), id_dueno)
+        self.assertIsNone(dao.dueno_de_mascota_en_adopcion(id_mascota + 100000))
+        self.assertGreater(dao.insertar(id_usuario, "adopcion", id_mascota, telefono, mensaje,
+                                        "1.1", fecha), 0)
+        self.assertGreater(dao.insertar(id_usuario, "contacto", None, None, mensaje, "1.1", fecha), 0)
+
+        # La regla y el modo estricto rechazan filas incoherentes
+        malas = {
+            "adopcion sin mascota": (id_usuario, "adopcion", None, None, mensaje, "1.1", fecha),
+            "contacto con mascota": (id_usuario, "contacto", id_mascota, None, mensaje, "1.1", fecha),
+            "contacto con telefono": (id_usuario, "contacto", None, telefono, mensaje, "1.1", fecha),
+            "mensaje de 1001": (id_usuario, "contacto", None, None, "a" * 1001, "1.1", fecha),
+            "tipo inventado": (id_usuario, "otro", None, None, mensaje, "1.1", fecha),
+            "sin version": (id_usuario, "contacto", None, None, mensaje, None, fecha),
+        }
+        for caso, valores in malas.items():
+            with self.subTest(caso=caso), self.assertRaises(self.Error):
+                dao.insertar(*valores)
+
+        self.conn.commit()      # lectura nueva: ver lo que guardo la conexion del DAO
+        cursor.execute("SELECT tipo, id_mascota, telefono, mensaje, version_politica_datos, "
+                       "fecha_envio FROM solicitudes WHERE id_usuario = %s ORDER BY id_solicitud",
+                       (id_usuario,))
+        self.assertEqual(cursor.fetchall(), [
+            ("adopcion", id_mascota, telefono, mensaje, "1.1", fecha),
+            ("contacto", None, None, mensaje, "1.1", fecha),
+        ])
+
+        # Si se borra la cuenta se borran sus solicitudes (politica v1.1, A.11)
+        self.assertTrue(usuarios.eliminar(id_usuario))
+        self.conn.commit()
+        cursor.execute("SELECT COUNT(*) FROM solicitudes WHERE id_usuario = %s", (id_usuario,))
+        self.assertEqual(cursor.fetchone()[0], 0)
+        cursor.close()
+
 
 def _lista_estados(sql):
     """Devuelve la ultima lista enum de `estado` que aparece en el texto."""
@@ -407,6 +504,11 @@ def _regla_fechas(sql):
 
 def _regla_autorizacion(sql):
     encontrada = re.search(r"`chk_autorizacion_datos` CHECK (\(.*\))", sql)
+    return encontrada.group(1) if encontrada else None
+
+
+def _regla_solicitudes(sql):
+    encontrada = re.search(r"`chk_solicitud_tipo` CHECK (\(.*\))", sql)
     return encontrada.group(1) if encontrada else None
 
 
@@ -862,6 +964,117 @@ class PruebasMigracionEjemploEnBD(unittest.TestCase):
         self._migrar()
         self._migrar()
         self.assertEqual(self._mascotas(), {("Nala", "Gato", "en_adopcion"): (0, None)})
+
+
+class PruebasMigracionSolicitudesSinBD(unittest.TestCase):
+    """A-21 (item 3.6): la migracion del 07/11/2026 crea la misma tabla que schema.sql."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sql = _leer(RUTA_MIGRACION_SOLICITUDES)
+        cls.sentencias = _sentencias(cls.sql)
+
+    def test_crea_la_misma_tabla_que_el_esquema(self):
+        bloque = _bloque_tabla(self.sql, "solicitudes")
+        self.assertNotEqual(bloque, "")
+        self.assertEqual(bloque, _bloque_tabla(_leer(RUTA_ESQUEMA), "solicitudes"))
+        self.assertEqual(_regla_solicitudes(bloque), REGLA_SOLICITUDES)
+
+    def test_nunca_apaga_el_modo_estricto(self):
+        self.assertTrue(self.sentencias[0].startswith("SET SESSION sql_mode"))
+        for modo in (s for s in self.sentencias if "sql_mode" in s):
+            self.assertIn("STRICT_TRANS_TABLES", modo)
+
+    def test_solo_crea_la_tabla(self):
+        """No borra ni cambia nada: se puede correr en la BD del dueno sin riesgo."""
+        self.assertEqual(len(self.sentencias), 2)
+        self.assertTrue(self.sentencias[1].startswith("CREATE TABLE IF NOT EXISTS `solicitudes`"))
+        for sentencia in self.sentencias:
+            # "ON DELETE / ON UPDATE CASCADE" son parte de las claves foraneas, no ordenes
+            sin_claves = re.sub(r"\bON (DELETE|UPDATE)\b", "", sentencia)
+            self.assertNotRegex(sin_claves, r"\b(DROP|ALTER|DELETE|UPDATE|INSERT|TRUNCATE)\b")
+
+
+@unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",
+                     "Prueba con MariaDB real: activar con PETCONNECT_PRUEBA_BD=1")
+class PruebasMigracionSolicitudesEnBD(unittest.TestCase):
+    """A-21 (item 3.6): la migracion crea la tabla en una base vieja y su regla funciona."""
+
+    @classmethod
+    def setUpClass(cls):
+        import mysql.connector
+        from config.db_config import DB_CONFIG
+
+        cls.Error = mysql.connector.Error
+        servidor = {k: v for k, v in DB_CONFIG.items() if k not in ("database", "sql_mode")}
+        try:
+            cls.conn = mysql.connector.connect(**servidor)
+        except mysql.connector.Error:
+            raise unittest.SkipTest("No hay conexion con MariaDB")
+        cls.conn.autocommit = True
+
+        cursor = cls.conn.cursor()
+        # Nombre constante del archivo: los identificadores no van como parametro.
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_SOLICITUDES}`")
+        cursor.execute(f"CREATE DATABASE `{BD_PRUEBA_SOLICITUDES}` "
+                       "CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci")
+        cls.addClassCleanup(cls._borrar_bd_prueba)
+        cursor.execute(f"USE `{BD_PRUEBA_SOLICITUDES}`")
+        cursor.close()
+
+    @classmethod
+    def _borrar_bd_prueba(cls):
+        cursor = cls.conn.cursor()
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_SOLICITUDES}`")
+        cursor.close()
+        cls.conn.close()
+
+    def setUp(self):
+        self.cursor = self.conn.cursor()
+        # Base "vieja": solo las tablas a las que apuntan las claves foraneas
+        for tabla in ("solicitudes", "mascotas", "usuarios"):
+            self.cursor.execute(f"DROP TABLE IF EXISTS {tabla}")
+        self.cursor.execute("CREATE TABLE usuarios (id_usuario int(11) AUTO_INCREMENT PRIMARY KEY) "
+                            "ENGINE=InnoDB")
+        self.cursor.execute("CREATE TABLE mascotas (id_mascota int(11) AUTO_INCREMENT PRIMARY KEY) "
+                            "ENGINE=InnoDB")
+        self.cursor.execute("INSERT INTO usuarios VALUES (1)")
+        self.cursor.execute("INSERT INTO mascotas VALUES (1)")
+
+    def tearDown(self):
+        self.cursor.close()
+
+    def _migrar(self):
+        for sentencia in _sentencias(_leer(RUTA_MIGRACION_SOLICITUDES)):
+            self.cursor.execute(sentencia)
+
+    def _insertar(self, tipo, id_mascota, telefono):
+        self.cursor.execute(
+            "INSERT INTO solicitudes (id_usuario, tipo, id_mascota, telefono, mensaje, "
+            "version_politica_datos) VALUES (%s, %s, %s, %s, %s, %s)",
+            (1, tipo, id_mascota, telefono, "Mensaje de prueba", "1.1"))
+
+    def test_se_puede_ejecutar_dos_veces_sin_perder_filas(self):
+        self._migrar()
+        self._insertar("adopcion", 1, None)
+        self._migrar()
+        self.cursor.execute("SELECT COUNT(*) FROM solicitudes")
+        self.assertEqual(self.cursor.fetchone()[0], 1)
+
+    def test_la_regla_y_las_claves_funcionan(self):
+        self._migrar()
+        self._insertar("adopcion", 1, "3000000000")
+        self._insertar("contacto", None, None)
+        incoherentes = (("adopcion", None, None), ("contacto", 1, None),
+                        ("contacto", None, "3000000000"), ("adopcion", 99, None))
+        for tipo, id_mascota, telefono in incoherentes:
+            with self.subTest(tipo=tipo, id_mascota=id_mascota, telefono=telefono):
+                with self.assertRaises(self.Error):
+                    self._insertar(tipo, id_mascota, telefono)
+        # Borrar la cuenta borra sus solicitudes
+        self.cursor.execute("DELETE FROM usuarios WHERE id_usuario = 1")
+        self.cursor.execute("SELECT COUNT(*) FROM solicitudes")
+        self.assertEqual(self.cursor.fetchone()[0], 0)
 
 
 if __name__ == "__main__":

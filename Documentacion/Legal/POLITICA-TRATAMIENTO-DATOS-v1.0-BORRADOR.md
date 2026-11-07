@@ -1,4 +1,4 @@
-# Política de tratamiento de datos personales de PetConnect — versión 1.0 (BORRADOR)
+# Política de tratamiento de datos personales de PetConnect — versión 1.1 (BORRADOR)
 
 > **Estado: BORRADOR para validar. No publicar todavía.**
 > Lo redactó Claude Code el 05/11/2026 para el ítem 3.1 (A-20, NC-005). Es contenido legal: puede *sonar* bien y
@@ -14,9 +14,16 @@
 > - **Parte C**: lo que el sistema debe hacer para cumplir. Es la especificación de las 3 partes del 3.1.
 > - **Parte D**: las decisiones que faltan. **Parte E**: la revisión de datos personales.
 >
-> **Prueba de la autorización:** la versión `1.0` es la que guarda el servidor en `VERSION_POLITICA_DATOS`. El texto
+> **Prueba de la autorización:** la versión `1.1` es la que guarda el servidor en `VERSION_POLITICA_DATOS`. El texto
 > exacto de cada versión queda en el historial de git de este archivo. Así se puede mostrar qué aceptó cada persona.
 > Si el texto cambia, cambia la versión (ver A.13).
+>
+> **Versiones:**
+> - **1.0** (05/11/2026, ítem 3.1): cuenta, códigos, mascotas y protección de la plataforma.
+> - **1.1** (07/11/2026, ítem 3.6, A-21): agrega las solicitudes de adopción y los mensajes de contacto (A.4, A.5
+>   punto 7, A.6, A.11 y A.14; Partes B.3, B.5 y C.12 a C.15). Al subir la versión, quien aceptó la 1.0 debe
+>   autorizar otra vez al iniciar sesión (C.9). El archivo conserva el nombre `...v1.0-BORRADOR.md` para no romper
+>   los enlaces de los demás documentos.
 
 ---
 
@@ -65,6 +72,8 @@ Política de Colombia (derecho al hábeas data).
 | Fecha en que autorizaste y versión de la política que aceptaste | Al registrarte | Sí (es la prueba de tu autorización) |
 | Códigos de verificación | Cada vez que te registras o inicias sesión; te los enviamos por correo | Sí |
 | Datos de tus mascotas (nombre, especie, raza, sexo, edad aproximada, color, foto y observaciones) | Solo si registras mascotas en tu cuenta | No |
+| Mensajes que nos envías por los formularios de adopción y contacto (con la fecha y la mascota) | Solo si los envías, con tu sesión iniciada | No |
+| Teléfono | Solo si lo escribes en una solicitud de adopción | No |
 | Dirección IP desde la que te conectas | En cada petición | Técnico |
 
 **No pedimos datos sensibles** (salud, origen racial o étnico, orientación política, creencias, datos biométricos,
@@ -86,6 +95,8 @@ borra al cerrar sesión. **No usamos cookies de publicidad ni herramientas de an
 5. Proteger la plataforma: limitar los intentos de inicio de sesión y de códigos, y detectar abusos. Los registros
    técnicos del servidor no guardan tu correo ni tus códigos.
 6. Atender tus consultas, reclamos y solicitudes sobre tus datos.
+7. Gestionar tus solicitudes de adopción y responder tus mensajes de contacto. Solo los lee el equipo de PetConnect;
+   no se envían a quien publicó la mascota.
 
 **Lo que no hacemos:** no vendemos ni alquilamos tus datos, no te enviamos publicidad y no los usamos para fines
 distintos a los de esta lista. Si algún día quisiéramos usarlos para otra cosa (por ejemplo, enviarte novedades), te
@@ -96,6 +107,10 @@ pediríamos una autorización nueva y aparte, que podrías no dar sin perder tu 
 Solo tratamos tus datos si nos autorizas **antes** de registrarte, marcando tú mismo la casilla del formulario de
 registro. La casilla viene **sin marcar** y no puedes crear la cuenta sin ella (Ley 1581, art. 9). Guardamos la fecha
 y la versión de esta política que aceptaste, como prueba (Decreto 1377, art. 8).
+
+Los formularios de adopción y contacto no piden otra casilla: usan la autorización de tu cuenta con esta versión de
+la política, y cada solicitud guarda la versión que tenías aceptada al enviarla. Si aceptaste una versión anterior, te
+pediremos autorizar otra vez al iniciar sesión.
 
 No necesitamos tu autorización en los casos del artículo 10 de la Ley 1581 (por ejemplo, una orden judicial o un
 requerimiento de una entidad pública en ejercicio de sus funciones).
@@ -163,6 +178,8 @@ como lo exige la ley.
 - **Tu cuenta:** mientras esté activa. Si pides borrarla, eliminamos tus datos en el plazo de respuesta del reclamo
   (A.8), salvo lo que la ley nos obligue a conservar.
 - **Prueba de tu autorización** (fecha y versión): [PENDIENTE: cuánto tiempo después de cerrar la cuenta].
+- **Tus solicitudes de adopción y mensajes de contacto:** se guardan mientras tu cuenta exista o hasta que pidas
+  borrarlos.
 - **Un registro que no terminaste:** tus datos y el código se guardan solo en la memoria temporal del servidor, dejan
   de servir a los 10 minutos y nunca llegan a la base de datos.
 - **Cuentas inactivas:** [PENDIENTE: decidir si se borran tras un tiempo sin uso].
@@ -182,7 +199,7 @@ correo. Si el cambio afecta para qué usamos tus datos, te pediremos de nuevo la
 
 ### A.14 Vigencia
 
-- Versión: **1.0**
+- Versión: **1.1**
 - Vigente desde: [PENDIENTE: fecha de publicación].
 - Las bases de datos estarán vigentes mientras PetConnect preste el servicio.
 
@@ -218,10 +235,28 @@ dueño del proyecto pidió volver a mostrarlo en el aviso. El correo también es
 | Inicio de sesión de una cuenta sin autorización vigente (creada antes del 3.1 o que aceptó otra versión), sin la casilla | API, respuesta 403 con `"requiere_autorizacion": true` (ítem 3.5) | “Para seguir usando tu cuenta debes autorizar el tratamiento de tus datos personales” |
 | Se intenta continuar el inicio de sesión sin marcar la casilla | Web y móvil, antes de llamar a la API (ítem 3.5) | “Para continuar debes autorizar el tratamiento de tus datos personales.” |
 | Debajo de la casilla del inicio de sesión | Web y móvil (ítem 3.5) | “Si no quieres autorizarlo, escríbenos a proyectopetconnect+atencion@gmail.com y borraremos tu cuenta.” (enlace `mailto`, proceso manual de C.8) |
+| Se envía una solicitud o un mensaje con una cuenta sin la autorización de la versión vigente (por ejemplo, un token de antes de la 1.1) | API, respuesta 403 con `"requiere_autorizacion": true` (ítem 3.6) | “Para enviar tu solicitud debes autorizar la versión vigente de la política de datos. Cierra sesión y vuelve a iniciarla” |
+| Formulario de adopción o contacto sin sesión iniciada | Web y móvil (ítem 3.6, partes 2 y 3) | El botón dice “Inicia sesión para enviar” y no se puede escribir en el formulario |
 
 **B.4 Accesibilidad:** la casilla debe tener su etiqueta asociada (`<label htmlFor>` en la web,
 `accessibilityRole="checkbox"` y `accessibilityState={{ checked }}` en el móvil), un área táctil de al menos
 44 × 44 px y un contraste suficiente. El error debe leerse con el lector de pantalla.
+
+**B.5 Aviso de los formularios de adopción y contacto** (versión 1.1, ítem 3.6; letra pequeña, encima del botón
+“Enviar”; cumple el deber de informar del art. 12 de la Ley 1581). Decisión del dueño del proyecto (07/11/2026): **sin
+casilla aparte**, porque la cuenta ya autorizó la versión 1.1, que nombra esta finalidad (A.5 punto 7).
+
+> Adopción: Al enviar, usaremos tu nombre, tu correo, tu teléfono (si lo escribes) y este mensaje para gestionar tu
+> solicitud de adopción de {nombre de la mascota}, según la **[Política de tratamiento de datos personales]**. Solo el
+> equipo de PetConnect lee tu mensaje. No escribas datos sensibles (salud, creencias…). Puedes pedir que lo borremos
+> escribiendo a proyectopetconnect+atencion@gmail.com.
+
+> Contacto: Al enviar, usaremos tu nombre, tu correo y este mensaje para responder tu consulta, según la
+> **[Política de tratamiento de datos personales]**. Solo el equipo de PetConnect lee tu mensaje. No escribas datos
+> sensibles (salud, creencias…). Puedes pedir que lo borremos escribiendo a proyectopetconnect+atencion@gmail.com.
+
+El nombre y el correo se muestran solo para leer (salen de la cuenta). La web y el móvil dicen “enviada” **solo** si la
+API respondió 201.
 
 ---
 
@@ -240,10 +275,14 @@ dueño del proyecto pidió volver a mostrarlo en el aviso. El correo también es
 | C.9 | Cambios en la política | Decreto 1377, art. 13 | Cambiar el texto obliga a subir `VERSION_POLITICA_DATOS`; al iniciar sesión, quien aceptó otra versión debe autorizar otra vez (casilla + código; ítem 3.5, hecho el 06/11/2026 en la API, la web y el móvil) | 3.5 |
 | C.10 | Usuarios sin autorización registrada | Riesgo R05 del plan GA9 (contingencia) | Quedan con `acepta_datos = 0` (nunca un `UPDATE` que la invente); al iniciar sesión deben marcar la casilla y la autorización se guarda con el código correcto (ítem 3.5, hecho el 06/11/2026 en la API, la web y el móvil) | 3.5 |
 | C.11 | Datos personales fuera de los registros técnicos | Ley 1581, art. 4 (seguridad y confidencialidad) | Ya cumplido en el 2.8: los registros no llevan correos ni códigos | Hecho |
+| C.12 | Finalidad nueva: solicitudes de adopción y mensajes de contacto | Ley 1581, arts. 4 b y 12; Decreto 1377, art. 13 | La política pasa a la versión 1.1 (A.4, A.5 punto 7, A.11) y `VERSION_POLITICA_DATOS = "1.1"`: quien aceptó la 1.0 autoriza otra vez al iniciar sesión (C.9). Las rutas `POST /api/solicitudes/adopcion` y `/contacto` exigen sesión (`@require_auth`) y una cuenta activa con la autorización de la versión vigente; si no, 403 con `"requiere_autorizacion": true` (B.3) | 3.6 (parte 1, API) |
+| C.13 | Conservar la prueba de la autorización de cada solicitud | Ley 1581, art. 17 b; Decreto 1377, art. 8 | Tabla `solicitudes`: `id_usuario` (del token, nunca del cuerpo), `version_politica_datos` (la que aceptó la cuenta) y `fecha_envio`. La API responde 201 solo si la fila se guardó | 3.6 (parte 1, API + BD) |
+| C.14 | Minimización y confidencialidad | Ley 1581, art. 4 (finalidad, seguridad, confidencialidad) | La tabla no repite el nombre ni el correo (salen de la cuenta). Teléfono opcional y solo en adopción; un mensaje de contacto no guarda mascota ni teléfono (regla `chk_solicitud_tipo`). Mensaje de 10 a 1000 caracteres. Los registros técnicos no llevan el mensaje ni el teléfono. Límite de 5 envíos por minuto por IP | 3.6 (parte 1) |
+| C.15 | Conservación | Decreto 1377, art. 11 | Si se borra la cuenta o la mascota, se borran sus solicitudes (`ON DELETE CASCADE`); A.11 | 3.6 (parte 1, BD) |
 
 **Fuera del 3.1** (no mezclar): la consola (`vista/menu_usuarios.py`) es el 4.11. Desde el 3.1 guardará
-`acepta_datos = 0` por el nuevo valor por defecto del modelo, que es lo honesto. Los formularios de adopción y contacto,
-que hoy no envían nada, son el 3.2: si algún día envían datos, esta política se actualiza (versión nueva).
+`acepta_datos = 0` por el nuevo valor por defecto del modelo, que es lo honesto. Los formularios de adopción y contacto
+se rotularon como demo en el 3.2 y envían datos desde el 3.6, con esta política en su versión 1.1 (C.12 a C.15).
 
 ---
 
@@ -269,6 +308,7 @@ que hoy no envían nada, son el 3.2: si algún día envían datos, esta polític
 | Datos personales | A.10 | Hoy la web y el móvil hablan con la API por HTTP sin cifrar en desarrollo (A-27), y el token del móvil está en AsyncStorage sin cifrar (A-28). A.10 no promete HTTPS a propósito | Media | Hacer el 5.3 antes de publicar en internet y entonces agregar “conexión cifrada (HTTPS)” a A.10 |
 | Datos personales | A.11 | Hoy los registros pendientes vencidos no se limpian de la memoria (A-12) | Baja | El 4.6 los limpia. El texto dice solo lo que es cierto hoy |
 | Datos personales | Todo el archivo | Fuera de A.1 no hay datos de personas: solo marcadores `[PENDIENTE]` | — | Ninguna |
+| Datos personales | A.4, A.5 punto 7, B.5 (versión 1.1, 07/11/2026) | Los mensajes son texto libre: alguien puede escribir datos sensibles o datos de otra persona. El aviso B.5 pide no hacerlo, pero no lo impide. Las solicitudes no llegan a quien publicó la mascota: el equipo hace de intermediario a mano | Media | Validar con el instructor que la autorización de la cuenta (sin casilla aparte, decisión del 07/11/2026) basta para esta finalidad |
 | Salud animal | A.4 | Solo nombra que existen datos de vacunas; no da información veterinaria | — | No necesita `REVISAR-VETERINARIO` |
 | Imágenes | — | No hay imágenes | — | Ninguna |
 | Legal | Todo el archivo | Lo redactó una IA; las citas (Ley 1581 arts. 3, 8, 9, 10, 12, 14, 15, 16, 17, 26; Decreto 1377 arts. 7, 8, 11, 13, 24, 25; Decreto 090 de 2018) se deben comparar con el texto oficial | Alta | Validación del dueño y del instructor |

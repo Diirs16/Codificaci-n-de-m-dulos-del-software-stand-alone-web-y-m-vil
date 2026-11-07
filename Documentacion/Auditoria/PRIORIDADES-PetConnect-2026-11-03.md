@@ -70,7 +70,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 3.3 | A-23 | NC-009 | Web: estados de carga/vacío/error en Catálogo, Adopción, detalles y Home; `data/*.js` solo para pruebas | 🟡 | Con la API apagada, la web muestra un error, no perritos falsos — *Hecho el 06/11/2026 (solo web): `api.js` (cada error trae `status`; 0 sin conexión), componente `EstadoCarga.jsx` (cargando / error con “Reintentar” / vacío), `Adoption.jsx`, `Catalog.jsx`, `PetDetail.jsx` (404 → “no encontrada”, otro fallo → error; nunca la ficha falsa), `ProductDetail.jsx` y `Home.jsx` (“Productos destacados” de la API en lugar de ofertas/nuevos inventados); `src/data/pets.js` y `products.js` borrados. Pruebas nuevas `npm test` (`node --test`, sin dependencias): `tests/api.test.js` y `tests/sin-datos-falsos.test.js` (fallan 5 de 6 con el código viejo, pasan 6 de 6 con el nuevo). Lint 0 errores, build OK, 375 px con la API apagada: error en las 5 páginas (contraprueba: el código viejo mostraba las 6 mascotas falsas); `/impeccable audit` 17/20. Probado por el dueño con la API real: 6 mascotas de la BD, `/adopcion/99999` → “Mascota no encontrada”, Home con productos reales. NC-009 cerrada* |
 | [x] | 3.4 | A-22 | — | Datos reales de vacunación/esterilización/tamaño (o no mostrarlos); corregir `seed.py` (tamaño en `color`); `/revision-contenido-mascotas` | 🟡 | La ficha no contradice la descripción; textos marcados `REVISAR-VETERINARIO` — *Opción (a) del dueño: no mostrar vacunación, esterilización ni tamaño. Parte 1 de 3 (backend) hecha el 06/11/2026: `api.py` ya no inventa `vaccinated`/`sterilized`/`size`; `seed.py` con `color` en `None` y 10 textos `# REVISAR-VETERINARIO`; migración `2026-11-06_mascotas_ejemplo.sql` (color con tamaño → `NULL`, Nala 6 → 0; reconoce las 6 de ejemplo por nombre + especie + `en_adopcion`), aplicada por el dueño; `tests/test_ficha_mascota.py` y `test_esquema.py` (fallan con el código viejo, pasan con el nuevo). Parte 2 de 3 (web) hecha el 06/11/2026: `src/utils/mascota.js` (edad “2 años” / “Menos de 1 año”, sexo “Hembra”/“Macho”, línea sin datos desconocidos); `PetDetail.jsx` sin el bloque ✓/✗ ni la talla y `Adoption.jsx` sin la talla; `tests/mascota.test.js` y `tests/sin-salud-inventada.test.js` (con las páginas viejas falla 1 de 12, que nombra las dos páginas; pasan 12 de 12 con las nuevas); lint 0 errores, build OK, 375 px con la API real; `/impeccable audit` 16/20. Parte 3 de 3 (móvil) hecha el 06/11/2026: `src/utils/mascota.js` (copia de la web); `PetDetailScreen.js` sin las insignias Vacunada/Esterilizada, sin `Badge` y sin “Talla undefined”; `AdoptionScreen.js` con la misma línea “Raza · Edad · Sexo”; fotos con `role="img"` y `aria-label`; `tests/mascota.test.mjs` y `tests/sin-salud-inventada.test.mjs` (`npm test` del móvil, `node --test`; con las pantallas viejas fallan 2 de 7, pasan 7 de 7 con las nuevas); `npx expo export --platform web` OK y 375 px con la API simulada; probado por el dueño en el emulador con la API real (6 mascotas, Nala “Menos de 1 año”); `/impeccable audit` 14/20. A-22 resuelto. Falta la validación veterinaria de los textos marcados antes de publicar* |
 | [x] | 3.5 | A-20 | — (R05) | Pedir la autorización de datos a las cuentas existentes (`acepta_datos = 0`) y a quienes aceptaron una versión vieja de la política, al iniciar sesión (API + web + móvil); si no autorizan, ofrecer borrar la cuenta. **Nunca** con un `UPDATE` que la invente. Después de la parte 3 del 3.1. Surgió el 05/11/2026 | 🔴 | Una cuenta en 0 que inicia sesión ve la casilla y, al marcarla, queda con fecha y versión; sin marcarla no entra — *Opción (a) del dueño; si no autorizan, enlace al correo de atención para borrar la cuenta (proceso manual, C.8). Parte 1 de 3 (API + DAO) hecha el 06/11/2026: `api.py` (`_autorizacion_vigente`: `acepta_datos` = 1 y versión actual; `/login` responde 403 `"requiere_autorizacion": true` tras la contraseña y sin enviar código; con `"acepta_datos": true` la fecha y la versión van en el pendiente; `/login/verify` las escribe solo con el código correcto y sin prueba válida responde 403 sin token), `dao/usuario_dao.py` (los `SELECT` leen fecha y versión; `registrar_autorizacion`, `UPDATE` parametrizado de las tres columnas); `tests/test_login_datos.py` (12) y `test_esquema.py` (1 con MariaDB); con el `api.py` anterior fallan 5 de 9, con el DAO anterior 3 de 3. Parte 2 de 3 (web) hecha el 06/11/2026: componente `CasillaAutorizacion.jsx` (texto B.1 + B.2 en un solo lugar, lo usan el registro y el inicio de sesión); `LoginModal.jsx` muestra el paso “Autoriza el uso de tus datos” con el 403 (casilla sin marcar, “Autorizar y continuar”, “Cancelar” y `mailto` B.3 para pedir borrar la cuenta; sin marcar, mensaje B.3 y 0 peticiones; un 403 en `/login/verify` vuelve a la casilla); `api.js` (`acepta_datos` solo con `true`, error con `requiereAutorizacion`) y `AuthContext.jsx`; `tests/api.test.js` (+5) y `tests/casilla-autorizacion.test.js` (3): con el código anterior fallan 7 de 8; `npm test` 20/20, lint y build OK, 375 px con la API simulada; `/impeccable audit` 16/20. Arreglo de la auditoría del 06/11/2026: “Cancelar” desactivado mientras se envía (si no, al llegar la respuesta salía igual la pantalla del código). Probada por el dueño con la API real el 06/11/2026: la cuenta 18 (`acepta_datos = 0`) inició sesión en la web, vio “Autoriza el uso de tus datos”, marcó la casilla, escribió el código y quedó con `acepta_datos = 1` y fecha; el caso “sin marcar” quedó probado con las pruebas automáticas y la API simulada. Parte 3 de 3 (móvil) hecha el 06/11/2026: componente `src/components/CasillaAutorizacion.js` (texto B.1 + enlace aparte + B.2 en un solo lugar; lo usan `RegisterScreen.js`, sin cambio visible, y `LoginScreen.js`); `LoginScreen.js` muestra el paso “Autoriza el uso de tus datos” con el 403 (casilla sin marcar, “Autorizar y continuar”, “Cancelar” desactivado mientras se envía y que borra la contraseña, línea B.3 con enlace aparte `mailto`; sin marcar, mensaje B.3 en `aria-live` y 0 peticiones; un 403 en `/login/verify` vuelve a la casilla); `src/utils/peticiones.js` (`errorDeApi` con `status` y `requiereAutorizacion`, `cuerpoLogin` con `acepta_datos` solo con `true`) que usa `api.js`; `AuthContext.js` sin cambios. `tests/peticiones.test.mjs` (5) y `tests/casilla-autorizacion.test.mjs` (4): con el código anterior fallan las 9 nuevas (5 si se deja `peticiones.js`: pasan a propósito las 4 que solo prueban ese archivo nuevo); `npm test` 16/16; `npx expo export --platform web` OK; 375 px con la API simulada (sin marcar 0 peticiones, marcada 1 con `"acepta_datos": true`, 403 en verify → casilla, Cancelar borra la contraseña, registro igual); `/impeccable audit` 14/20. Probado por el dueño en el emulador con la API real el 07/11/2026: la cuenta 17 (`acepta_datos = 0`) vio la casilla, la marcó, escribió el código y quedó con `acepta_datos = 1` y fecha 2026-11-07 01:32:37 (consulta por `id_usuario`, sin correos; las 18 y 19 siguen en 1 con su fecha). A-20 y R05: contingencia completa* |
-| [ ] | 3.6 | A-21 | — | Envío real de la solicitud de adopción y del mensaje de contacto: endpoint con `@require_auth` (y limitador), tabla nueva (migración + `schema.sql`), consentimiento para esa finalidad y **política v1.1** (Parte C, “Fuera del 3.1”; subir `VERSION_POLITICA_DATOS`), web y, si se decide, móvil. Quitar el `AvisoDemo` solo del formulario que ya envíe. El checkout real va aparte (A-26). Surgió en el 3.2 (06/11/2026) | 🔴 | Una solicitud enviada queda en la BD con el usuario, la fecha y la versión de la política, y la web dice “enviada” solo si la API respondió 201 |
+| [ ] | 3.6 | A-21 | — | Envío real de la solicitud de adopción y del mensaje de contacto: endpoint con `@require_auth` (y limitador), tabla nueva (migración + `schema.sql`), consentimiento para esa finalidad y **política v1.1** (Parte C, “Fuera del 3.1”; subir `VERSION_POLITICA_DATOS`), web y, si se decide, móvil. Quitar el `AvisoDemo` solo del formulario que ya envíe. El checkout real va aparte (A-26). Surgió en el 3.2 (06/11/2026) | 🔴 | Una solicitud enviada queda en la BD con el usuario, la fecha y la versión de la política, y la web dice “enviada” solo si la API respondió 201 — *Decisiones del dueño (07/11/2026): adopción y contacto; solo con sesión; solo en la BD (el equipo las lee con SQL); mensaje + teléfono opcional (solo adopción); sin casilla aparte, aviso corto B.5 (vale la autorización de la cuenta con la política 1.1, cuya versión se copia a cada solicitud); `VERSION_POLITICA_DATOS` = `"1.1"` desde la parte 1; móvil como parte 3. Parte 1 de 3 (API + BD) hecha el 07/11/2026: tabla `solicitudes` (`schema.sql` + migración `2026-11-07_solicitudes.sql`, regla `chk_solicitud_tipo`, `ON DELETE CASCADE`), `dao/solicitud_dao.py`, `POST /api/solicitudes/adopcion` y `/contacto` (limitador + `@require_auth`; 400 / 403 con `requiere_autorizacion` / 404 / 201 solo si se guardó), política 1.1 en el borrador .md; `tests/test_solicitudes.py` (19) y `test_esquema.py` (+7); con el código anterior fallan 27. Pendiente: migración en la BD del dueño, parte 2 (web) y parte 3 (móvil)* |
 
 ---
 
@@ -145,8 +145,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 06/11/2026, actualizada al terminar el 3.5 (parte 3 de 3, móvil: el inicio de sesión del móvil muestra
-la casilla cuando la API la pide): estado conocido al día y contexto del 3.6, último ítem de la Fase 3. Sin push hasta terminar toda la Fase 3. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
+*Versión del 07/11/2026, actualizada al terminar el 3.6 parte 1 de 3 (API + BD: tabla `solicitudes`, rutas
+`POST /api/solicitudes/adopcion` y `/contacto`, política 1.1): estado conocido al día y contexto de la parte 2 (web).
+El 3.6 es el último ítem de la Fase 3. Sin push hasta terminar toda la Fase 3. Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
 Vamos a seguir corrigiendo PetConnect con la auditoría del 3/11/2026.
@@ -164,7 +165,8 @@ Lee primero:
   todo queda en local: 3.1 (31f005c, fa1dda3, 6f0bdc9), 0a5e1dd, b8d5ec2,
   f40af07, 57e05c4 (3.2), 6c9c0bf (3.3), 47ae96d, b398126 y f441696 (3.4,
   3 partes), 03925c5 y fdaf59b (3.5 partes 1 y 2), 09fe293 (Cancelar +
-  prueba web con la API real) y el commit del 3.5 parte 3 (móvil).
+  prueba web con la API real), eaf0cdd y 095c112 (3.5 parte 3, móvil) y el
+  commit del 3.6 parte 1 (API + BD, 07/11/2026).
   REGLA DEL DUEÑO (06/11/2026): NO
   se hace push hasta terminar TODA la Fase 3 (3.1 a 3.6). No preguntes por el
   push antes; al marcar el último ítem de la fase, recuérdalo y pregunta)
@@ -175,9 +177,12 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   web y móvil; A-22 resuelto). NC-005 y NC-009 cerradas el 06/11/2026.
   El 3.5 está HECHO (3 partes el 06/11/2026: API + DAO, web y móvil; A-20 y
   R05 con la contingencia completa). La web la probó el dueño con la API
-  real (cuenta 18) y el móvil en el emulador (cuenta 17, 07/11/2026). Sigue
-  el 3.6, último de la Fase 3. Cuentas 17, 18 y 19 del dueño: las tres en
-  acepta_datos = 1 con fecha.
+  real (cuenta 18) y el móvil en el emulador (cuenta 17, 07/11/2026). El
+  3.6 (último de la Fase 3) va por la parte 2 de 3 (web): la parte 1 (API +
+  BD) quedó hecha el 07/11/2026. Cuentas 17, 18 y 19 del dueño: las tres en
+  acepta_datos = 1 con fecha, pero con la versión 1.0: desde que el dueño
+  reinicie la API con el código del 3.6, TODAS las cuentas deben autorizar
+  otra vez (1.1) al iniciar sesión. Eso es lo esperado, no un error.
 - Web sin datos falsos (3.3, A-23, hecho el 06/11/2026, solo web):
   src/data/pets.js y products.js BORRADOS; la prueba
   tests/sin-datos-falsos.test.js falla si algo de src/ vuelve a importar data/.
@@ -231,7 +236,7 @@ Estado conocido (6/11/2026; si el git log muestra más ítems hechos, manda el g
   antes en RegisterModal.jsx), y en el móvil CasillaAutorizacion.js y
   LoginScreen.js (desde el 3.5; antes en RegisterScreen.js), y el borrador .md.
 - "Por actualizar" está vacía.
-- Pruebas: 153 (132 OK + 21 omitidas que necesitan MariaDB).
+- Pruebas: 179 (155 OK + 24 omitidas que necesitan MariaDB), desde el 3.6 parte 1.
 - Autorización de datos (3.1 parte 1, NC-005 cerrada): api.py tiene
   VERSION_POLITICA_DATOS = "1.0" y _MENSAJE_SIN_AUTORIZACION. /register exige
   "acepta_datos": true (solo el booleano JSON, con `is True`) justo después de
@@ -606,28 +611,90 @@ dueño):
   17, 18 y 19 en 1 con fecha). El caso "sin marcar" con la API real no se
   capturó: lo cubren las pruebas y la API simulada.
 
-Contexto del próximo paso (3.6, A-21; ÚLTIMO de la Fase 3; es 🔴: proponer
-partes, como el 3.1 y el 3.5, y esperar aprobación):
-- Qué pide la fila: envío real de la solicitud de adopción y del mensaje de
-  contacto. Endpoint con @require_auth y limitador (LIMITE_AUTH u otro),
-  tabla nueva (migración en sql/migraciones/ + schema.sql + test_esquema.py),
-  consentimiento para esa finalidad y política v1.1 (subir
-  VERSION_POLITICA_DATOS: al hacerlo, el 3.5 vuelve a pedir la casilla a
-  TODAS las cuentas al iniciar sesión; avisar al dueño y decidir si se sube
-  ya o al publicar). Web y, si se decide, móvil. Quitar AvisoDemo solo del
-  formulario que ya envíe; el checkout sigue en demo (A-26).
-- Hoy: PetDetail.jsx y Contact.jsx tienen AvisoDemo + <fieldset disabled>
-  (3.2). La tabla `adopciones` del schema.sql NO sirve para solicitudes: es
-  la publicación de una mascota (con vacunada/esterilizada, que el 3.4 dejó
-  de mostrar); no reutilizarla sin preguntar. El borrador de la política
-  (Parte A.5 finalidades, Parte C "Fuera del 3.1") dice que si los
-  formularios envían datos la política sube de versión.
-- Decisiones para el dueño antes del plan: ¿adopción y contacto, o solo
-  adopción?; ¿solo con sesión iniciada (los datos salen de la cuenta) o
-  también sin sesión?; ¿qué campos (teléfono sí/no: dato personal extra)?;
-  ¿quién lee las solicitudes (correo al refugio, consulta en la BD)?; ¿móvil
-  en este ítem o después?; texto de la casilla para esta finalidad (Parte
-  B nueva) y de la v1.1.
+3.6 parte 1 (API + BD, A-21, hecha el 07/11/2026; plan de 3 partes aprobado
+por el dueño: API + BD, web, móvil):
+- Decisiones del dueño (07/11/2026): adopción Y contacto; solo con sesión
+  iniciada (nombre y correo salen de la cuenta, no se guardan otra vez);
+  solo en la BD (el equipo las lee con SQL; ni correo ni pantalla del dueño
+  de la mascota: las 6 mascotas son del usuario 5, de correo ajeno); mensaje
+  + teléfono OPCIONAL (solo adopción); SIN casilla aparte: aviso corto B.5
+  (vale la autorización de la cuenta con la política 1.1); textos v1.1 de
+  A.4, A.5 punto 7 y A.11 aprobados; VERSION_POLITICA_DATOS = "1.1" desde
+  esta parte; móvil como parte 3.
+- BD: tabla `solicitudes` (id_solicitud, id_usuario, tipo enum
+  adopcion/contacto, id_mascota NULL, telefono varchar(20) NULL, mensaje
+  varchar(1000), version_politica_datos NOT NULL, fecha_envio datetime) con
+  chk_solicitud_tipo (adopción exige mascota; contacto sin mascota ni
+  teléfono) y ON DELETE CASCADE desde usuarios y mascotas. En schema.sql
+  (33 tablas) y en sql/migraciones/2026-11-07_solicitudes.sql (solo el
+  CREATE TABLE IF NOT EXISTS, misma definición; lo revisa test_esquema).
+  sql/README.md explica cómo aplicarla y cómo leer las solicitudes.
+- dao/solicitud_dao.py: dueno_de_mascota_en_adopcion(id) (id_usuario o
+  None; solo estado en_adopcion) e insertar(id_usuario, tipo, id_mascota,
+  telefono, mensaje, version, fecha) → id. NO se traga los errores (los
+  deja subir: 503/500 de los manejadores globales); sin conexión lanza
+  InterfaceError (→ 503). Modelo para el 4.15.
+- api.py: VERSION_POLITICA_DATOS = "1.1"; MENSAJE_MIN/MAX = 10/1000;
+  teléfono: números, espacios y un + al inicio, 7 a 15 dígitos, máx. 20;
+  _cuenta_que_envia() (UsuarioDAO.consultar_por_id del token: 404 si no
+  existe, 403 "Cuenta inactiva o bloqueada", 403 con
+  "requiere_autorizacion": true y el mensaje "Para enviar tu solicitud
+  debes autorizar la versión vigente de la política de datos. Cierra sesión
+  y vuelve a iniciarla" si no tiene la 1.1). POST /api/solicitudes/adopcion
+  {id_mascota (int, no bool), mensaje, telefono opcional} y POST
+  /api/solicitudes/contacto {mensaje} (ignora mascota y teléfono). Orden:
+  limitador (LIMITE_AUTH, 5/min por IP) → @require_auth → validar cuerpo
+  (400) → cuenta → mascota en adopción (404 "Mascota no encontrada") y no
+  propia (400) → insertar → 201 {"message": "Solicitud enviada" | "Mensaje
+  enviado", "id"}. Los mensajes nuevos llevan tildes.
+- Pruebas: tests/test_solicitudes.py (15 de rutas con UsuarioDAO y
+  SolicitudDAO simulados y token de api.generate_token; 4 del DAO con
+  conexión simulada); test_esquema.py: tabla (sin BD), migración (sin BD,
+  3) y con MariaDB test_solicitudes_con_la_base_real (PruebasEsquemaEnBD) y
+  PruebasMigracionSolicitudesEnBD (2, base "petconnect_prueba_solicitudes");
+  test_limite.py con las 2 rutas; test_login_datos.py y
+  test_registro_datos.py con VERSION = "1.1" (y el caso "versión 1.0" debe
+  autorizar otra vez); test_logs.py lee api.VERSION_POLITICA_DATOS.
+  Contraprueba (git stash de api.py y schema.sql): fallan 27; pasan a
+  propósito las 4 del DAO y 2 de la migración (archivos nuevos).
+- Borrador de la política en 1.1 (mismo nombre de archivo ...v1.0-BORRADOR
+  .md, para no romper enlaces): A.4 (mensajes + teléfono), A.5 punto 7,
+  A.6 (sin casilla aparte), A.11, A.14, B.3 (+2 filas), B.5 (avisos de
+  adopción y contacto), C.12 a C.15 y una fila en la Parte E.
+- Prueba con la BD real (la hace el dueño; si no ha mandado la captura,
+  pídela antes de la prueba web): respaldo, migración, SHOW COLUMNS FROM
+  solicitudes, reiniciar la API (sin la tabla, enviar responde 500) y
+  correr con PETCONNECT_PRUEBA_BD=1 las clases
+  tests.test_esquema.PruebasEsquemaEnBD y
+  tests.test_esquema.PruebasMigracionSolicitudesEnBD.
+- La GA9 no tiene una NC para A-21: no se tocó.
+
+Contexto del próximo paso (3.6 parte 2 de 3: web):
+- PetDetail.jsx y Contact.jsx: quitar AvisoDemo y <fieldset disabled>
+  (AvisoDemo se queda para Checkout.jsx, A-26). Sin sesión: el botón dice
+  "Inicia sesión para enviar" y abre el inicio de sesión (ver cómo lo abre
+  Header.jsx / App.jsx). Con sesión: nombre y correo de la cuenta solo para
+  leer; teléfono opcional (solo adopción); mensaje (10 a 1000, con contador);
+  aviso B.5 con enlace a /politica-de-datos en pestaña nueva; "Enviar".
+  "Solicitud enviada" / "Mensaje enviado" SOLO con el 201; cualquier error
+  muestra data.error en role="alert" sin borrar lo escrito; el 403 con
+  requiereAutorizacion (y el 401 de token vencido) explica que hay que
+  volver a iniciar sesión y ofrece hacerlo (cerrar sesión + abrir el login).
+- api.js: enviarSolicitudAdopcion(...) y enviarMensajeContacto(...) con el
+  token (ver cómo lo manda hoy getMiMascota u otra ruta privada).
+- PoliticaDatos.jsx: VERSION_POLITICA = "1.1" y los textos nuevos de A.4,
+  A.5 punto 7, A.6 y A.11 (copiar del borrador .md). Hasta la parte 2 la
+  página sigue diciendo 1.0 aunque la API pide la 1.1.
+- Pruebas (npm test): api.test.js (+ las dos funciones: cuerpo, token,
+  errores con status y requiereAutorizacion), una prueba nueva que lea el
+  texto de PetDetail.jsx y Contact.jsx (no importan AvisoDemo, tienen el
+  aviso B.5, "enviada" solo tras la respuesta ok) y que PoliticaDatos.jsx
+  tenga la misma versión que VERSION_POLITICA_DATOS de api.py. Lint, build,
+  375 px con la API simulada, /impeccable audit y prueba del dueño con la
+  API real (autorizar la 1.1 al entrar, enviar una solicitud y un mensaje,
+  conteo SELECT tipo, COUNT(*) FROM solicitudes GROUP BY tipo).
+- Parte 3 (móvil): antes de empezar, preguntar al dueño dónde va Contacto
+  (el móvil no tiene esa pantalla).
 - Al terminar el 3.6: marcar [x], y como es el último de la Fase 3,
   RECORDAR EL PUSH y preguntar (regla del dueño).
 
@@ -668,6 +735,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 3.6** (A-21): envío real de la solicitud de adopción y del mensaje de contacto (endpoint con sesión,
-tabla nueva, consentimiento y política v1.1). Es el último de la Fase 3 y es 🔴: va por partes, con decisiones del
-dueño antes del plan. Al terminarlo, recordar el push (regla del dueño: sin push hasta cerrar la Fase 3).
+**Próximo ítem: 3.6, parte 2 de 3 (web)** (A-21): los formularios de adopción y contacto envían a la API (parte 1,
+API + BD, hecha el 07/11/2026) y `/politica-de-datos` pasa a la versión 1.1. Después, la parte 3 (móvil). Es el último
+de la Fase 3: al terminarlo, recordar el push (regla del dueño: sin push hasta cerrar la Fase 3).

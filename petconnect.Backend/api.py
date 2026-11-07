@@ -28,6 +28,7 @@ from werkzeug.exceptions import BadRequest, HTTPException
 
 from conexion.conexion_bd import ConexionBD
 from dao.usuario_dao import UsuarioDAO
+from dao.solicitud_dao import SolicitudDAO
 from modelo.usuario import Usuario
 from correo import enviar_codigo, enviar_bienvenida
 from otp import AlmacenOTP
@@ -59,7 +60,10 @@ limiter = Limiter(
 # que acepta quien se registra (Ley 1581 de 2012, art. 9). La fija el servidor, no
 # el cliente. Texto: Documentacion/Legal/POLITICA-TRATAMIENTO-DATOS-v1.0-BORRADOR.md.
 # Si el texto cambia, se sube esta version (Decreto 1377 de 2013, art. 13).
-VERSION_POLITICA_DATOS = "1.0"
+# 1.1 (07/11/2026, item 3.6): agrega las solicitudes de adopcion y los mensajes de
+# contacto (A.4, A.5 punto 7, A.11). Al subirla, toda cuenta que acepto la 1.0 debe
+# autorizar otra vez al iniciar sesion (item 3.5).
+VERSION_POLITICA_DATOS = "1.1"
 _MENSAJE_SIN_AUTORIZACION = "Debes autorizar el tratamiento de tus datos personales para registrarte"
 # Item 3.5 (A-20, R05): cuentas creadas antes del 3.1 (acepta_datos = 0) o que
 # aceptaron otra version de la politica. Se les pide al iniciar sesion.
@@ -760,6 +764,119 @@ def verify():
         "name":  f"{nombres} {apellidos}".strip(),
         "email": email,
     }), 201
+
+
+# ---------------------------------------------------------------------------
+# Solicitudes de adopcion y mensajes de contacto  (privado - con sesion)
+# ---------------------------------------------------------------------------
+# Item 3.6 (A-21): antes la web mostraba "Solicitud enviada" sin enviar nada.
+# Ahora se guardan en la tabla solicitudes y el equipo las lee en la BD. Decisiones
+# del dueno (07/11/2026): solo con sesion (nombre y correo salen de la cuenta), sin
+# casilla aparte (vale la autorizacion de la cuenta con la politica vigente, que
+# desde la 1.1 nombra esta finalidad) y telefono opcional solo en adopcion.
+# Nunca se registra en los logs el mensaje ni el telefono (Ley 1581).
+
+MENSAJE_MIN, MENSAJE_MAX = 10, 1000
+TELEFONO_MAX = 20                       # como usuarios.telefono y solicitudes.telefono
+TELEFONO_DIGITOS_MIN, TELEFONO_DIGITOS_MAX = 7, 15   # 15: maximo internacional (E.164)
+_TELEFONO_REGEX = re.compile(r"\+?[0-9 ]+")
+
+_MENSAJE_SOLICITUD_SIN_AUTORIZACION = (
+    "Para enviar tu solicitud debes autorizar la versión vigente de la política de datos. "
+    "Cierra sesión y vuelve a iniciarla"
+)
+
+
+def _validar_mensaje(mensaje: str) -> str | None:
+    if not (MENSAJE_MIN <= len(mensaje) <= MENSAJE_MAX):
+        return f"El mensaje debe tener entre {MENSAJE_MIN} y {MENSAJE_MAX} caracteres"
+    return None
+
+
+def _validar_telefono(telefono: str) -> str | None:
+    """Vacio = no lo dio (es opcional). Solo numeros, espacios y un + al inicio."""
+    if telefono == "":
+        return None
+    digitos = sum(c.isdigit() for c in telefono)
+    if (len(telefono) > TELEFONO_MAX or not _TELEFONO_REGEX.fullmatch(telefono)
+            or not (TELEFONO_DIGITOS_MIN <= digitos <= TELEFONO_DIGITOS_MAX)):
+        return (f"El teléfono solo puede tener números, espacios y un + al inicio "
+                f"(entre {TELEFONO_DIGITOS_MIN} y {TELEFONO_DIGITOS_MAX} dígitos)")
+    return None
+
+
+def _cuenta_que_envia():
+    """
+    Usuario del token, revisado en la BD: el token pudo emitirse antes de que la
+    cuenta se bloqueara o de que subiera la version de la politica (vale 24 h).
+    Devuelve (usuario, None) o (None, respuesta de error).
+    """
+    _get_conn()
+    usuario = UsuarioDAO().consultar_por_id(request.current_user_id)
+    if usuario is None:
+        return None, (jsonify({"error": "Usuario no encontrado"}), 404)
+    if usuario.estado != "activo":
+        return None, (jsonify({"error": "Cuenta inactiva o bloqueada"}), 403)
+    if not _autorizacion_vigente(usuario):
+        return None, (jsonify({"error": _MENSAJE_SOLICITUD_SIN_AUTORIZACION,
+                               "requiere_autorizacion": True}), 403)
+    return usuario, None
+
+
+def _guardar_solicitud(usuario, tipo, id_mascota, telefono, mensaje):
+    """Guarda la fila con la version de la politica que la cuenta acepto y devuelve su id."""
+    return SolicitudDAO().insertar(
+        usuario.id_usuario, tipo, id_mascota, telefono or None, mensaje,
+        usuario.version_politica_datos, datetime.now().replace(microsecond=0),
+    )
+
+
+@app.route("/api/solicitudes/adopcion", methods=["POST"])
+@limiter.limit(LIMITE_AUTH)
+@require_auth
+def enviar_solicitud_adopcion():
+    data = _cuerpo_json()
+    id_mascota = data.get("id_mascota")
+    # bool es un int en Python: True no puede pasar por la mascota 1
+    if not isinstance(id_mascota, int) or isinstance(id_mascota, bool) or id_mascota < 1:
+        return jsonify({"error": "Falta la mascota que quieres adoptar"}), 400
+    mensaje = _texto(data, "mensaje").strip()
+    telefono = _texto(data, "telefono").strip()
+    error = _validar_mensaje(mensaje) or _validar_telefono(telefono)
+    if error:
+        return jsonify({"error": error}), 400
+
+    usuario, respuesta = _cuenta_que_envia()
+    if respuesta:
+        return respuesta
+
+    dueno = SolicitudDAO().dueno_de_mascota_en_adopcion(id_mascota)
+    if dueno is None:
+        return _mascota_no_encontrada()
+    if dueno == usuario.id_usuario:
+        return jsonify({"error": "No puedes solicitar la adopción de tu propia mascota"}), 400
+
+    id_solicitud = _guardar_solicitud(usuario, "adopcion", id_mascota, telefono, mensaje)
+    return jsonify({"message": "Solicitud enviada", "id": id_solicitud}), 201
+
+
+@app.route("/api/solicitudes/contacto", methods=["POST"])
+@limiter.limit(LIMITE_AUTH)
+@require_auth
+def enviar_mensaje_contacto():
+    data = _cuerpo_json()
+    mensaje = _texto(data, "mensaje").strip()
+    error = _validar_mensaje(mensaje)
+    if error:
+        return jsonify({"error": error}), 400
+
+    usuario, respuesta = _cuenta_que_envia()
+    if respuesta:
+        return respuesta
+
+    # Contacto no lleva mascota ni telefono (regla chk_solicitud_tipo): se ignoran
+    id_solicitud = _guardar_solicitud(usuario, "contacto", None, "", mensaje)
+    return jsonify({"message": "Mensaje enviado", "id": id_solicitud}), 201
 
 
 @app.route("/api/auth/me", methods=["GET"])

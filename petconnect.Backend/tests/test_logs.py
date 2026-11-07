@@ -62,7 +62,7 @@ class PruebasLogsSinDatosPersonales(unittest.TestCase):
             password_hash="hash-falso", estado="activo",
             # Item 3.5: cuenta con la autorizacion vigente, para que /login llegue al correo
             acepta_datos=True, fecha_autorizacion_datos=datetime(2026, 11, 5, 10, 0, 0),
-            version_politica_datos="1.0",
+            version_politica_datos=self.api.VERSION_POLITICA_DATOS,
         )
         parches = {
             # BD simulada "encendida" (un objeto cualquiera): el DAO tambien es falso
@@ -190,7 +190,7 @@ class PruebasLogsSinDatosPersonales(unittest.TestCase):
                     CORREO_PRUEBA, {"name": NOMBRE, "password_hash": "hash-falso",
                                     # NC-005 (item 3.1): la prueba de la autorizacion
                                     "fecha_autorizacion_datos": datetime(2026, 11, 5, 10, 0, 0),
-                                    "version_politica_datos": "1.0"})
+                                    "version_politica_datos": self.api.VERSION_POLITICA_DATOS})
                 r, salida, logs = self._pedir(
                     "/api/auth/verify", {"email": CORREO_PRUEBA, "code": codigo}, valor)
 
