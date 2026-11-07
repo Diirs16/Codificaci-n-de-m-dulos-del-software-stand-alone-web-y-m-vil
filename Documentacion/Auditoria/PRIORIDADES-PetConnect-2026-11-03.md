@@ -164,10 +164,12 @@ Lee primero:
   PUSH: el 07/11/2026, al cerrar la Fase 3 y con el sí del dueño, se subió a
   origin/main TODO hasta el commit que actualiza este prompt (incluye 3.1 a
   3.6; los últimos: 2b8bc59, 3.6 parte 3 móvil, y e978419, prueba del móvil
-  en el emulador). Desde ahí los commits nuevos quedan en local: NO hagas
-  push por tu cuenta; pregunta al dueño cuándo subir (push normal, nunca
-  --force). Sin subir todavía (07/11/2026): los 3 commits del 4.1
-  (240116e, 680797e, 43fcfe1) y el que actualiza la documentación.
+  en el emulador). Desde ahí los commits nuevos quedan en local. Decisión
+  del dueño del 07/11/2026, al cerrar el 4.1: el push se hace cuando TODO
+  esté hecho. NO hagas push ni lo preguntes al cerrar cada ítem; solo al
+  marcar el último [ ] de este archivo, recuerda los commits pendientes y
+  pregunta (push normal, nunca --force). Sin subir todavía: desde 240116e
+  (4.1) en adelante.
 
 Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - 4.1 HECHO el 07/11/2026 (A-17, NC-004 CERRADA, CP-003 aprobado). La
