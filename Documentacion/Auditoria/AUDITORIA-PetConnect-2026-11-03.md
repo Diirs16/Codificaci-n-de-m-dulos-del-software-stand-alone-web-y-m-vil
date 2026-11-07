@@ -573,8 +573,13 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   nuevos). `npm test` 29/29, lint 0 errores, build OK. Revisado a 375 px con la API simulada y datos inventados (vacío y
   teléfono inválido → 0 peticiones; 403 → mensaje y botón, nada “enviada”; 201 → recuadro verde; 401 → cierra sesión y
   abre el inicio de sesión) y sin desplazamiento horizontal. `/impeccable audit` 16/20 (pulido opcional: el foco cae
-  en `body` al abrir o cerrar el formulario de adopción, colores fijos sin modo oscuro). Falta: aplicar la migración en
-  la BD del dueño, reiniciar la API y probar con la API real, y el móvil (parte 3).
+  en `body` al abrir o cerrar el formulario de adopción, colores fijos sin modo oscuro).
+  **Prueba con la API real (dueño, 07/11/2026):** migración aplicada en su BD (`SHOW COLUMNS FROM solicitudes`: las 8
+  columnas de `schema.sql`) y respaldo hecho. Al principio la ruta respondía 404: seguía viva una API del 06/11 sin el
+  código nuevo y atendía el puerto 5000; al cerrarla, la ruta sin token respondió 401. Luego, con su sesión, envió una
+  solicitud de adopción para Luna y la web mostró “Solicitud enviada… número 1”. Como la API solo responde 201 tras
+  guardar la fila y con la autorización 1.1, eso confirma la fila y el cambio de versión (C.9) con datos reales. El
+  mensaje de contacto y el conteo no se capturaron (lo cubren las pruebas automáticas). Falta el móvil (parte 3).
 
 #### A-22 · 🟡 Media · Información de salud contradictoria en la ficha de la mascota [N]
 - La API pone siempre `vaccinated=False`, `sterilized=False`, `size="Mediano"` (`api.py:215-220`), así que
