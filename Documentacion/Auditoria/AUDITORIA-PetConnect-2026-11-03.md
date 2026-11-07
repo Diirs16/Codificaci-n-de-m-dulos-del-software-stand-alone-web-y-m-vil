@@ -495,8 +495,11 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   true` y paso al código; 403 en `/login/verify` → casilla sin marcar; “Cancelar” deja la contraseña vacía; código
   correcto → sesión iniciada; el registro conserva su casilla; sin desborde horizontal. `/impeccable audit` 14/20
   (pulido opcional: el mensaje del 403 en gris sobre el fondo gris ≈ 4,3:1, enlaces de 44 px y no 48 dp, sin
-  `android_ripple`, colores fijos sin modo oscuro como toda la app). Prueba en el emulador con la API real: opcional,
-  pendiente del dueño (cuenta 17).
+  `android_ripple`, colores fijos sin modo oscuro como toda la app). Prueba en el emulador Android (Pixel 7) con la API real,
+  ejecutada por el dueño el 07/11/2026: la cuenta 17 (`acepta_datos = 0`) inició sesión, vio la casilla, la marcó
+  (“Cancelar” quedó gris mientras se enviaba), escribió el código y quedó con `acepta_datos = 1` y su fecha
+  (2026-11-07 01:32:37; consulta por `id_usuario`, sin correos). El caso “sin marcar” no se capturó con la API real:
+  lo cubren las pruebas automáticas y la API simulada.
 
 #### A-21 · 🟠 Alta · Formularios que fingen enviar datos personales [N]
 - **Solicitud de adopción** (`PetDetail.jsx:56-60`) y **Contacto** (`Contact.jsx:15-17`) piden nombre, correo, teléfono y
