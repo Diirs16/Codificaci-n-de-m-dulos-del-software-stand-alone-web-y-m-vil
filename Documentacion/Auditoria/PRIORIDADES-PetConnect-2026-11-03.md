@@ -82,7 +82,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.2 | A-19 | NC-011 | `AND activo = TRUE` en `buscar_por_nombre` de proveedores — *Hecho el 07/11/2026 en una parte (`06a422d`, solo backend): `_BUSCAR_POR_NOMBRE` filtra `activo = TRUE` como la búsqueda por ciudad y, con el sí del dueño, escapa `!`, `%` y `_` (`ESCAPE '!'`). Regresión: `tests/test_proveedores.py` (5, BD simulada); con el DAO viejo fallan 3 y pasan a propósito 2. NC-011 cerrada; CP-013 sigue en seguimiento por el filtro por tipo, que no existe* | 🟢 |
 | [x] | 4.3 | A-31 | — | GitHub Actions: `unittest` + `npm run lint` + `npm run build` en cada push — *Hecho el 07/11/2026 en una parte (`8802815`): `.github/workflows/ci.yml`, en cada push y con “Run workflow”, un job por módulo en `ubuntu-latest`: backend (Python 3.14, `unittest`), web (Node 24: `npm ci`, lint, `npm test`, build) y móvil (Node 24: `npm ci`, `npm test` y `expo export --platform web`, con el sí del dueño). `permissions: contents: read`, `persist-credentials: false`, acciones `@v7`, sin secretos. Validado en local en una copia limpia del commit (sin `.env` ni `node_modules`): backend 200 (176 + 24 omitidas), web 0 errores de lint + 42/42 + build, móvil 35/35 + export; YAML revisado y sin diferencias de mayúsculas en los imports. **La primera ejecución en GitHub queda pendiente del push** (al terminar todo). No cierra NC* | 🟡 |
 | [x] | 4.4 | A-31 | todas | Pruebas de endpoints con el cliente de Flask (mascotas, productos, auth, errores) — *Hecho el 07/11/2026 en una parte (`37f8126`, solo pruebas; `api.py` sin tocar). Primero un inventario ruta × caso y NC × prueba: de 14 rutas, 6 tenían huecos (`/api/auth/me` sin ninguna prueba) y NC-001, NC-008 y NC-009 no tenían regresión por la API. `tests/test_endpoints.py` (31, BD/DNS/correo simulados, sin `.env`): inventario vivo de rutas (ruta nueva sin pruebas → falla; privadas → 401 sin token), productos, filtro de adopción, `/me` con token real, migración del hash, login, verificación del código, registro y `validar-correo`. Suite 231 (207 + 24 omitidas). Contraprueba en una copia temporal: 28 roturas, todas detectadas; cada prueba falla con al menos una. A-31 resuelto (falta ver la CI en GitHub con el push). Hallazgo → 4.16* | 🟡 |
-| [ ] | 4.5 | A-11 | NC-003 | Pool de conexiones + `try/finally` para cerrar cursores | 🟡 |
+| [x] | 4.5 | A-11 | NC-003 | Pool de conexiones + `try/finally` para cerrar cursores — *Hecho el 07/11/2026 en una parte (`9c417de`, solo backend). Decisiones del dueño: pool de 10 (`DB_POOL_SIZE`, de 1 a 32), consola y `seed.py` en el mismo pool, 4.15 aparte. `ConexionBD` presta conexiones de un `MySQLConnectionPool`; si está lleno espera hasta 5 s y luego 503; el log no trae usuario ni host. `conexion_y_cursor()` (el `try/finally` escrito una vez) en los 32 métodos de los 5 DAO y en las 4 consultas de `api.py`; `_get_conn()` (pedía y nunca devolvía) → `_verificar_bd()`. `tests/test_pool.py` (25; 3 con MariaDB): sin fugas en 32 métodos y 14 rutas × 3 escenarios. Suite 256 (229 + 27 omitidas). Contraprueba: con el código viejo fallan 20 de 22; cada archivo arreglado tiene su prueba. NC-003 sigue abierta (4.6, 4.12; paginación e índices sin ítem)* | 🟡 |
 | [ ] | 4.6 | A-12 | NC-003 | OTP en tabla de la BD (hash del código, intentos, expiración) o 1 worker con hilos; limpiar vencidos y acotar `_mx_cache` | 🟡 |
 | [ ] | 4.7 | A-24 | — | Web: validar sesión con `/auth/me` al iniciar y cerrar sesión ante 401 | 🟢 |
 | [ ] | 4.8 | A-13 | — | Fernet: usarlo para el teléfono o quitarlo; corregir comentario `api.py:400`; `decrypt` debe fallar | 🟢 |
@@ -90,9 +90,9 @@ se borra de aquí y se marca `[x]` en su fase.
 | [ ] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) | 🟢 |
 | [ ] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos | 🟢 |
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5 y 4.6 | 🟡 |
-| [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5.** No reemplaza 2.2 | 🟡 |
+| [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 | 🟡 |
 | [ ] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` | 🟢 |
-| [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Hacerlo junto con 4.5 (pool y `try/finally`). Surgió en el 2.9 | 🟡 |
+| [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`* | 🟡 |
 | [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
 
 ---
@@ -146,8 +146,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 07/11/2026, actualizada al terminar el 4.4 (A-31, segunda parte: pruebas de endpoints con el cliente
-de Flask, una parte). El próximo ítem es el 4.5 (A-11, NC-003: pool de conexiones + `try/finally`).
+*Versión del 07/11/2026, actualizada al terminar el 4.5 (A-11, NC-003: pool de conexiones + `try/finally`, una
+parte). El próximo ítem es el 4.6 (A-12, NC-003: OTP fuera de la memoria del proceso).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -173,6 +173,29 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.5 HECHO el 07/11/2026 (A-11; commit 9c417de, solo backend; NC-003
+  sigue abierta). Decisiones del dueño: pool de 10 (DB_POOL_SIZE en
+  .env.example, vacío = 10, de 1 a 32; otro valor detiene el arranque),
+  consola y seed.py en el mismo pool, 4.15 aparte. ConexionBD (sigue
+  Singleton) presta conexiones de un MySQLConnectionPool creado una sola
+  vez; si está lleno espera hasta 5 s (ESPERA_MAXIMA_SEGUNDOS) y devuelve
+  None → 503; el log solo trae tipo y errno. conexion_y_cursor(conexion_bd,
+  dictionary=False) es el try/finally: cierra cursor y devuelve la
+  conexión aunque haya error; sin BD lanza InterfaceError (503). La usan
+  los 32 métodos de los DAO (commit/rollback sobre la conexión prestada;
+  ConexionBD.commit/rollback ya no existen) y las 4 consultas de api.py.
+  _get_conn() → _verificar_bd() (pide y devuelve enseguida). El punto de
+  parche de las pruebas sigue siendo _conexion_bd.obtener_conexion.
+  tests/test_pool.py (25; 3 con PETCONNECT_PRUEBA_BD=1, base temporal
+  petconnect_prueba_pool): PETICIONES debe cubrir TODA ruta del inventario
+  (ruta nueva → agregarla ahí y "test_pool.py" en RUTAS_PUBLICAS/PRIVADAS
+  de test_endpoints.py) y cada DAO nuevo entra solo en la revisión de
+  fugas (ojo: el número de métodos está fijo en 32). Suite 256 (229 + 27
+  omitidas). Contraprueba en el scratchpad (copia con tar + git archive):
+  viejo → fallan 20 de 22; solo api.py viejo → 36 subcasos; solo DAO
+  viejos → 96 + 21; seed/main viejos → su prueba. PENDIENTE DEL DUEÑO
+  (opcional): correr las 27 de MariaDB con PETCONNECT_PRUEBA_BD=1.
+  Hallazgo: paginación e índices de NC-003 no tienen ítem.
 - 4.4 HECHO el 07/11/2026 (A-31 segunda parte; A-31 RESUELTO; commit
   37f8126, solo tests/test_endpoints.py; api.py sin tocar). Inventario
   ruta x caso y NC x prueba antes de escribir: huecos en /api/auth/me (sin
@@ -871,37 +894,40 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.5, A-11, NC-003: pool de conexiones):
-- La fila dice "Pool de conexiones + try/finally para cerrar cursores".
-  A-11: conexion/conexion_bd.py es un Singleton con UNA conexión que
-  comparten todos los hilos de Flask (con 500 usuarios falló el 56 %:
-  'MySQL Connection not available', 'bytearray index out of range').
-  Arreglo propuesto: mysql.connector.pooling.MySQLConnectionPool, una
-  conexión por petición devuelta al pool (try/finally) y cursores que
-  siempre se cierran.
-- QUIÉN LA USA (revisado el 07/11/2026): api.py (_conexion_bd =
-  ConexionBD(); _get_conn() la pide y lanza BDNoDisponible → 503), los 5
-  DAO (usuario, mascota, producto, proveedor, solicitud: cada método llama
-  self._conexion_bd.obtener_conexion()), main.py (consola) y seed.py.
-  ConexionBD también tiene commit() y rollback() de la conexión única.
-- OJO CON LAS PRUEBAS: 13 archivos de tests/ parchean
-  _conexion_bd.obtener_conexion (BD "apagada" = None, "encendida" =
-  MagicMock). Si cambia la forma de pedir o devolver la conexión, hay que
-  conservar ese punto de parche o adaptar las pruebas sin perder lo que
-  prueban; el inventario de tests/test_endpoints.py y la suite (231, 207 +
-  24 omitidas) deben seguir pasando. Las 24 omitidas usan MariaDB real con
-  PETCONNECT_PRUEBA_BD=1: para el pool conviene que el dueño las corra
-  (bases temporales).
-- Decisiones para el dueño antes de tocar código: tamaño del pool (p. ej.
-  5, por variable en .env.example), si la consola y seed.py también pasan
-  al pool o siguen con una conexión, y si 4.15 (SQL de productos/mascotas
-  a dao/ + DAO que propaguen errores) va junto (la fila de 4.15 lo sugiere)
-  o aparte. Es un cambio de varios archivos y de la BD: PLAN PRIMERO
-  (CLAUDE.md, regla 2) y quizá por partes.
-- La medición de carga (CP-008/CP-017) es el 4.12, después de 4.5 y 4.6.
-- obtener_conexion() hoy imprime str(e) del error de conexión: revisar que
-  no muestre datos de la configuración (host, usuario) y pasarlo al logger
-  sin el mensaje, como _registrar_error.
+Contexto del próximo paso (4.6, A-12, NC-003: OTP fuera de la memoria):
+- La fila dice "OTP en tabla de la BD (hash del código, intentos,
+  expiración) o 1 worker con hilos; limpiar vencidos y acotar _mx_cache".
+  A-12: api.py crea _otp_registro y _otp_login = AlmacenOTP() en memoria
+  (otp/servicio.py: diccionario _pendientes, sin candado entre hilos, los
+  vencidos solo se borran si alguien vuelve a consultar ese correo). Con
+  varios procesos (Gunicorn), el código se guarda en uno y la verificación
+  llega a otro → "No hay verificación pendiente"; al reiniciar se pierden.
+  _mx_cache (api.py, junto a _validar_correo) crece sin límite.
+- Reglas que hoy cumple AlmacenOTP y que no se pueden perder (pruebas en
+  test_otp.py, test_registro.py, test_endpoints.py y otros): 10 min de
+  vigencia, 5 fallos → bloqueado (429), comparación en tiempo constante,
+  reenvío del MISMO código con 60 s de espera y máximo 3 (A-09), pedir uno
+  nuevo reinicia el contador. 8 archivos de tests/ usan
+  api._otp_login/_otp_registro (crear, descartar, verificar): conservar esa
+  interfaz o adaptar las pruebas sin perder lo que prueban.
+- Opciones para el dueño (plan primero; la opción A toca la BD):
+  A) Tabla otp_pendientes (sql/schema.sql + migración en sql/migraciones/
+     con su prueba en test_esquema.py): guardar solo el HASH del código
+     (nunca el código), intentos, vence, reenvíos; DAO nuevo con
+     conexion_y_cursor (4.5) que propague errores como SolicitudDAO; los
+     datos del pendiente de registro (nombre, hash de la contraseña, fecha
+     y versión de la política) también tendrían que ir en la tabla, y son
+     datos personales (Ley 1581): borrarlos al verificar o al vencer.
+  B) Seguir en memoria con 1 proceso y varios hilos: candado
+     (threading.Lock) en AlmacenOTP, limpieza periódica de vencidos y
+     _mx_cache con tamaño máximo. Más simple, pero no deja escalar a
+     varios procesos.
+  OJO: Gunicorn no corre en Windows (el dueño desarrolla en Windows; en
+  Docker, 5.2, sí). Con varios procesos, cada uno tiene su pool de 10:
+  procesos × 10 debe quedar bajo las 151 conexiones de MariaDB.
+- La medición de carga (CP-008/CP-017) es el 4.12, después del 4.6.
+  Paginación e índices (también de NC-003) no tienen ítem: preguntar al
+  dueño si se agrega uno.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -940,6 +966,6 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.5** (A-11, NC-003): pool de conexiones + `try/finally` para cerrar cursores; plan primero
-(varios archivos y la BD). El 4.4 quedó hecho el 07/11/2026 (pruebas de endpoints, `37f8126`; A-31 resuelto) y
-dejó el ítem nuevo 4.16 (detalle de producto sin filtro `activo`).
+**Próximo ítem: 4.6** (A-12, NC-003): OTP fuera de la memoria del proceso (tabla en la BD o 1 proceso con
+hilos), limpiar vencidos y acotar `_mx_cache`; plan primero (puede tocar la BD). El 4.5 quedó hecho el 07/11/2026
+(pool de conexiones, `9c417de`); NC-003 sigue abierta hasta el 4.6 y la medición del 4.12.

@@ -321,6 +321,33 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - **Dónde:** `conexion/conexion_bd.py:17-31` (Singleton con una conexión). El equipo midió 56 % de errores con 500 usuarios.
 - **Arreglo:** `mysql.connector.pooling.MySQLConnectionPool`, pedir y devolver una conexión por petición (con
   `try/finally`), cerrar cursores siempre.
+- **Estado: resuelto en el código el 07/11/2026 (ítem 4.5 de PRIORIDADES, commit `9c417de`; solo backend). NC-003
+  sigue abierta** hasta el 4.6 (OTP fuera de la memoria, A-12) y la nueva medición de carga (4.12); la paginación y
+  los índices que también pide NC-003 no tienen ítem todavía. Decisiones del dueño: pool de 10, la consola y
+  `seed.py` usan el mismo pool, y el 4.15 va aparte. `conexion/conexion_bd.py`: `ConexionBD` (sigue siendo
+  Singleton) presta conexiones de un `MySQLConnectionPool` creado la primera vez que se necesita, una sola vez
+  aunque lo pidan varios hilos; tamaño en `DB_POOL_SIZE` (`config/db_config.py`, `.env.example`; vacío = 10, de 1 a
+  32, otro valor detiene el arranque). El pool de la librería no espera: si está lleno, `obtener_conexion()`
+  reintenta hasta 5 s y luego devuelve `None` (503). El log de conexión guarda solo el tipo y el número del error,
+  no el mensaje (traía usuario y host). `conexion_y_cursor()` es el `try/finally` escrito una vez: cierra el cursor
+  y devuelve la conexión al pool aunque haya error. La usan los 32 métodos de los 5 DAO (el `commit`/`rollback`
+  pasa a la conexión prestada; `ConexionBD.commit()` y `rollback()` desaparecen) y las 4 consultas directas de
+  `api.py`. Hallazgo de la revisión: `_get_conn()` se usaba 7 veces solo para preguntar si había BD y nunca
+  devolvía la conexión; con un pool, eso lo habría agotado en 10 peticiones. Ahora es `_verificar_bd()`, que la
+  devuelve enseguida. `main.py` devuelve la conexión de prueba y cierra el pool al salir; `seed.py` devuelve la
+  suya. Se comprobó en el código de mysql-connector 9.1 que, al devolver una conexión, la limpieza de sesión
+  vuelve a aplicar el modo estricto (NC-009), el juego de caracteres y `autocommit`. Los DAO viejos siguen
+  devolviendo `None`/`[]` ante errores de la BD (eso es el 4.15). Regresión: `tests/test_pool.py` (25 pruebas; 3
+  con MariaDB real): tamaño del pool, pool falso con 20 hilos, espera y 503, log sin datos, `conexion_y_cursor` con
+  y sin error, los 32 métodos de los DAO y las 14 rutas del inventario de `tests/test_endpoints.py` (anotadas ahí)
+  devuelven toda conexión y cierran todo cursor con la BD vacía, con error de MySQL y con error inesperado; lo
+  mismo la consola y `seed.py`. Con `PETCONNECT_PRUEBA_BD=1`, en una base temporal: 30 hilos a la vez sin
+  respuestas cruzadas, modo estricto tras reutilizar cada conexión y 30 consultas de un DAO sin agotar el pool.
+  Suite: 256 pruebas (229 correctas y 27 omitidas que requieren MariaDB). Contraprueba en una copia temporal fuera
+  del repositorio: con el backend anterior fallan 20 de las 22 pruebas sin MariaDB (las 2 que pasan solo revisan
+  que las listas de métodos y rutas estén completas); con solo el `api.py` anterior fallan las 12 rutas que usan
+  la BD en los 3 escenarios; con solo los DAO anteriores, los 32 métodos; con solo el `seed.py` o el `main.py`
+  anterior, su prueba.
 
 #### A-12 · 🟠 Alta · Pasar a Gunicorn romperá los OTP [N]
 - **Dónde:** `api.py:44-45` (`AlmacenOTP()` en memoria), `otp/servicio.py`.
