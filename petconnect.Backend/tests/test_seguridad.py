@@ -64,12 +64,8 @@ class PruebasPasswords(unittest.TestCase):
         self.assertFalse(verificar_password("", hash_password(CONTRASENA)))
         self.assertFalse(verificar_password(CONTRASENA, ""))
 
-    def test_politica_de_longitud(self):
-        self.assertIsNone(api._validate_password("Abc12345!"))
-        self.assertIn("al menos 8", api._validate_password("Abc12!x"))
-        self.assertIsNone(api._validate_password("Aa1!" + "b" * 60))          # 64 caracteres
-        self.assertIn("maximo 64", api._validate_password("Aa1!" + "b" * 61))  # 65 caracteres
-        self.assertIn("maximo 64", api._validate_password("Aa1!" + "🐶" * 20))  # 84 bytes
+    # La politica de contrasenas (longitud y composicion) se prueba en
+    # tests/test_politica.py desde el item 4.1.
 
 
 class PruebasToken(unittest.TestCase):

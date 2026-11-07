@@ -34,7 +34,8 @@ from correo import enviar_codigo, enviar_bienvenida
 from otp import AlmacenOTP
 from security.jwt_helper import generate_token, verify_token
 from security.crypto import encrypt, decrypt
-from security.passwords import hash_password, verificar_password, es_hash_heredado, MAX_BYTES_BCRYPT
+from security.passwords import hash_password, verificar_password, es_hash_heredado
+from security.politica import validar_contrasena
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -224,18 +225,10 @@ def _row_to_dict(row):
     return {k: _serialize(v) for k, v in row.items()}
 
 
-def _validate_password(password: str) -> str | None:
-    if len(password) < 8:
-        return "La contrasena debe tener al menos 8 caracteres"
-    if len(password) > 64 or len(password.encode("utf-8")) > MAX_BYTES_BCRYPT:
-        return "La contrasena debe tener maximo 64 caracteres"
-    if not re.search(r'[A-Z]', password):
-        return "La contrasena debe tener al menos una mayuscula"
-    if not re.search(r'[0-9]', password):
-        return "La contrasena debe tener al menos un numero"
-    if not re.search(r'[@#!"$&?¡\-_*.]', password):
-        return 'La contrasena debe tener al menos un caracter especial: @ # ! " $ & ? ¡'
-    return None
+# Item 4.1 (A-17, NC-004): la politica de contrasenas vive en security/politica.py
+# (la usara tambien la consola en el 4.11). Se conserva el nombre viejo porque lo
+# llama Documentacion/Evidencias-GA9-AA2-EV01/pruebas_aa2.py (evidencia del AA2).
+_validate_password = validar_contrasena
 
 
 # A-05: un nombre son palabras de letras (con tildes y ñ) separadas por espacios.
@@ -624,7 +617,7 @@ def register():
     if not correo_valido:
         return jsonify({"error": mensaje_correo}), 400
 
-    error_pw = _validate_password(password)
+    error_pw = validar_contrasena(password)
     if error_pw:
         return jsonify({"error": error_pw}), 400
 
