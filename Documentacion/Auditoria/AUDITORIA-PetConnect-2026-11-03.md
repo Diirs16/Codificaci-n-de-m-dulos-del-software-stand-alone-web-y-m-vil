@@ -323,7 +323,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `try/finally`), cerrar cursores siempre.
 - **Estado: resuelto en el código el 07/11/2026 (ítem 4.5 de PRIORIDADES, commit `9c417de`; solo backend). NC-003
   sigue abierta** hasta el 4.6 (OTP fuera de la memoria, A-12) y la nueva medición de carga (4.12); la paginación y
-  los índices que también pide NC-003 no tienen ítem todavía. Decisiones del dueño: pool de 10, la consola y
+  los índices que también pide NC-003 quedaron como ítem 4.17. Decisiones del dueño: pool de 10, la consola y
   `seed.py` usan el mismo pool, y el 4.15 va aparte. `conexion/conexion_bd.py`: `ConexionBD` (sigue siendo
   Singleton) presta conexiones de un `MySQLConnectionPool` creado la primera vez que se necesita, una sola vez
   aunque lo pidan varios hilos; tamaño en `DB_POOL_SIZE` (`config/db_config.py`, `.env.example`; vacío = 10, de 1 a

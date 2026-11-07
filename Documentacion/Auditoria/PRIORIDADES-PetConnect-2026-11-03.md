@@ -89,11 +89,12 @@ se borra de aquí y se marca `[x]` en su fase.
 | [ ] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README | 🟢 |
 | [ ] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) | 🟢 |
 | [ ] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos | 🟢 |
-| [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5 y 4.6 | 🟡 |
+| [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
 | [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 | 🟡 |
 | [ ] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` | 🟢 |
 | [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`* | 🟡 |
 | [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
+| [ ] | 4.17 | A-11 | NC-003 | Paginación e índices (la otra mitad de la acción correctiva de NC-003). **Paginación:** `GET /api/productos` y `GET /api/mascotas/adopcion` devuelven todas las filas sin `LIMIT`; la web y el móvil las consumen (`src/services/api.js` en ambos), así que cambiar la forma de la respuesta toca los 3 módulos: decidir antes si se usan parámetros opcionales (`?pagina=&por_pagina=` con un máximo fijo, parametrizados) que mantengan la lista de hoy o un objeto con `total`, y hacerlo por partes (API, web, móvil). **Índices:** `mascotas` solo tiene la clave primaria y `id_usuario` (falta `estado`), `productos` no tiene índice en `activo` y `proveedores_servicio` solo la clave primaria (`ciudad`, `activo`, `nombre`); el `LIKE '%texto%'` no usa índice. Va en `sql/schema.sql` y en una migración de `sql/migraciones/` con su prueba en `tests/test_esquema.py` (toca la BD: plan primero, respaldo y que el dueño la aplique). Agregado el 07/11/2026 con el sí del dueño, al cerrar el 4.5. Hacerlo antes del 4.12 | 🟡 |
 
 ---
 
@@ -195,7 +196,8 @@ Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el g
   viejo → fallan 20 de 22; solo api.py viejo → 36 subcasos; solo DAO
   viejos → 96 + 21; seed/main viejos → su prueba. PENDIENTE DEL DUEÑO
   (opcional): correr las 27 de MariaDB con PETCONNECT_PRUEBA_BD=1.
-  Hallazgo: paginación e índices de NC-003 no tienen ítem.
+  Hallazgo: paginación e índices de NC-003 no tenían ítem → 4.17
+  (agregado con el sí del dueño; el 4.12 espera a 4.6 y 4.17).
 - 4.4 HECHO el 07/11/2026 (A-31 segunda parte; A-31 RESUELTO; commit
   37f8126, solo tests/test_endpoints.py; api.py sin tocar). Inventario
   ruta x caso y NC x prueba antes de escribir: huecos en /api/auth/me (sin
@@ -925,9 +927,9 @@ Contexto del próximo paso (4.6, A-12, NC-003: OTP fuera de la memoria):
   OJO: Gunicorn no corre en Windows (el dueño desarrolla en Windows; en
   Docker, 5.2, sí). Con varios procesos, cada uno tiene su pool de 10:
   procesos × 10 debe quedar bajo las 151 conexiones de MariaDB.
-- La medición de carga (CP-008/CP-017) es el 4.12, después del 4.6.
-  Paginación e índices (también de NC-003) no tienen ítem: preguntar al
-  dueño si se agrega uno.
+- La medición de carga (CP-008/CP-017) es el 4.12, después del 4.6 y del
+  4.17 (paginación e índices, la otra parte de NC-003). Después del 4.6,
+  el siguiente en orden es el 4.7; el 4.12 se salta hasta tener el 4.17.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
