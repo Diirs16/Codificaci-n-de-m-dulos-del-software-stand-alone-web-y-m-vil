@@ -50,7 +50,8 @@ class ProveedorDAO:
         SELECT id_proveedor, nombre, tipo_documento, numero_documento,
             telefono, correo, direccion, ciudad, descripcion,
             horario, atiende_24_7, latitud, longitud, activo
-        FROM proveedores_servicio WHERE nombre LIKE %s ORDER BY nombre
+        FROM proveedores_servicio WHERE nombre LIKE %s ESCAPE '!' AND activo = TRUE
+        ORDER BY nombre
     """
 
     _CONSULTAR_POR_CIUDAD = """
@@ -181,14 +182,25 @@ class ProveedorDAO:
             print(f"[ERROR] Al eliminar proveedor: {e}")
             return False
 
+    @staticmethod
+    def _escapar_like(termino):
+        """Hace que '%' y '_' del término se busquen como letras y no como comodines.
+
+        Se usa '!' como carácter de escape (ESCAPE '!' en la consulta) porque la
+        barra invertida cambia de significado según el modo NO_BACKSLASH_ESCAPES
+        de MariaDB. El '!' se escapa primero para no duplicar los que se agregan.
+        """
+        return termino.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+
     def buscar_por_nombre(self, termino):
-        """Busca proveedores cuyo nombre contenga el término."""
+        """Busca proveedores activos cuyo nombre contenga el término (NC-011)."""
         conexion = self._conexion_bd.obtener_conexion()
         if conexion is None:
             return []
         try:
             cursor = conexion.cursor()
-            cursor.execute(self._BUSCAR_POR_NOMBRE, (f"%{termino}%",))
+            cursor.execute(self._BUSCAR_POR_NOMBRE,
+                           (f"%{self._escapar_like(termino)}%",))
             filas = cursor.fetchall()
             proveedores = [self._mapear_proveedor(fila) for fila in filas]
             cursor.close()
