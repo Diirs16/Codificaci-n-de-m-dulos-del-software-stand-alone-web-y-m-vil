@@ -534,7 +534,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `/confirmacion` ya no muestra nada. `/impeccable audit` 16/20 (detector sin hallazgos); queda como pulido, ya
   existente antes: al abrir el formulario de adopción el foco cae en `body`, el horario de atención de `Contact.jsx` es
   inventado y la web no tiene modo oscuro ni tokens de color.
-- **Envío real (ítem 3.6, hecho el 07/11/2026; 3 partes: API + BD, web y móvil).** Decisiones del dueño (07/11/2026): adopción
+- **Envío real (ítem 3.6, hecho y probado con la API real el 07/11/2026; 3 partes: API + BD, web y móvil).** Decisiones del dueño (07/11/2026): adopción
   **y** contacto; solo con sesión iniciada (el nombre y el correo salen de la cuenta); las solicitudes solo se guardan
   en la BD y el equipo las lee con SQL (no van por correo ni a quien publicó la mascota); mensaje y **teléfono
   opcional** (solo adopción); **sin casilla aparte**, con un aviso corto (B.5), porque vale la autorización de la
@@ -599,8 +599,14 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   sesión, vacío y teléfono con guiones (0 peticiones), 401 → “Volver a iniciar sesión” abre el modal y, al entrar, el
   texto sigue ahí; 403 → mensaje y botón, nada “enviada”; 201 → recuadro verde con el número, en adopción y contacto;
   sin desplazamiento horizontal. `/impeccable audit` 14/20 (pulido opcional, como el resto del móvil: colores fijos sin
-  modo oscuro, iconos emoji en las pestañas, enlaces de 44 px y no 48 dp, sin `android_ripple`). La prueba en el
-  emulador con la API real la hace el dueño.
+  modo oscuro, iconos emoji en las pestañas, enlaces de 44 px y no 48 dp, sin `android_ripple`).
+  **Prueba con la API real en el emulador Pixel_7 (dueño, 07/11/2026):** la API respondió 401 a un POST sin token
+  (una sola API en el puerto 5000) y la app mostró las 4 pestañas. Con la sesión de la cuenta del dueño: en Contacto,
+  enviar vacío → aviso rojo y nada enviado; con texto → “Mensaje enviado… número 2”. En la ficha de Luna, un mensaje
+  de 6 letras → aviso rojo; con un mensaje válido y teléfono → “Solicitud enviada… número 3”. Los números vienen de la
+  BD (el 1 fue la prueba web), así que las dos filas quedaron guardadas. El 401/403 con la API real y el conteo con
+  `SELECT` no se capturaron (lo cubren las pruebas y la API simulada). Detalle de uso visto en la prueba (web y
+  móvil): el aviso rojo de validación sigue visible mientras se corrige el campo, hasta volver a tocar “Enviar”.
 
 #### A-22 · 🟡 Media · Información de salud contradictoria en la ficha de la mascota [N]
 - La API pone siempre `vaccinated=False`, `sterilized=False`, `size="Mediano"` (`api.py:215-220`), así que
