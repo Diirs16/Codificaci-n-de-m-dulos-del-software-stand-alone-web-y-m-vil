@@ -112,10 +112,14 @@ class PruebasRutasOTP(unittest.TestCase):
 
     def _seis_intentos(self, ruta, codigo):
         malo = _codigo_incorrecto(codigo)
+        # Item 4.10 (A-14): /verify del registro usa un solo mensaje para "incorrecto",
+        # "vencido" y "sin pendiente"; /login/verify conserva el suyo
+        mensaje = (self.api._MENSAJE_CODIGO_REGISTRO if ruta == "/api/auth/verify"
+                   else "Codigo incorrecto")
         for i in range(MAX_INTENTOS):
             r = self.cliente.post(ruta, json={"email": CORREO_PRUEBA, "code": malo})
             self.assertEqual(r.status_code, 400, f"intento {i + 1}")
-            self.assertEqual(r.get_json(), {"error": "Codigo incorrecto"})
+            self.assertEqual(r.get_json(), {"error": mensaje})
         return self.cliente.post(ruta, json={"email": CORREO_PRUEBA, "code": codigo})
 
     def _sin_token_ni_bd(self, r):

@@ -19,7 +19,10 @@ from email.mime.multipart import MIMEMultipart
 import mailtrap as mt
 
 from config.email_config import EMAIL_CONFIG
-from correo.plantillas import HTML_CODE, HTML_WELCOME
+from correo.plantillas import HTML_AVISO_REGISTRO, HTML_CODE, HTML_WELCOME
+
+ASUNTO_AVISO_REGISTRO = "PetConnect - Intento de registro con tu correo"
+CORREO_ATENCION = "proyectopetconnect+atencion@gmail.com"   # canal de A.8 de la politica
 
 
 def enviar_correo(to_email: str, asunto: str, texto: str, html: str):
@@ -87,3 +90,23 @@ def enviar_bienvenida(to_email: str, name: str):
         "Equipo PetConnect"
     )
     enviar_correo(to_email, "Bienvenido a la familia PetConnect", texto, cuerpo_html)
+
+
+def enviar_aviso_cuenta_existente(to_email: str, name: str):
+    """
+    Item 4.10 (A-14): alguien intento registrarse con un correo que ya tiene cuenta.
+    La API le responde lo mismo que a un registro nuevo (para no revelar la cuenta)
+    y este aviso le cuenta al titular lo que paso. `name` es el nombre guardado en la
+    cuenta, nunca el que escribio quien intento registrarse (A-05). No lleva codigo.
+    """
+    cuerpo_html = HTML_AVISO_REGISTRO.format(name=html.escape(name))
+    texto = (
+        f"Hola {name},\n\n"
+        "Alguien intento crear una cuenta en PetConnect con este correo, pero ya tienes una.\n\n"
+        "Si fuiste tu, no necesitas registrarte: inicia sesion con tu correo y tu contrasena.\n\n"
+        "Si no fuiste tu, puedes ignorar este mensaje: no se creo ninguna cuenta ni cambio "
+        "tu contrasena.\n\n"
+        f"Olvidaste tu contrasena? Escribenos a {CORREO_ATENCION}.\n\n"
+        "Equipo PetConnect"
+    )
+    enviar_correo(to_email, ASUNTO_AVISO_REGISTRO, texto, cuerpo_html)

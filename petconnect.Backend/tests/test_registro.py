@@ -150,7 +150,7 @@ class PruebasRegistroYReenvio(_ConReloj):
         for _ in range(veces):
             r = self._verificar(_codigo_incorrecto(codigo))
             self.assertEqual(r.status_code, 400)
-            self.assertEqual(r.get_json(), {"error": "Codigo incorrecto"})
+            self.assertEqual(r.get_json(), {"error": self.api._MENSAJE_CODIGO_REGISTRO})   # item 4.10
 
     def _reenvio_neutro(self, r):
         self.assertEqual(r.status_code, 200)
@@ -295,7 +295,10 @@ class PruebasRegistroYReenvio(_ConReloj):
         codigo = self.envios[0][2]
         r = self._verificar(codigo)
         self.assertEqual(r.status_code, 400)
-        self.assertIn("expiro", r.get_json()["error"])
+        # Item 4.10 (A-14): "vencido" ya no tiene mensaje propio. Que el codigo
+        # correcto no sirvio por vencido se ve en que el pendiente ya no esta.
+        self.assertEqual(r.get_json(), {"error": self.api._MENSAJE_CODIGO_REGISTRO})
+        self.assertFalse(self.api._otp_registro.tiene_pendiente(CORREO))
 
     # -- envio fallido del reenvio (decision f y A-10) -------------------------
 

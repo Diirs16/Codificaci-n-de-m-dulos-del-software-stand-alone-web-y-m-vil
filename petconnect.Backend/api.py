@@ -7,8 +7,10 @@ import sys
 import os
 import re
 import json
+import hashlib
 import secrets
 import threading
+import time
 import traceback
 from collections import OrderedDict
 from datetime import datetime, date
@@ -34,7 +36,7 @@ from dao.usuario_dao import UsuarioDAO
 from dao.solicitud_dao import SolicitudDAO
 from dao.otp_dao import OtpDAO
 from modelo.usuario import Usuario
-from correo import enviar_codigo, enviar_bienvenida
+from correo import enviar_codigo, enviar_bienvenida, enviar_aviso_cuenta_existente
 from otp import AlmacenOTP
 from security.jwt_helper import generate_token, verify_token
 from security.passwords import hash_password, verificar_password, es_hash_heredado
@@ -627,6 +629,87 @@ def login_verify():
     })
 
 
+# Item 4.10 (A-14): un registro con un correo que ya tiene cuenta responde lo mismo
+# que uno nuevo y le manda al titular un aviso. Como mucho un aviso cada
+# AVISO_REGISTRO_ESPERA segundos por cuenta, igual que un registro nuevo no manda otro
+# codigo mientras el primero este vigente (A-09): asi nadie llena de correos al
+# titular y el segundo intento tarda lo mismo en los dos casos (sin correo).
+# Se guarda el SHA-256 del correo (no el correo) y como mucho AVISOS_MAXIMO, como
+# _mx_cache. Esta en la memoria del proceso: con varios procesos cada uno lleva su
+# cuenta (en el peor caso, un aviso por proceso cada 10 minutos).
+AVISO_REGISTRO_ESPERA = 10 * 60      # los mismos 10 minutos que dura un codigo
+AVISOS_MAXIMO = 1000
+_avisos_registro: "OrderedDict[str, float]" = OrderedDict()
+_avisos_candado = threading.Lock()
+
+
+def _reloj_avisos() -> float:
+    """Segundos de un reloj que no retrocede (las pruebas lo simulan)."""
+    return time.monotonic()
+
+
+def _clave_aviso(email: str) -> str:
+    return hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
+
+
+def _reservar_aviso(email: str) -> bool:
+    """True si toca enviar el aviso (y lo anota); False si ya se envio uno hace poco."""
+    clave = _clave_aviso(email)
+    ahora = _reloj_avisos()
+    with _avisos_candado:
+        anterior = _avisos_registro.get(clave)
+        if anterior is not None and ahora - anterior < AVISO_REGISTRO_ESPERA:
+            return False
+        _avisos_registro[clave] = ahora
+        _avisos_registro.move_to_end(clave)
+        while len(_avisos_registro) > AVISOS_MAXIMO:
+            _avisos_registro.popitem(last=False)
+        return True
+
+
+def _liberar_aviso(email: str):
+    """El aviso no salio: se olvida para que el proximo intento pueda enviarlo."""
+    with _avisos_candado:
+        _avisos_registro.pop(_clave_aviso(email), None)
+
+
+_RESPUESTA_REGISTRO = "Codigo enviado"
+
+
+def _registro_con_cuenta_existente(email: str, password: str, usuario):
+    """
+    Item 4.10 (A-14): antes respondia 409 "El correo ya esta registrado" y asi
+    cualquiera sabia quien tiene cuenta. Ahora responde EXACTAMENTE lo mismo que un
+    registro nuevo y por el mismo camino:
+      - la primera vez calcula bcrypt (y descarta el resultado) y envia un correo,
+        como un registro nuevo, para que el tiempo de respuesta no delate la cuenta;
+      - un segundo intento antes de 10 minutos no calcula ni envia nada, como un
+        registro nuevo con su codigo vigente (A-09);
+      - si el correo falla, el mismo 503 que un registro nuevo.
+    NUNCA crea un codigo OTP: la cuenta ya existe y no hay nada que verificar.
+    El aviso lleva el nombre de la cuenta, no el que escribio quien intento
+    registrarse (A-05: ese texto no debe viajar en un correo al titular).
+    """
+    if not _reservar_aviso(email):
+        return jsonify({"message": _RESPUESTA_REGISTRO, "email": email})
+
+    hash_password(password)   # solo para tardar lo mismo que un registro nuevo
+
+    palabras = (usuario.nombres or "").split()
+    try:
+        enviar_aviso_cuenta_existente(usuario.correo or email, palabras[0] if palabras else "usuario")
+    except Exception as e:
+        # A-10: en el log solo la ruta y el tipo de error (nunca el correo). En
+        # desarrollo un registro nuevo sigue con 200 (imprime el codigo); aqui
+        # tambien, para responder igual. Fuera de desarrollo, el mismo 503.
+        _avisar_fallo_envio(e)
+        _liberar_aviso(email)
+        if not _es_desarrollo():
+            return jsonify({"error": _MENSAJE_FALLO_CORREO}), 503
+
+    return jsonify({"message": _RESPUESTA_REGISTRO, "email": email})
+
+
 @app.route("/api/auth/register", methods=["POST"])
 @limiter.limit(LIMITE_AUTH)
 def register():
@@ -659,8 +742,10 @@ def register():
 
     _verificar_bd()
     dao = UsuarioDAO()
-    if dao.consultar_por_correo(email) is not None:
-        return jsonify({"error": "El correo ya esta registrado"}), 409
+    usuario_existente = dao.consultar_por_correo(email)
+    if usuario_existente is not None:
+        # Item 4.10 (A-14): ya no hay 409; misma respuesta + aviso al titular
+        return _registro_con_cuenta_existente(email, password, usuario_existente)
 
     # A-09 (item 2.7): si ya hay un registro pendiente y vigente para este correo,
     # NO se toca (ni nombre, ni hash, ni codigo, ni intentos, ni vencimiento) y no
@@ -668,7 +753,7 @@ def register():
     # no revelar que alguien se esta registrando (A-14). Para recibir otra vez el
     # codigo esta /api/auth/register/resend.
     if _otp_registro.vigente(email) is not None:
-        return jsonify({"message": "Codigo enviado", "email": email})
+        return jsonify({"message": _RESPUESTA_REGISTRO, "email": email})
 
     # Prueba de la autorizacion (Decreto 1377, art. 8): la hora en que la persona la
     # dio y la version que acepto. /verify las escribe al crear el usuario.
@@ -688,12 +773,13 @@ def register():
     except Exception as e:
         # A-10: solo con APP_ENV=desarrollo se imprime el codigo (nunca el correo).
         # Fuera de desarrollo se borra el registro pendiente y se pide reintentar.
-        # No revela cuentas: el 409 de arriba ya se respondio antes (A-14).
+        # No revela cuentas: una cuenta existente responde este mismo 503 si su
+        # aviso falla (item 4.10, A-14).
         if not _avisar_fallo_envio(e, code):
             _otp_registro.descartar(email)
             return jsonify({"error": _MENSAJE_FALLO_CORREO}), 503
 
-    return jsonify({"message": "Codigo enviado", "email": email})
+    return jsonify({"message": _RESPUESTA_REGISTRO, "email": email})
 
 
 _MENSAJE_REENVIO = "Si hay un registro pendiente para este correo, te reenviamos el codigo"
@@ -731,6 +817,9 @@ def register_resend():
     return jsonify({"message": _MENSAJE_REENVIO})
 
 
+_MENSAJE_CODIGO_REGISTRO = "Codigo incorrecto o vencido. Si pasaron mas de 10 minutos, vuelve a registrarte"
+
+
 @app.route("/api/auth/verify", methods=["POST"])
 @limiter.limit(LIMITE_AUTH)
 def verify():
@@ -739,14 +828,14 @@ def verify():
     code  = _texto(data, "code").strip()
 
     pending, error = _otp_registro.verificar(email, code)
-    if error == "no_pendiente":
-        return jsonify({"error": "No hay verificacion pendiente para este correo"}), 400
-    if error == "expirado":
-        return jsonify({"error": "El codigo expiro. Vuelve a registrarte"}), 400
+    # Item 4.10 (A-14): "no hay pendiente", "vencido" e "incorrecto" responden lo
+    # mismo. Antes, tras un /register neutro, bastaba probar un codigo cualquiera:
+    # "No hay verificacion pendiente" delataba que el correo ya tenia cuenta (a una
+    # cuenta existente nunca se le crea codigo) y "Codigo incorrecto", que no.
+    if error in ("no_pendiente", "expirado", "incorrecto"):
+        return jsonify({"error": _MENSAJE_CODIGO_REGISTRO}), 400
     if error == "bloqueado":   # 5 fallos: el codigo se borro (A-04, NC-006)
         return jsonify({"error": "Demasiados intentos fallidos. Vuelve a registrarte para recibir otro codigo"}), 429
-    if error == "incorrecto":
-        return jsonify({"error": "Codigo incorrecto"}), 400
 
     # NC-005 (item 3.1), doble barrera: sin la prueba de la autorizacion guardada en
     # /register no se crea la cuenta (nunca un acepta_datos=True sin fecha ni version)

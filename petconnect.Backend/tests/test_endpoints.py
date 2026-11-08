@@ -12,7 +12,7 @@ los otros archivos de tests/ no se repite aqui.
   cuentas) y migracion del hash SHA-256 heredado a bcrypt (NC-001).
 - Verificacion del codigo (login/verify y verify): sin pendiente, vencido, usuario
   inexistente, BD caida sin gastar el codigo y fallo al crear la cuenta.
-- Registro: campos vacios, correo ya registrado (409) y BD caida.
+- Registro: campos vacios, correo ya registrado (respuesta neutra, item 4.10) y BD caida.
 - Validar correo: formato, dominio sin MX, dominio con MX y DNS caido.
 
 La BD, el DNS y el correo se simulan: no usan MariaDB, no envian correos, no salen
@@ -72,10 +72,10 @@ RUTAS_PUBLICAS = {
     ("POST", "/api/auth/login/verify"): ("test_endpoints.py", "test_login_datos.py", "test_otp.py",
                                          "test_pool.py"),
     ("POST", "/api/auth/register"): ("test_endpoints.py", "test_registro.py", "test_registro_datos.py",
-                                     "test_politica.py", "test_pool.py"),
+                                     "test_politica.py", "test_pool.py", "test_registro_neutro.py"),
     ("POST", "/api/auth/register/resend"): ("test_registro.py", "test_pool.py"),
     ("POST", "/api/auth/verify"): ("test_endpoints.py", "test_registro_datos.py", "test_otp.py",
-                                   "test_logs.py", "test_pool.py"),
+                                   "test_logs.py", "test_pool.py", "test_registro_neutro.py"),
 }
 
 RUTAS_PRIVADAS = {   # llevan @require_auth: sin token, 401
@@ -149,6 +149,7 @@ class _BaseEndpoints(unittest.TestCase):
             "UsuarioDAO": mock.patch.object(self.api, "UsuarioDAO"),
             "enviar_codigo": mock.patch.object(self.api, "enviar_codigo"),
             "enviar_bienvenida": mock.patch.object(self.api, "enviar_bienvenida"),
+            "enviar_aviso": mock.patch.object(self.api, "enviar_aviso_cuenta_existente"),
         }
         for nombre, parche in parches.items():
             setattr(self, nombre, parche.start())
@@ -160,6 +161,8 @@ class _BaseEndpoints(unittest.TestCase):
         for almacen in (self.api._otp_login, self.api._otp_registro):
             almacen.descartar(CORREO)
             self.addCleanup(almacen.descartar, CORREO)
+        self.api._liberar_aviso(CORREO)               # item 4.10: avisos recientes
+        self.addCleanup(self.api._liberar_aviso, CORREO)
 
     def _bd_apagada(self):
         self.obtener_conexion.return_value = None
@@ -440,7 +443,7 @@ class PruebasVerificacionDelCodigo(_BaseEndpoints):
     def test_sin_codigo_pendiente_responde_400(self):
         mensajes = {
             self.LOGIN_VERIFY: "No hay inicio de sesion pendiente para este correo",
-            self.VERIFY: "No hay verificacion pendiente para este correo",
+            self.VERIFY: self.api._MENSAJE_CODIGO_REGISTRO,     # item 4.10 (A-14)
         }
         for ruta, mensaje in mensajes.items():
             with self.subTest(ruta=ruta):
@@ -453,7 +456,7 @@ class PruebasVerificacionDelCodigo(_BaseEndpoints):
     def test_codigo_vencido_responde_400_y_se_borra(self):
         casos = {
             self.LOGIN_VERIFY: (self.api._otp_login, "El codigo expiro. Vuelve a iniciar sesion"),
-            self.VERIFY: (self.api._otp_registro, "El codigo expiro. Vuelve a registrarte"),
+            self.VERIFY: (self.api._otp_registro, self.api._MENSAJE_CODIGO_REGISTRO),   # item 4.10
         }
         for ruta, (almacen, mensaje) in casos.items():
             with self.subTest(ruta=ruta):
@@ -545,13 +548,14 @@ class PruebasRegistro(_BaseEndpoints):
         self.obtener_conexion.assert_not_called()
         self._nada_enviado()
 
-    def test_correo_ya_registrado_responde_409_sin_enviar_codigo(self):
-        # Ojo: el item 4.10 (A-14) cambiara el 409 por una respuesta neutra
+    def test_correo_ya_registrado_responde_neutro_sin_enviar_codigo(self):
+        # Item 4.10 (A-14): ya no hay 409. Mas casos en tests/test_registro_neutro.py
         self.dao.consultar_por_correo.return_value = _usuario()
         r = self._registrar()
-        self.assertEqual(r.status_code, 409)
-        self.assertEqual(r.get_json(), {"error": "El correo ya esta registrado"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json(), {"message": "Codigo enviado", "email": CORREO})
         self._nada_enviado()
+        self.enviar_aviso.assert_called_once_with(CORREO, "Laura")
 
     def test_bd_caida_responde_503_sin_enviar_codigo(self):
         self._bd_apagada()

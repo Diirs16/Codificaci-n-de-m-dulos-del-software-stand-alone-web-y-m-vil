@@ -120,3 +120,68 @@ HTML_WELCOME = """
     </tr>
   </table>
 </div>"""
+
+# Item 4.10 (A-14): aviso al titular cuando alguien intenta registrarse con un correo
+# que ya tiene cuenta. La API responde lo mismo que a un registro nuevo (no revela la
+# cuenta) y este correo le cuenta al dueno lo que paso. Solo lleva el nombre de la
+# cuenta (de la BD, nunca el que escribio quien intento registrarse) y ningun codigo.
+HTML_AVISO_REGISTRO = """
+<div style="background:#f5f5f5;padding:32px 16px;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:480px;margin:0 auto;">
+    <tr>
+      <td style="height:6px;line-height:6px;font-size:0;border-radius:14px 14px 0 0;
+                 background:linear-gradient(90deg,#4cc9d0,#7bc67e,#f5c242,#e8833a);">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="background:#ffffff;border:1px solid #e8e8e8;border-top:none;
+                 border-radius:0 0 14px 14px;padding:40px 36px;">
+
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+          <tr>
+            <td>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="26">
+                <tr>
+                  <td width="12" height="12" style="background:#4cc9d0;border-radius:4px;font-size:0;">&nbsp;</td>
+                  <td width="2"></td>
+                  <td width="12" height="12" style="background:#e8833a;border-radius:4px;font-size:0;">&nbsp;</td>
+                </tr>
+                <tr><td colspan="3" height="2"></td></tr>
+                <tr>
+                  <td width="12" height="12" style="background:#8cc63f;border-radius:4px;font-size:0;">&nbsp;</td>
+                  <td width="2"></td>
+                  <td width="12" height="12" style="background:#f5c242;border-radius:4px;font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+            <td style="padding-left:10px;font-size:19px;font-weight:800;color:#111111;letter-spacing:-0.02em;">
+              PetConnect
+            </td>
+          </tr>
+        </table>
+
+        <p style="color:#111111;font-size:16px;margin:0 0 6px;">Hola <strong>{name}</strong>,</p>
+        <p style="color:#666666;font-size:14px;line-height:1.5;margin:0 0 16px;">
+          Alguien intent&oacute; crear una cuenta en PetConnect con este correo, pero ya tienes una.
+        </p>
+        <p style="color:#666666;font-size:14px;line-height:1.5;margin:0 0 16px;">
+          <strong style="color:#111111;">Si fuiste t&uacute;,</strong> no necesitas registrarte: inicia sesi&oacute;n
+          con tu correo y tu contrase&ntilde;a.
+        </p>
+        <p style="color:#666666;font-size:14px;line-height:1.5;margin:0 0 24px;">
+          <strong style="color:#111111;">Si no fuiste t&uacute;,</strong> puedes ignorar este mensaje: no se cre&oacute;
+          ninguna cuenta ni cambi&oacute; tu contrase&ntilde;a.
+        </p>
+
+        <p style="color:#999999;font-size:12px;line-height:1.6;text-align:center;margin:0;">
+          &iquest;Olvidaste tu contrase&ntilde;a? Escr&iacute;benos a
+          <a href="mailto:proyectopetconnect+atencion@gmail.com" style="color:#666666;">proyectopetconnect+atencion@gmail.com</a>.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding-top:20px;text-align:center;color:#bbbbbb;font-size:11px;">
+        Pet Connect &middot; Tu tienda de confianza para productos de mascotas y adopcion responsable
+      </td>
+    </tr>
+  </table>
+</div>"""
