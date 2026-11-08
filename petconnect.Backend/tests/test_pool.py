@@ -405,7 +405,7 @@ class PruebasDAOSinFugas(unittest.TestCase):
     def test_todos_los_metodos_publicos_se_revisan(self):
         nombres = {f"{clase}.{nombre}" for clase, _, nombre, _ in self._metodos()}
         # 32 hasta el 4.5 + 7 de OtpDAO (item 4.6); si se agrega uno, entra solo
-        self.assertEqual(len(nombres), 39, sorted(nombres))
+        self.assertEqual(len(nombres), 41, sorted(nombres))
 
     def test_cada_metodo_devuelve_la_conexion_y_cierra_el_cursor(self):
         for escenario, error in ESCENARIOS.items():
@@ -461,12 +461,12 @@ class PruebasTransacciones(unittest.TestCase):
             resultados.append((f"{clase}.{nombre}", escribe, bd.conexiones[0]))
         return resultados
 
-    def test_hay_21_escrituras_y_18_lecturas(self):
+    def test_hay_22_escrituras_y_19_lecturas(self):
         resultados = self._llamar(None)
         escrituras = sorted(m for m, escribe, _ in resultados if escribe)
         lecturas = sorted(m for m, escribe, _ in resultados if not escribe)
-        self.assertEqual(len(escrituras), 21, escrituras)
-        self.assertEqual(len(lecturas), 18, lecturas)
+        self.assertEqual(len(escrituras), 22, escrituras)
+        self.assertEqual(len(lecturas), 19, lecturas)
 
     def test_cada_escritura_confirma_una_vez_y_las_lecturas_no_confirman(self):
         for metodo, escribe, conexion in self._llamar(None):
@@ -508,6 +508,7 @@ PETICIONES = {
     ("POST", "/api/auth/verify"): {"email": CORREO, "code": "pendiente-registro"},
     ("GET", "/api/usuarios/me/mascotas/<int:id_mascota>"): {},
     ("GET", "/api/auth/me"): {},
+    ("POST", "/api/auth/logout"): {},
     ("POST", "/api/solicitudes/adopcion"): {"id_mascota": 1, "mensaje": _MENSAJE},
     ("POST", "/api/solicitudes/contacto"): {"mensaje": _MENSAJE},
 }
@@ -531,7 +532,7 @@ class PruebasAPISinFugas(unittest.TestCase):
         for almacen in (self.api._otp_login, self.api._otp_registro):
             almacen.descartar(CORREO)
             self.addCleanup(almacen.descartar, CORREO)
-        self.token = self.api.generate_token(ID_USUARIO, CORREO)
+        self.token = self.api.generate_token(ID_USUARIO, 0)
 
     def _pedir(self, metodo, regla, cuerpo):
         cuerpo = dict(cuerpo or {})

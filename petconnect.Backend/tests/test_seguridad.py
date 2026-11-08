@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -75,13 +76,13 @@ class PruebasToken(unittest.TestCase):
     """NC-008: el token emitido por la API debe ser aceptado por la API."""
 
     def test_ida_y_vuelta(self):
-        payload = verify_token(generate_token(7, "laura@example.com"))
+        payload = verify_token(generate_token(7, 0))
         self.assertIsNotNone(payload)
         self.assertEqual(payload["sub"], "7")
         self.assertEqual(int(payload["sub"]), 7)
 
     def test_firma_alterada_se_rechaza(self):
-        token = generate_token(7, "laura@example.com")
+        token = generate_token(7, 0)
         alterado = token[:-2] + ("AA" if not token.endswith("AA") else "BB")
         self.assertIsNone(verify_token(alterado))
 
@@ -108,8 +109,10 @@ class PruebasEndpointProtegido(unittest.TestCase):
         cls.cliente = api.app.test_client()
 
     def test_acepta_el_token_emitido(self):
-        token = generate_token(7, "laura@example.com")
-        r = self.cliente.get("/_prueba/protegida", headers={"Authorization": f"Bearer {token}"})
+        token = generate_token(7, 0)
+        with mock.patch.object(api, "UsuarioDAO") as usuarios:   # sesion vigente (4.13)
+            usuarios.return_value.consultar_sesion.return_value = (0, "activo")
+            r = self.cliente.get("/_prueba/protegida", headers={"Authorization": f"Bearer {token}"})
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json(), {"id": 7, "tipo": "int"})
 

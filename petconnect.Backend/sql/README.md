@@ -46,7 +46,8 @@ pasos no borra nada.
 - **`aplicaciones_vacuna`**: la regla `chk_aplicacion_fechas` exige que `fecha_proxima` sea posterior a
   `fecha_aplicacion` (NC-010).
 - **`usuarios`**: `acepta_datos` vale 0 por defecto y la regla `chk_autorizacion_datos` exige que un 1 tenga
-  `fecha_autorizacion_datos` y `version_politica_datos` (NC-005, Ley 1581).
+  `fecha_autorizacion_datos` y `version_politica_datos` (NC-005, Ley 1581). `version_sesion` (desde el ítem 4.13)
+  empieza en 0 y no admite vacío: la API la compara con el token en cada petición.
 - **`solicitudes`** (desde el 07/11/2026, ítem 3.6): la regla `chk_solicitud_tipo` exige la mascota en una
   solicitud de `adopcion` y prohíbe la mascota y el teléfono en un mensaje de `contacto`. `mensaje` tiene máximo
   1000 caracteres. Si se borra la cuenta o la mascota, se borran sus solicitudes.
@@ -203,6 +204,38 @@ mysql -u root -p -P 3310 petconnect -e "SELECT proposito, COUNT(*) AS pendientes
 ```
 
 Si cambias la `FERNET_KEY`, los códigos pendientes quedan ilegibles: la API los borra y la persona pide otro.
+
+## ¿Ya tenías la base creada antes del ítem 4.13? (cerrar sesiones, A-03)
+
+Desde el ítem 4.13 cada cuenta tiene un contador `usuarios.version_sesion` (empieza en 0). El token de la API lleva
+ese número (y ya **no** lleva el correo) y, en cada petición con sesión, la API lo compara con la base: si no coincide,
+o si la cuenta no está `activo`, responde 401. `POST /api/auth/logout` le suma 1 y así cierra **todas** las sesiones
+de esa cuenta (web y móvil). Bloquear o inactivar una cuenta desde la consola también la saca al momento.
+
+La migración `migraciones/2026-11-08_version_sesion.sql` solo agrega esa columna (las cuentas que ya existen quedan en
+0): no borra ni cambia ningún dato, no toca `fecha_actualizacion` y se puede ejecutar varias veces. Usa
+`ADD COLUMN IF NOT EXISTS`, que existe en MariaDB pero no en MySQL.
+
+**Hazlo antes de arrancar la API nueva:** sin la columna, `python api.py` se detiene con el aviso
+"Falta la columna usuarios.version_sesion". Desde la carpeta `petconnect.Backend`, con un respaldo nuevo como el del
+paso 1 de arriba:
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "source sql/migraciones/2026-11-08_version_sesion.sql"
+```
+
+**Comprobar** (solo muestra la estructura y un conteo, no datos personales):
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SHOW COLUMNS FROM usuarios LIKE 'version_sesion'"
+```
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SELECT version_sesion, COUNT(*) AS cuentas FROM usuarios GROUP BY version_sesion"
+```
+
+Los tokens emitidos antes de este cambio (llevaban el correo y no traen versión) dejan de valer: cada persona inicia
+sesión una vez más (decisión del dueño, 08/11/2026).
 
 ## Prueba automática
 

@@ -35,7 +35,6 @@ RUTA_SEED = os.path.join(RAIZ, "seed.py")
 
 ID_MASCOTA = 3
 ID_DUENO = 7
-CORREO_DUENO = "dueno.prueba@ejemplo.test"   # inventado (Ley 1581)
 
 # Los alias de las consultas de mascotas en api.py: lo unico que la API puede devolver
 CAMPOS_DE_LA_BD = {"id", "name", "species", "breed", "gender", "age", "image",
@@ -100,9 +99,11 @@ class PruebasFichaSinDatosInventados(unittest.TestCase):
         fila["id_usuario"] = ID_DUENO
         self.cursor.fetchone.return_value = fila
         # Token firmado con la clave de pruebas de este proceso; nunca se imprime
-        token = self.api.generate_token(ID_DUENO, CORREO_DUENO)
-        r = self.cliente.get(f"/api/usuarios/me/mascotas/{ID_MASCOTA}",
-                             headers={"Authorization": f"Bearer {token}"})
+        token = self.api.generate_token(ID_DUENO, 0)
+        with mock.patch.object(self.api, "UsuarioDAO") as usuarios:   # sesion vigente (4.13)
+            usuarios.return_value.consultar_sesion.return_value = (0, "activo")
+            r = self.cliente.get(f"/api/usuarios/me/mascotas/{ID_MASCOTA}",
+                                 headers={"Authorization": f"Bearer {token}"})
         self.assertEqual(r.status_code, 200)
         self._assert_sin_datos_inventados(r.get_json())
 

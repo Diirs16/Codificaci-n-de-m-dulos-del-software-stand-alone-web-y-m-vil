@@ -321,23 +321,54 @@ def _validar_correo(email: str) -> tuple[bool, str]:
 # Decorador de autenticacion JWT
 # ---------------------------------------------------------------------------
 
+_MENSAJE_SESION_INVALIDA = "Token invalido o sesion expirada. Inicia sesion de nuevo"
+VERSION_SESION_INICIAL = 0   # DEFAULT de usuarios.version_sesion (sql/schema.sql)
+
+
+def _datos_del_token(payload):
+    """
+    Saca (id_usuario, version_sesion) de un token ya verificado, o None.
+    Un token sin "ver" (emitido antes del item 4.13, que ademas llevaba el correo)
+    no vale: la persona inicia sesion otra vez (decision del dueno, 08/11/2026).
+    """
+    if not payload:
+        return None
+    try:
+        # "sub" viaja como texto (RFC 7519); el resto de la API usa el id entero
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    version = payload.get("ver")
+    # type() y no isinstance(): True es un int en Python y valdria como version 1
+    if type(version) is not int or version < 0:
+        return None
+    return user_id, version
+
+
 def require_auth(f):
+    """
+    Item 4.13 (A-03): la firma del token no basta. En cada peticion se consulta la
+    BD y la sesion solo vale si la cuenta existe, esta "activa" y su version_sesion
+    es la misma que trae el token. Asi /api/auth/logout (suma 1) o bloquear la
+    cuenta desde la consola cierran las sesiones al momento, no a las 24 h.
+    Todos los rechazos responden el mismo 401 (la web cierra la sesion con 401, 4.7).
+    Si la BD no responde, consultar_sesion deja subir el error y se responde 503:
+    una caida de la BD no debe sacar a nadie de su sesion.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.replace("Bearer ", "").strip()
         if not token:
             return jsonify({"error": "Autenticacion requerida"}), 401
-        payload = verify_token(token)
-        try:
-            # "sub" viaja como texto (RFC 7519); el resto de la API usa el id entero
-            user_id = int(payload["sub"]) if payload else None
-        except (KeyError, TypeError, ValueError):
-            user_id = None
-        if user_id is None:
-            return jsonify({"error": "Token invalido o sesion expirada. Inicia sesion de nuevo"}), 401
+        datos = _datos_del_token(verify_token(token))
+        if datos is None:
+            return jsonify({"error": _MENSAJE_SESION_INVALIDA}), 401
+        user_id, version = datos
+        sesion = UsuarioDAO().consultar_sesion(user_id)
+        if sesion is None or sesion[0] != version or sesion[1] != "activo":
+            return jsonify({"error": _MENSAJE_SESION_INVALIDA}), 401
         request.current_user_id = user_id
-        request.current_user_email = payload["email"]
         return f(*args, **kwargs)
     return decorated
 
@@ -605,7 +636,11 @@ def login_verify():
         if not dao.registrar_autorizacion(usuario.id_usuario, fecha, version):
             return jsonify({"error": "No pudimos guardar tu autorizacion. Intenta de nuevo"}), 500
 
-    token = generate_token(usuario.id_usuario, usuario.correo)
+    # Item 4.13: el token lleva la version_sesion actual (sin el correo)
+    sesion = dao.consultar_sesion(usuario.id_usuario)
+    if sesion is None:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    token = generate_token(usuario.id_usuario, sesion[0])
     return jsonify({
         "token": token,
         "id":    usuario.id_usuario,
@@ -862,7 +897,9 @@ def verify():
         # La cuenta ya se creo: la respuesta sigue siendo 201, solo se registra el fallo
         _avisar_fallo_envio(e)
 
-    token = generate_token(usuario.id_usuario, email)
+    # Item 4.13: una cuenta nueva empieza con version_sesion = 0 (DEFAULT de la
+    # columna, lo revisa tests/test_esquema.py): no hace falta otra consulta
+    token = generate_token(usuario.id_usuario, VERSION_SESION_INICIAL)
     return jsonify({
         "token": token,
         "id":    usuario.id_usuario,
@@ -1000,6 +1037,19 @@ def me():
     })
 
 
+@app.route("/api/auth/logout", methods=["POST"])
+@require_auth
+def logout():
+    """
+    Item 4.13 (A-03): cierra TODAS las sesiones de la cuenta (web y movil) sumando 1
+    a version_sesion: el token que se uso aqui y cualquier copia dejan de valer.
+    Solo con un token vigente (require_auth); si ya no valia, 401 y el cliente
+    igual borra el suyo. Si la BD no responde, 503 (el error sube del DAO).
+    """
+    UsuarioDAO().cerrar_sesiones(request.current_user_id)
+    return jsonify({"message": "Sesion cerrada"})
+
+
 # ---------------------------------------------------------------------------
 # Inicio
 # ---------------------------------------------------------------------------
@@ -1021,13 +1071,31 @@ def _preparar_otp() -> bool:
     return True
 
 
+def _preparar_sesiones() -> bool:
+    """
+    Item 4.13: comprueba que exista la columna usuarios.version_sesion. Sin ella
+    cada ruta con sesion daria 500 (require_auth la consulta siempre): mejor no
+    arrancar y decir que migracion falta. Busca un id que no existe (0): no lee
+    datos de nadie.
+    """
+    try:
+        UsuarioDAO().consultar_sesion(0)
+    except ProgrammingError as e:
+        if e.errno != errorcode.ER_BAD_FIELD_ERROR:
+            raise
+        print("[ERROR] Falta la columna usuarios.version_sesion. Aplica la migracion "
+              "sql/migraciones/2026-11-08_version_sesion.sql (pasos en sql/README.md).")
+        return False
+    return True
+
+
 if __name__ == "__main__":
     try:
         _verificar_bd()
     except BDNoDisponible:
         print("[ERROR] No se pudo conectar a la base de datos.")
         sys.exit(1)
-    if not _preparar_otp():
+    if not _preparar_otp() or not _preparar_sesiones():
         sys.exit(1)
     print("[OK] Conexion a la base de datos establecida.")
     modo_debug = _modo_debug()

@@ -92,12 +92,14 @@ class PruebasEnvioDeSolicitudes(unittest.TestCase):
             self.addCleanup(parche.stop)
         self.usuarios = self.UsuarioDAO.return_value
         self.usuarios.consultar_por_id.return_value = _usuario()
+        # Item 4.13: require_auth ve la sesion vigente (version 0, cuenta activa)
+        self.usuarios.consultar_sesion.return_value = (0, "activo")
         self.solicitudes = self.SolicitudDAO.return_value
         self.solicitudes.dueno_de_mascota_en_adopcion.return_value = ID_DUENO
         self.solicitudes.insertar.return_value = ID_SOLICITUD
 
     def _token(self, id_usuario=ID_USUARIO):
-        return {"Authorization": f"Bearer {self.api.generate_token(id_usuario, CORREO)}"}
+        return {"Authorization": f"Bearer {self.api.generate_token(id_usuario, 0)}"}
 
     def _enviar(self, ruta, cuerpo=None, token=True):
         cabeceras = self._token() if token else {}

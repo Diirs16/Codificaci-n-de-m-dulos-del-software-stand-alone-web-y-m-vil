@@ -82,6 +82,7 @@ RUTAS_PRIVADAS = {   # llevan @require_auth: sin token, 401
     ("GET", "/api/usuarios/me/mascotas/<int:id_mascota>"): ("test_mascotas.py", "test_ficha_mascota.py",
                                                             "test_pool.py"),
     ("GET", "/api/auth/me"): ("test_endpoints.py", "test_pool.py"),
+    ("POST", "/api/auth/logout"): ("test_sesiones.py", "test_pool.py"),
     ("POST", "/api/solicitudes/adopcion"): ("test_solicitudes.py", "test_limite.py", "test_pool.py"),
     ("POST", "/api/solicitudes/contacto"): ("test_solicitudes.py", "test_limite.py", "test_pool.py"),
 }
@@ -305,9 +306,14 @@ class PruebasAuthMe(_BaseEndpoints):
         jwt_helper = importlib.import_module("security.jwt_helper")
         return jwt.encode(payload, jwt_helper._SECRET, algorithm="HS256")
 
+    def _token_vigente(self):
+        # Item 4.13: require_auth consulta la sesion en la BD (version 0, activa)
+        self.dao.consultar_sesion.return_value = (0, "activo")
+        return self.api.generate_token(ID_USUARIO, 0)
+
     def test_token_recien_emitido_responde_200_con_los_datos_de_la_cuenta(self):
         self.dao.consultar_por_id.return_value = _usuario()
-        r = self._con_token(self.api.generate_token(ID_USUARIO, CORREO))
+        r = self._con_token(self._token_vigente())
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json(), {"id": ID_USUARIO, "name": "Laura Gomez", "email": CORREO})
         self.dao.consultar_por_id.assert_called_once_with(ID_USUARIO)   # entero, sale del token
@@ -332,15 +338,22 @@ class PruebasAuthMe(_BaseEndpoints):
         self.obtener_conexion.assert_not_called()
         self.dao.consultar_por_id.assert_not_called()
 
-    def test_usuario_borrado_responde_404(self):
-        r = self._con_token(self.api.generate_token(ID_USUARIO, CORREO))
+    def test_usuario_borrado_responde_401(self):
+        # Item 4.13: sin fila no hay sesion (antes llegaba a la ruta y daba 404)
+        self.dao.consultar_sesion.return_value = None
+        r = self._con_token(self.api.generate_token(ID_USUARIO, 0))
+        self.assertEqual(r.status_code, 401)
+        self.dao.consultar_por_id.assert_not_called()
+
+    def test_usuario_borrado_entre_las_dos_consultas_responde_404(self):
+        r = self._con_token(self._token_vigente())
         self.assertEqual(r.status_code, 404)
         self.assertEqual(r.get_json(), {"error": "Usuario no encontrado"})
 
     def test_bd_caida_responde_503(self):
         self._bd_apagada()
         with self.assertLogs(self.api.app.logger, "ERROR"):
-            r = self._con_token(self.api.generate_token(ID_USUARIO, CORREO))
+            r = self._con_token(self._token_vigente())
         self.assertEqual(r.status_code, 503)
         self.assertIn("id_error", r.get_json())
         self._sin_datos_internos(r)

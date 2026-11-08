@@ -119,9 +119,17 @@ class PruebasMascotaPrivada(_BaseMascotas):
 
     RUTA = f"/api/usuarios/me/mascotas/{ID_MASCOTA}"
 
+    def setUp(self):
+        super().setUp()
+        # Item 4.13: require_auth consulta la sesion; aqui siempre esta vigente
+        # (version 0, activa) y no gasta el fetchone del cursor de la mascota
+        parche = mock.patch.object(self.api, "UsuarioDAO")
+        parche.start().return_value.consultar_sesion.return_value = (0, "activo")
+        self.addCleanup(parche.stop)
+
     def _token(self, id_usuario, correo):
         # Token firmado con la clave de pruebas de este proceso; nunca se imprime
-        return {"Authorization": f"Bearer {self.api.generate_token(id_usuario, correo)}"}
+        return {"Authorization": f"Bearer {self.api.generate_token(id_usuario, 0)}"}
 
     def test_sin_token_responde_401_sin_consultar_la_bd(self):
         r = self.cliente.get(self.RUTA)

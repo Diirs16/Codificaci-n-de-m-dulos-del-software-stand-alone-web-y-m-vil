@@ -84,6 +84,21 @@ class UsuarioDAO:
         ORDER BY nombres
     """
 
+    # Item 4.13 (A-03): lo unico que require_auth necesita en cada peticion. Es una
+    # consulta corta por la clave primaria (solo dos columnas).
+    _CONSULTAR_SESION = """
+        SELECT version_sesion, estado FROM usuarios WHERE id_usuario = %s
+    """
+
+    # Sumar 1 deja sin valor todos los tokens de la cuenta. fecha_actualizacion se
+    # reasigna a si misma para que su regla "on update" no la cambie: cerrar sesion no es
+    # editar los datos de la persona.
+    _CERRAR_SESIONES = """
+        UPDATE usuarios
+        SET version_sesion = version_sesion + 1, fecha_actualizacion = fecha_actualizacion
+        WHERE id_usuario = %s
+    """
+
     def __init__(self):
         self._conexion_bd = ConexionBD()
 
@@ -214,6 +229,29 @@ class UsuarioDAO:
         except Error as e:
             print(f"[ERROR] Al registrar la autorizacion de datos: {e}")
             return False
+
+    # Item 4.13: estos dos metodos NO se tragan los errores de la BD (como OtpDAO y
+    # SolicitudDAO). Si devolvieran None con la BD caida, require_auth responderia
+    # 401 y la web cerraria la sesion (4.7); dejandolos subir, la API responde 503.
+
+    def consultar_sesion(self, id_usuario):
+        """Devuelve (version_sesion, estado) del usuario, o None si no existe."""
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            cursor.execute(self._CONSULTAR_SESION, (id_usuario,))
+            fila = cursor.fetchone()
+        return (int(fila[0]), fila[1]) if fila else None
+
+    def cerrar_sesiones(self, id_usuario):
+        """Suma 1 a version_sesion: cierra todas las sesiones abiertas de la cuenta."""
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            try:
+                cursor.execute(self._CERRAR_SESIONES, (id_usuario,))
+                conexion.commit()
+            except Error:
+                conexion.rollback()
+                raise
+            filas_afectadas = cursor.rowcount
+        return filas_afectadas > 0
 
     def eliminar(self, id_usuario):
         """Elimina un usuario por su ID."""

@@ -28,6 +28,9 @@ y modo estricto) y NC-010 (fechas de vacunas).
   otp_pendientes y su migracion del 07/11/2026. OtpDAO con MariaDB y la migracion en
   una base vieja se prueban en tests/test_otp_bd.py (PETCONNECT_PRUEBA_BD=1).
   Ninguna toca la base "petconnect".
+- A-03 (item 4.13): PruebasEsquemaSinBD y PruebasMigracionSesionSinBD revisan la
+  columna usuarios.version_sesion y su migracion del 08/11/2026. La migracion en una
+  base vieja y el cierre de sesion con MariaDB se prueban en tests/test_sesiones.py.
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -v
@@ -55,6 +58,11 @@ BD_PRUEBA_EJEMPLO = "petconnect_prueba_ejemplo"
 RUTA_MIGRACION_SOLICITUDES = os.path.join(RAIZ, "sql", "migraciones", "2026-11-07_solicitudes.sql")
 BD_PRUEBA_SOLICITUDES = "petconnect_prueba_solicitudes"
 RUTA_MIGRACION_OTP = os.path.join(RAIZ, "sql", "migraciones", "2026-11-07_otp_pendientes.sql")
+RUTA_MIGRACION_SESION = os.path.join(RAIZ, "sql", "migraciones", "2026-11-08_version_sesion.sql")
+
+# Item 4.13 (A-03): igual en schema.sql y en la migracion. Empieza en 0, que es la
+# version con que /api/auth/verify firma el token de una cuenta nueva.
+COLUMNA_VERSION_SESION = "`version_sesion` int(10) unsigned NOT NULL DEFAULT 0"
 
 # Item 4.6 (A-12): nombre y hash solo en el registro, usuario solo en el inicio de sesion
 REGLA_OTP = ("(`proposito` = 'registro' AND `nombre` IS NOT NULL AND `password_hash` IS NOT NULL "
@@ -142,6 +150,11 @@ class PruebasEsquemaSinBD(unittest.TestCase):
             "(`acepta_datos` = 0 OR (`fecha_autorizacion_datos` IS NOT NULL "
             "AND `version_politica_datos` IS NOT NULL))",
         )
+
+    def test_usuarios_tiene_la_version_de_sesion_en_0(self):
+        """Item 4.13: sin NULL (require_auth la compara) y 0 al crear la cuenta."""
+        lineas = [l.strip().rstrip(",") for l in _bloque_tabla(self.sql, "usuarios").splitlines()]
+        self.assertIn(COLUMNA_VERSION_SESION, lineas)
 
     def test_tiene_las_34_tablas(self):
         # 32 hasta el 07/11/2026, + solicitudes (item 3.6) + otp_pendientes (item 4.6)
@@ -300,10 +313,16 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
         import api
 
-        # Mascota "activa" (privada) del dueno ficticio de la semilla
+        # Item 4.13: require_auth exige una cuenta activa con su version_sesion, y el
+        # refugio de la semilla esta inactivo: se crean dos cuentas activas inventadas
+        # (el dueno y otra persona) y una mascota "activa" (privada) del dueno.
         cursor = self.conn.cursor()
-        cursor.execute("SELECT id_usuario FROM mascotas WHERE estado = 'en_adopcion' LIMIT 1")
-        id_dueno = cursor.fetchone()[0]
+        ids = []
+        for correo in ("dueno.privada@ejemplo.test", "otra.persona@ejemplo.test"):
+            cursor.execute("INSERT INTO usuarios (nombres, correo, password_hash) VALUES (%s, %s, %s)",
+                           ("Prueba", correo, "hash-falso"))
+            ids.append(cursor.lastrowid)
+        id_dueno, id_otro = ids
         cursor.execute(
             "INSERT INTO mascotas (id_usuario, nombre, especie, observaciones, estado) "
             "VALUES (%s, %s, %s, %s, %s)",
@@ -316,19 +335,20 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         def borrar():
             c = self.conn.cursor()
             c.execute("DELETE FROM mascotas WHERE id_mascota = %s", (id_privada,))
+            c.execute("DELETE FROM usuarios WHERE id_usuario IN (%s, %s)", (id_dueno, id_otro))
             self.conn.commit()
             c.close()
         self.addCleanup(borrar)
 
         def token(id_usuario):
-            # Correo inventado; el token se firma en este proceso y nunca se imprime
-            return {"Authorization": f"Bearer {api.generate_token(id_usuario, 'dueno@ejemplo.test')}"}
+            # Version 0 = DEFAULT de la columna; el token se firma aqui y nunca se imprime
+            return {"Authorization": f"Bearer {api.generate_token(id_usuario, 0)}"}
 
         # Igual que arriba: se llama la funcion sin test_client()
         with api.app.test_request_context(f"/api/mascotas/{id_privada}"):
             r_publica, codigo_publica = api.get_mascota(id_privada)
         with api.app.test_request_context(f"/api/usuarios/me/mascotas/{id_privada}",
-                                          headers=token(id_dueno + 1000)):
+                                          headers=token(id_otro)):
             r_ajena, codigo_ajena = api.get_mi_mascota(id_privada)
         with api.app.test_request_context(f"/api/usuarios/me/mascotas/{id_privada}",
                                           headers=token(id_dueno)):
@@ -1064,6 +1084,26 @@ class PruebasMigracionOtpSinBD(unittest.TestCase):
         self.assertTrue(self.sentencias[1].startswith("CREATE TABLE IF NOT EXISTS `otp_pendientes`"))
         sin_claves = re.sub(r"\bON (DELETE|UPDATE)\b", "", self.sentencias[1])
         self.assertNotRegex(sin_claves, r"\b(DROP|ALTER|DELETE|UPDATE|INSERT|TRUNCATE)\b")
+
+
+class PruebasMigracionSesionSinBD(unittest.TestCase):
+    """A-03 (item 4.13): la migracion del 08/11/2026 agrega la misma columna que schema.sql."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sentencias = _sentencias(_leer(RUTA_MIGRACION_SESION))
+
+    def test_nunca_apaga_el_modo_estricto(self):
+        self.assertTrue(self.sentencias[0].startswith("SET SESSION sql_mode"))
+        self.assertIn("STRICT_TRANS_TABLES", self.sentencias[0])
+
+    def test_solo_agrega_la_columna_y_se_puede_repetir(self):
+        """No borra ni cambia datos: se puede correr en la BD del dueno sin riesgo."""
+        self.assertEqual(len(self.sentencias), 2)
+        alter = " ".join(self.sentencias[1].split())
+        self.assertEqual(alter, "ALTER TABLE `usuarios` ADD COLUMN IF NOT EXISTS "
+                                f"{COLUMNA_VERSION_SESION} AFTER `estado`")
+        self.assertNotRegex(alter, r"(DROP|DELETE|UPDATE|INSERT|TRUNCATE)")
 
 
 @unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",

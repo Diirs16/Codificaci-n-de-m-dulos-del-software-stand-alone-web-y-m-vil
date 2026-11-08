@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
   `password_hash` varchar(255) NOT NULL,
   `foto_perfil` varchar(255) DEFAULT NULL,
   `estado` enum('activo','inactivo','bloqueado') DEFAULT 'activo',
+  `version_sesion` int(10) unsigned NOT NULL DEFAULT 0,
   `verificado` tinyint(1) DEFAULT 0,
   `acepta_datos` tinyint(1) NOT NULL DEFAULT 0,
   `fecha_autorizacion_datos` datetime DEFAULT NULL,
