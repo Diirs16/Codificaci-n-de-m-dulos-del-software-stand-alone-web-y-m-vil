@@ -18,7 +18,6 @@ codigo. Ahora AlmacenOTP guarda en la tabla otp_pendientes (OtpDAO).
 - PruebasApiConOtp: la API guarda los OTP con OtpDAO, sin BD responde 503, otro
   proceso verifica el registro, no quedan datos del registro despues de verificar
   (Ley 1581), correos de mas de 120 caracteres y el aviso al arrancar sin la tabla.
-- PruebasDescifradoEstricto: security/crypto.decrypt_estricto falla con texto malo.
 - PruebasContratoEnBD y PruebasMigracionOtpEnBD: solo con PETCONNECT_PRUEBA_BD=1, en
   las bases temporales "petconnect_prueba_otp" y "petconnect_prueba_otp_migracion"
   (se borran al final). Nunca tocan la base "petconnect".
@@ -178,8 +177,8 @@ class PruebasAlmacenEnMemoria(_ConReloj):
         codigo = self.almacen.crear(CORREO, {"name": NOMBRE, "password_hash": "hash"})
         fila = self.almacen._repositorio.obtener(CORREO, "registro")
         self.assertNotIn(codigo, str(fila))
-        from security.crypto import decrypt_estricto
-        self.assertEqual(decrypt_estricto(fila["codigo_cifrado"]), codigo)
+        from security.crypto import decrypt
+        self.assertEqual(decrypt(fila["codigo_cifrado"]), codigo)
 
 
 # ---------------------------------------------------------------------------
@@ -514,19 +513,6 @@ class PruebasApiConOtp(unittest.TestCase):
         with mock.patch.object(self.api._otp_registro, "limpiar_vencidos", side_effect=otro):
             with self.assertRaises(errores_bd.ProgrammingError):
                 self.api._preparar_otp()
-
-
-class PruebasDescifradoEstricto(unittest.TestCase):
-
-    def test_ida_y_vuelta(self):
-        from security.crypto import decrypt_estricto, encrypt
-        self.assertEqual(decrypt_estricto(encrypt("123456")), "123456")
-
-    def test_texto_malo_lanza_error(self):
-        from cryptography.fernet import InvalidToken
-        from security.crypto import decrypt_estricto
-        with self.assertRaises(InvalidToken):
-            decrypt_estricto("no-es-un-texto-de-fernet")
 
 
 # ---------------------------------------------------------------------------

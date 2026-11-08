@@ -66,9 +66,9 @@ def _cifrar(codigo: str) -> str:
 def _descifrar(cifrado: str) -> str | None:
     """El codigo en claro, o None si no se puede descifrar (clave cambiada o dato alterado)."""
     from cryptography.fernet import InvalidToken
-    from security.crypto import decrypt_estricto
+    from security.crypto import decrypt
     try:
-        return decrypt_estricto(cifrado)
+        return decrypt(cifrado)
     except InvalidToken:
         return None
 

@@ -37,7 +37,6 @@ from modelo.usuario import Usuario
 from correo import enviar_codigo, enviar_bienvenida
 from otp import AlmacenOTP
 from security.jwt_helper import generate_token, verify_token
-from security.crypto import encrypt, decrypt
 from security.passwords import hash_password, verificar_password, es_hash_heredado
 from security.politica import validar_contrasena
 
@@ -761,8 +760,9 @@ def verify():
     nombres  = parts[0]
     apellidos = parts[1] if len(parts) > 1 else ""
 
-    # El telefono y datos sensibles adicionales se guardan cifrados con Fernet
-    # encrypt(telefono) antes de insertar; decrypt(telefono) al leer
+    # El registro no pide telefono. El unico que guarda la API es el opcional de
+    # las solicitudes de adopcion (dao/solicitud_dao.py), y va en texto plano: no
+    # se cifra (decision del item 4.8, A-13). Fernet solo cifra los codigos OTP.
     usuario = Usuario(
         nombres=nombres,
         apellidos=apellidos,

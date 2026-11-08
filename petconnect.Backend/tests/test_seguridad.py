@@ -1,6 +1,7 @@
 """
 Pruebas de regresion de NC-001 (contrasenas con bcrypt), NC-008 (token JWT)
-y NC-007 (JWT_SECRET obligatorio). No necesitan base de datos ni envian correos.
+y NC-007 (JWT_SECRET obligatorio y decrypt() que falla, item 4.8). No necesitan
+base de datos ni envian correos.
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -v
@@ -30,6 +31,8 @@ import api  # noqa: E402
 from security import jwt_helper  # noqa: E402
 from security.jwt_helper import generate_token, verify_token  # noqa: E402
 from security.passwords import es_hash_heredado, hash_password, verificar_password  # noqa: E402
+from security.crypto import decrypt, encrypt  # noqa: E402
+from cryptography.fernet import InvalidToken  # noqa: E402
 
 CONTRASENA = "Firulais2026!"
 
@@ -164,6 +167,39 @@ class PruebasSecretoObligatorio(unittest.TestCase):
     def test_secreto_de_64_caracteres_importa_bien(self):
         r = self._importar_con("a1b2c3d4" * 8)   # inventado, solo para la prueba
         self.assertEqual(r.returncode, 0, r.stderr)
+
+
+class PruebasDescifrado(unittest.TestCase):
+    """
+    NC-007 / A-13 (item 4.8): decrypt() debe FALLAR (InvalidToken) si no puede
+    descifrar. Antes devolvia el texto cifrado como si fuera el original.
+    """
+
+    def test_ida_y_vuelta(self):
+        self.assertEqual(decrypt(encrypt("123456")), "123456")
+
+    def test_texto_que_no_es_fernet_lanza_error(self):
+        with self.assertRaises(InvalidToken):
+            decrypt("no-es-un-texto-de-fernet")
+
+    def test_token_alterado_lanza_error(self):
+        cifrado = encrypt("123456")
+        # Cambia un caracter del medio: la firma (HMAC) ya no coincide
+        medio = len(cifrado) // 2
+        otro = "A" if cifrado[medio] != "A" else "B"
+        alterado = cifrado[:medio] + otro + cifrado[medio + 1:]
+        with self.assertRaises(InvalidToken):
+            decrypt(alterado)
+
+    def test_token_de_otra_clave_lanza_error(self):
+        # Como si FERNET_KEY hubiera cambiado: otra clave, generada solo para la prueba
+        de_otra_clave = Fernet(Fernet.generate_key()).encrypt(b"123456").decode()
+        with self.assertRaises(InvalidToken):
+            decrypt(de_otra_clave)
+
+    def test_vacio_y_none_se_devuelven_igual(self):
+        self.assertEqual(decrypt(""), "")
+        self.assertIsNone(decrypt(None))
 
 
 if __name__ == "__main__":
