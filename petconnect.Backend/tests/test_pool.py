@@ -14,9 +14,14 @@ pool, la usa y la devuelve (try/finally en conexion_y_cursor). Estas pruebas cui
   ruta del inventario de tests/test_endpoints.py devuelven todas las conexiones y
   cierran todos los cursores, con la BD vacia, con error de MySQL y con error
   inesperado. Lo mismo main.py (consola) y seed.py.
+- Transacciones (item 4.9, A-15): autocommit apagado, el pool limpia la sesion al
+  devolver la conexion, y cada escritura de los DAO hace commit() (y rollback() si
+  falla) mientras que las lecturas no confirman nada.
 - PruebasPoolEnBD (solo con PETCONNECT_PRUEBA_BD=1, en una base temporal): 30 hilos
-  consultan a la vez sin cruzarse, el modo estricto (NC-009) sigue tras devolver y
-  volver a pedir una conexion, y muchas consultas seguidas no agotan el pool.
+  consultan a la vez sin cruzarse, el modo estricto (NC-009) y autocommit=0 siguen
+  tras devolver y volver a pedir una conexion, muchas consultas seguidas no agotan
+  el pool, lo no confirmado se descarta al devolver la conexion y un rollback()
+  deshace todos los pasos de una operacion (todo o nada, item 4.9).
 
 Sin PETCONNECT_PRUEBA_BD no se usa MariaDB ni se lee .env (_importar_api). Los
 correos son inventados (Ley 1581).
@@ -268,6 +273,14 @@ class PruebasConexionBD(unittest.TestCase):
         self.bd.cerrar_conexion()
         self.bd.cerrar_conexion()        # dos veces seguidas no falla
 
+    def test_el_pool_limpia_la_sesion_al_devolver_la_conexion(self):
+        # Item 4.9 (A-15): con autocommit apagado, lo que una operacion deje sin
+        # commit() se descarta al devolver la conexion. Debe estar escrito aunque
+        # sea el valor por defecto de la libreria, para que nadie lo apague.
+        self.bd.obtener_conexion().close()
+        config = self.MySQLConnectionPool.call_args.kwargs
+        self.assertIs(config.get("pool_reset_session"), True)
+
     def test_ya_no_hay_commit_ni_rollback_de_una_conexion_unica(self):
         # El commit va sobre la conexion prestada (conexion.commit()), no sobre ConexionBD
         self.assertFalse(hasattr(self.bd, "commit"))
@@ -410,6 +423,67 @@ class PruebasDAOSinFugas(unittest.TestCase):
                             pass        # SolicitudDAO y OtpDAO dejan subir el error; los viejos no (4.15)
                     self.assertEqual(len(bd.conexiones), 1, "pide una sola conexion por operacion")
                     bd.revisar(self)
+
+
+# ---------------------------------------------------------------------------
+# 4b. Transacciones (item 4.9, A-15): autocommit apagado y commit() explicito
+# ---------------------------------------------------------------------------
+
+# Primera palabra de una sentencia que cambia datos
+_ESCRIBEN = {"INSERT", "UPDATE", "DELETE", "REPLACE"}
+
+
+class PruebasTransacciones(unittest.TestCase):
+    """Con autocommit apagado, una escritura sin commit() se pierde sin avisar."""
+
+    def test_autocommit_esta_apagado(self):
+        db_config = importlib.import_module("config.db_config").DB_CONFIG
+        self.assertIs(db_config["autocommit"], False)
+
+    def _llamar(self, error):
+        """Llama cada metodo publico de los DAO; devuelve (metodo, escribe, conexion)."""
+        resultados = []
+        for clase, dao_clase, nombre, funcion in PruebasDAOSinFugas()._metodos():
+            bd = _BDQueCuenta(error)
+            dao = dao_clase()
+            dao._conexion_bd = mock.Mock(obtener_conexion=bd)
+            argumentos = [mock.MagicMock() for _ in list(inspect.signature(funcion).parameters)[1:]]
+            with contextlib.redirect_stdout(io.StringIO()):
+                try:
+                    getattr(dao, nombre)(*argumentos)
+                except (errores_bd.Error, RuntimeError):
+                    pass
+            # Se mira el SQL que el metodo mando: asi un metodo nuevo se clasifica solo
+            sentencias = [llamada.args[0] for cursor in bd.cursores
+                          for llamada in cursor.execute.call_args_list]
+            self.assertTrue(sentencias, f"{clase}.{nombre} no ejecuto SQL")
+            escribe = any(s.split()[0].upper() in _ESCRIBEN for s in sentencias)
+            resultados.append((f"{clase}.{nombre}", escribe, bd.conexiones[0]))
+        return resultados
+
+    def test_hay_21_escrituras_y_18_lecturas(self):
+        resultados = self._llamar(None)
+        escrituras = sorted(m for m, escribe, _ in resultados if escribe)
+        lecturas = sorted(m for m, escribe, _ in resultados if not escribe)
+        self.assertEqual(len(escrituras), 21, escrituras)
+        self.assertEqual(len(lecturas), 18, lecturas)
+
+    def test_cada_escritura_confirma_una_vez_y_las_lecturas_no_confirman(self):
+        for metodo, escribe, conexion in self._llamar(None):
+            with self.subTest(metodo=metodo):
+                if escribe:
+                    conexion.commit.assert_called_once()
+                else:
+                    conexion.commit.assert_not_called()
+                conexion.rollback.assert_not_called()
+
+    def test_si_la_bd_falla_la_escritura_se_deshace_y_no_se_confirma(self):
+        for escenario in ("error de MySQL", "error inesperado"):
+            for metodo, escribe, conexion in self._llamar(ESCENARIOS[escenario]):
+                with self.subTest(escenario=escenario, metodo=metodo):
+                    conexion.commit.assert_not_called()
+                    if escribe and escenario == "error de MySQL":
+                        conexion.rollback.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -579,6 +653,9 @@ class PruebasPoolEnBD(unittest.TestCase):
             cls.conn = mysql.connector.connect(**servidor)
         except mysql.connector.Error:
             raise unittest.SkipTest("No hay conexion con MariaDB")
+        # Conexion auxiliar de la prueba (no la del pool): cada lectura ve lo ultimo
+        # que guardaron las conexiones del pool (item 4.9: DB_CONFIG ya no lo hace)
+        cls.conn.autocommit = True
         cursor = cls.conn.cursor()
         # El nombre es una constante del archivo (no viene del usuario)
         cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_POOL}`")
@@ -653,7 +730,7 @@ class PruebasPoolEnBD(unittest.TestCase):
                 with self.subTest(vuelta=vuelta):
                     self.assertIn("STRICT_TRANS_TABLES", sql_mode)
                     self.assertEqual(juego, "utf8mb4")
-                    self.assertEqual(int(autocommit), 1)
+                    self.assertEqual(int(autocommit), 0)     # item 4.9: commit() explicito
                 if vuelta == 0:
                     # Alguien cambia la sesion: al devolverla, el pool la limpia
                     cursor.execute("SET SESSION sql_mode = ''")
@@ -672,6 +749,63 @@ class PruebasPoolEnBD(unittest.TestCase):
         self.assertIsNotNone(conexion)
         conexion.close()
         self.assertLess(time.monotonic() - inicio, 1)   # no tuvo que esperar: nada quedo prestado
+
+    # --- Item 4.9 (A-15): transacciones de verdad ---
+
+    def _contar_categoria(self, nombre):
+        """Cuenta con la conexion auxiliar (autocommit): ve solo lo confirmado."""
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute(f"SELECT COUNT(*) FROM `{BD_PRUEBA_POOL}`.categorias_producto "
+                           "WHERE nombre = %s", (nombre,))
+            return cursor.fetchone()[0]
+        finally:
+            cursor.close()
+
+    def _borrar_categoria(self, nombre):
+        cursor = self.conn.cursor()
+        cursor.execute(f"DELETE FROM `{BD_PRUEBA_POOL}`.categorias_producto WHERE nombre = %s",
+                       (nombre,))
+        cursor.close()
+
+    def test_lo_no_confirmado_se_descarta_al_devolver_la_conexion(self):
+        conexion_y_cursor = _modulo_conexion().conexion_y_cursor
+        nombre = "Prueba sin commit 4.9"
+        self.addCleanup(self._borrar_categoria, nombre)
+
+        with conexion_y_cursor(self.ConexionBD()) as (_, cursor):
+            cursor.execute("INSERT INTO categorias_producto (nombre) VALUES (%s)", (nombre,))
+            # Sin commit(): otra conexion todavia no lo ve
+            self.assertEqual(self._contar_categoria(nombre), 0)
+        # Devuelta al pool: se descarto. Con autocommit=True ya estaria guardada
+        self.assertEqual(self._contar_categoria(nombre), 0)
+        filas = self._consultar("SELECT COUNT(*) FROM categorias_producto WHERE nombre = %s",
+                                (nombre,))
+        self.assertEqual(filas[0][0], 0)    # tampoco la ve ninguna conexion del pool
+
+        # Con commit() si queda guardada (la prueba de arriba no pasa "por nada")
+        with conexion_y_cursor(self.ConexionBD()) as (conexion, cursor):
+            cursor.execute("INSERT INTO categorias_producto (nombre) VALUES (%s)", (nombre,))
+            conexion.commit()
+        self.assertEqual(self._contar_categoria(nombre), 1)
+
+    def test_rollback_deshace_todos_los_pasos_de_la_operacion(self):
+        # Como seed.py: varios INSERT en una conexion y un solo commit() al final.
+        # Si el segundo paso falla, el primero tampoco debe quedar guardado.
+        conexion_y_cursor = _modulo_conexion().conexion_y_cursor
+        nombre = "Prueba todo o nada 4.9"
+        self.addCleanup(self._borrar_categoria, nombre)
+
+        with conexion_y_cursor(self.ConexionBD()) as (conexion, cursor):
+            try:
+                cursor.execute("INSERT INTO categorias_producto (nombre) VALUES (%s)", (nombre,))
+                # El nombre es UNIQUE: el segundo paso falla
+                cursor.execute("INSERT INTO categorias_producto (nombre) VALUES (%s)", (nombre,))
+                conexion.commit()
+                self.fail("el segundo INSERT debia fallar por el nombre repetido")
+            except errores_bd.IntegrityError:
+                conexion.rollback()
+        self.assertEqual(self._contar_categoria(nombre), 0)
 
 
 if __name__ == "__main__":

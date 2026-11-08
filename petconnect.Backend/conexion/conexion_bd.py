@@ -20,6 +20,13 @@ que lo hace en un solo lugar:
 
 ConexionBD sigue siendo Singleton (un solo objeto por proceso), pero lo único
 que comparte es el pool, que la librería protege para varios hilos.
+
+Ítem 4.9 (A-15): autocommit está apagado (config/db_config.py). Toda escritura
+termina con conexion.commit() y, si falla, conexion.rollback(). Al devolver una
+conexión, el pool "limpia" su sesión (pool_reset_session=True): descarta lo que
+haya quedado sin confirmar, incluida la transacción que abre cualquier SELECT, y
+vuelve a poner autocommit y sql_mode. Así la siguiente petición nunca recibe una
+conexión con cambios a medias de otra.
 """
 
 import logging
@@ -64,8 +71,11 @@ class ConexionBD:
         if self._pool is None:
             with self._candado_pool:
                 if self._pool is None:
+                    # pool_reset_session=True ya es el valor por defecto; se escribe
+                    # para que nadie lo apague sin ver que de eso depende el 4.9
                     self._pool = MySQLConnectionPool(
-                        pool_name="petconnect", pool_size=POOL_SIZE, **DB_CONFIG
+                        pool_name="petconnect", pool_size=POOL_SIZE,
+                        pool_reset_session=True, **DB_CONFIG
                     )
         return self._pool
 

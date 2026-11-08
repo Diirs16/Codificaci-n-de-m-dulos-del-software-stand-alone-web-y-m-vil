@@ -228,6 +228,9 @@ class PruebasEsquemaEnBD(unittest.TestCase):
             cls.conn = mysql.connector.connect(**servidor)
         except mysql.connector.Error:
             raise unittest.SkipTest("No hay conexion con MariaDB")
+        # Conexion auxiliar de la prueba (no la del pool): cada lectura ve lo ultimo
+        # que guardaron la API y los DAO (item 4.9: DB_CONFIG trae autocommit apagado)
+        cls.conn.autocommit = True
 
         cursor = cls.conn.cursor()
         # El nombre es una constante del archivo (no viene del usuario): los

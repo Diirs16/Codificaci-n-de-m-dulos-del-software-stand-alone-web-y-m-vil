@@ -125,29 +125,29 @@ DB_CONFIG = {
 | user | root | Usuario de MySQL |
 | password | (vacío) | Contraseña del usuario |
 | charset | utf8mb4 | Codificación de caracteres (soporta emojis) |
-| autocommit | False | Las transacciones requieren `commit()` explícito |
+| autocommit | False | Nada queda guardado hasta llamar `commit()`; si algo falla, `rollback()` deshace la operación completa ("todo o nada") |
 
 ### 5.2 Clase ConexionBD (`conexion_bd.py`)
 
-Implementa el patrón Singleton, garantizando que toda la aplicación use una única instancia de conexión a la base de datos. Equivale a la clase `DriverManager` de JDBC en Java.
+Implementa el patrón Singleton (un solo objeto por proceso). Desde el ítem 4.5 ese objeto no guarda una única conexión: administra un **pool** (un "estante" de conexiones abiertas, 10 por defecto con `DB_POOL_SIZE`) y presta una conexión distinta a cada operación. Equivale a un `DataSource` con pool en Java.
 
-Métodos disponibles:
+Métodos y funciones disponibles:
 
 | Método | Descripción |
 |---|---|
-| `obtener_conexion()` | Establece y retorna la conexión activa a MySQL. Si no existe o está desconectada, crea una nueva. |
-| `cerrar_conexion()` | Cierra la conexión activa y libera los recursos. |
-| `commit()` | Confirma la transacción actual, haciendo permanentes los cambios en la BD. |
-| `rollback()` | Revierte la transacción actual, deshaciendo los cambios no confirmados. |
+| `obtener_conexion()` | Presta una conexión del pool. Si están todas ocupadas espera hasta 5 s; si la BD no responde devuelve `None` (la API contesta 503). |
+| `cerrar_conexion()` | Cierra las conexiones libres del pool (la consola lo llama al salir). |
+| `conexion_y_cursor(bd)` | Bloque `with` que presta conexión y cursor y los devuelve al terminar, aunque haya error. |
+| `conexion.commit()` | Confirma los cambios de esa operación. Se llama sobre la conexión prestada, no sobre `ConexionBD`. |
+| `conexion.rollback()` | Deshace los cambios de esa operación que no se confirmaron. |
 
 ### 5.3 Flujo de conexión
 
-1. La aplicación inicia en `main.py` y crea una instancia de `ConexionBD`.
-2. `ConexionBD` lee los parámetros de `DB_CONFIG` (host, puerto, usuario, contraseña).
-3. Se llama a `mysql.connector.connect()` con esos parámetros para establecer la conexión.
-4. Los DAOs solicitan la conexión mediante `obtener_conexion()` para ejecutar consultas SQL.
-5. Tras cada operación de escritura, se llama a `commit()` para confirmar o `rollback()` si hay error.
-6. Al salir de la aplicación, se llama a `cerrar_conexion()` para liberar recursos.
+1. La aplicación (API, consola o `seed.py`) crea `ConexionBD`; la primera vez que se pide una conexión se crea el pool con `DB_CONFIG`.
+2. Cada método de un DAO abre `with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):` y ejecuta su consulta parametrizada.
+3. Si la operación escribe (INSERT, UPDATE, DELETE), termina con `conexion.commit()`; si la BD da error, llama `conexion.rollback()` y deja subir el error.
+4. Al salir del bloque `with`, el cursor se cierra y la conexión vuelve al pool. El pool limpia la sesión (`pool_reset_session=True`): lo que haya quedado sin `commit()` se descarta y nunca le llega a otra petición.
+5. Al salir de la consola se llama a `cerrar_conexion()` para liberar las conexiones.
 
 ## 6. Capa Modelo (Entidades)
 
@@ -214,10 +214,15 @@ _INSERTAR = """
     VALUES (%s, %s, %s, %s, %s)
 """
 
-# Ejecución con tupla de valores
-cursor.execute(self._INSERTAR, (usuario.nombres, usuario.apellidos,
-               usuario.correo, usuario.telefono, usuario.password_hash))
-self._conexion_bd.commit()  # Confirmar transacción
+# Ejecución con tupla de valores, en una conexión prestada por el pool
+with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+    try:
+        cursor.execute(self._INSERTAR, (usuario.nombres, usuario.apellidos,
+                       usuario.correo, usuario.telefono, usuario.password_hash))
+        conexion.commit()    # Confirmar: sin esto el cambio se descarta
+    except Error:
+        conexion.rollback()  # Deshacer lo que no se confirmó
+        raise
 ```
 
 ## 8. Capa Vista (Interfaz de consola)

@@ -37,6 +37,12 @@ def tamano_pool(texto):
 
 POOL_SIZE = tamano_pool(os.getenv("DB_POOL_SIZE"))
 
+# Item 4.9 (A-15): autocommit apagado. Ningun cambio queda guardado hasta que el
+# codigo llama conexion.commit(); si algo falla, conexion.rollback() deshace todo lo
+# de esa operacion ("todo o nada"). Antes estaba en True: cada sentencia se guardaba
+# sola y los rollback() de los DAO no deshacian nada. Cada escritura de los DAO hace
+# commit() (tests/test_pool.py lo revisa) y lo que quede sin confirmar se descarta
+# cuando la conexion vuelve al pool (pool_reset_session en conexion/conexion_bd.py).
 DB_CONFIG = {
     "host":      os.getenv("DB_HOST", "localhost"),
     "port":      int(os.getenv("DB_PORT", 3310)),
@@ -45,6 +51,6 @@ DB_CONFIG = {
     "password":  os.getenv("DB_PASSWORD", ""),
     "charset":   "utf8mb4",
     "collation": "utf8mb4_unicode_ci",
-    "autocommit": True,
+    "autocommit": False,
     "sql_mode":  SQL_MODE_ESTRICTO,
 }
