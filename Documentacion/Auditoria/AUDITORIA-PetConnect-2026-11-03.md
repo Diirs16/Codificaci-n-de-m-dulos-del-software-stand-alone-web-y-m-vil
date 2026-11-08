@@ -357,6 +357,39 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   igual `_mx_cache` en `api.py:81`).
 - **Arreglo:** guardar los OTP en una tabla de la BD (`otp_pendientes` con hash del código, intentos y expiración) o
   usar 1 worker con hilos mientras tanto; limpiar vencidos.
+- **Estado: resuelto en el código el 07/11/2026 (ítem 4.6 de PRIORIDADES, en dos partes; solo backend). NC-003 sigue
+  abierta** hasta el 4.17 (paginación e índices) y la medición del 4.12. **Falta que el dueño aplique la migración**
+  en su BD (`sql/migraciones/2026-11-07_otp_pendientes.sql`, con respaldo): sin ella la API nueva no arranca y lo
+  avisa. Decisiones del dueño: opción A (tabla), el código **cifrado con Fernet** y no con hash (con un hash no se
+  podría reenviar el mismo código, regla del A-09), borrar los datos del registro pendiente al terminar (Ley 1581) y
+  `_mx_cache` de 1.000 dominios.
+  - **Parte 1 (`9ccd379`):** `_mx_cache` (`api.py`) guarda como mucho 1.000 dominios (`MX_CACHE_MAXIMO`) y olvida el
+    que lleva más tiempo sin usarse (LRU, con `OrderedDict`), con un candado entre hilos.
+  - **Parte 2 (`24ed52c`):** tabla `otp_pendientes` (`sql/schema.sql` y migración): una fila por correo y propósito
+    (`registro`/`login`), código cifrado, intentos, reenvíos, vencimiento, y los datos del pendiente (nombre, hash
+    bcrypt, `id_usuario`, prueba de la autorización); la regla `chk_otp_proposito` y la clave foránea a `usuarios`
+    (`ON DELETE CASCADE`). `otp/servicio.py`: `AlmacenOTP(proposito, repositorio)` conserva las reglas (10 min, 5
+    fallos → 429, `compare_digest`, reenvío del mismo código con 60 s y máximo 3, código nuevo reinicia contadores)
+    y guarda en `OtpDAO` (`dao/otp_dao.py`, la API) o en `RepositorioMemoria` (con candado; las pruebas). Cada intento
+    se **reserva antes de comparar** con un solo `UPDATE ... WHERE intentos < 5` (atómico): ni 20 peticiones a la vez
+    ni varios procesos pasan de 5. Crear un código borra **todos** los vencidos y la API los borra también al arrancar
+    (`_preparar_otp()`, que además se detiene con un aviso claro si falta la tabla). Un código ilegible (cambió la
+    `FERNET_KEY`) se borra y se pide otro (`decrypt_estricto` nuevo en `security/crypto.py`). Correos de más de 120
+    caracteres se rechazan (antes daban 500 al guardar). `/register/resend` ahora usa la BD (sin BD, 503). El correo
+    usa la intercalación `utf8mb4_spanish_ci`: mayúsculas y minúsculas comparten pendiente.
+  - **Regresión:** `tests/test_otp_bd.py` (47; 16 con MariaDB en bases temporales): 20 hilos con código malo solo
+    comparan 5 veces, crear borra 100 vencidos de otros correos, código cifrado, las reglas con un repositorio
+    compartido (dos “procesos”), SQL parametrizado y errores que suben, la API crea los almacenes con `OtpDAO`, sin
+    BD las rutas de código responden 503, otro proceso completa el registro y no queda nada del pendiente,
+    arranque con y sin tabla; con `PETCONNECT_PRUEBA_BD=1` las mismas reglas con la tabla real, la regla CHECK, la
+    clave foránea y la migración dos veces. `test_esquema.py` (34 tablas, la tabla igual en el esquema y la
+    migración), `test_pool.py` (`OtpDAO` entra en la revisión de fugas: 39 métodos) y 2 pruebas de `_mx_cache` en
+    `test_endpoints.py`. Las pruebas de rutas usan un `RepositorioMemoria` (`_importar_api`). Suite: 310 (267 + 43
+    omitidas). Contraprueba en copias fuera del repositorio: con el código anterior, 20 intentos comparan 20 veces
+    (`20 != 5`) y los 100 vencidos nunca se borran; con solo el `api.py` anterior fallan 5 (los almacenes en memoria,
+    los 120 caracteres y el arranque); con el `_mx_cache` anterior, 1.500 entradas en vez de 1.000.
+  - **Hallazgo:** el borrador de la política (A.11) dice que un registro sin terminar “nunca llega a la base de
+    datos”: ya no es cierto. Corregirlo obliga a subir la versión (C.9): decisión D.7 del borrador.
 
 #### A-13 · 🟡 Media · El cifrado Fernet no se usa pero es obligatorio para arrancar [A]
 - `api.py:29` importa `encrypt/decrypt` y el comentario de `api.py:400-401` dice que el teléfono se guarda cifrado:

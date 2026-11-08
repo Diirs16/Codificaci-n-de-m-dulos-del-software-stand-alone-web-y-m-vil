@@ -83,7 +83,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.3 | A-31 | — | GitHub Actions: `unittest` + `npm run lint` + `npm run build` en cada push — *Hecho el 07/11/2026 en una parte (`8802815`): `.github/workflows/ci.yml`, en cada push y con “Run workflow”, un job por módulo en `ubuntu-latest`: backend (Python 3.14, `unittest`), web (Node 24: `npm ci`, lint, `npm test`, build) y móvil (Node 24: `npm ci`, `npm test` y `expo export --platform web`, con el sí del dueño). `permissions: contents: read`, `persist-credentials: false`, acciones `@v7`, sin secretos. Validado en local en una copia limpia del commit (sin `.env` ni `node_modules`): backend 200 (176 + 24 omitidas), web 0 errores de lint + 42/42 + build, móvil 35/35 + export; YAML revisado y sin diferencias de mayúsculas en los imports. **La primera ejecución en GitHub queda pendiente del push** (al terminar todo). No cierra NC* | 🟡 |
 | [x] | 4.4 | A-31 | todas | Pruebas de endpoints con el cliente de Flask (mascotas, productos, auth, errores) — *Hecho el 07/11/2026 en una parte (`37f8126`, solo pruebas; `api.py` sin tocar). Primero un inventario ruta × caso y NC × prueba: de 14 rutas, 6 tenían huecos (`/api/auth/me` sin ninguna prueba) y NC-001, NC-008 y NC-009 no tenían regresión por la API. `tests/test_endpoints.py` (31, BD/DNS/correo simulados, sin `.env`): inventario vivo de rutas (ruta nueva sin pruebas → falla; privadas → 401 sin token), productos, filtro de adopción, `/me` con token real, migración del hash, login, verificación del código, registro y `validar-correo`. Suite 231 (207 + 24 omitidas). Contraprueba en una copia temporal: 28 roturas, todas detectadas; cada prueba falla con al menos una. A-31 resuelto (falta ver la CI en GitHub con el push). Hallazgo → 4.16* | 🟡 |
 | [x] | 4.5 | A-11 | NC-003 | Pool de conexiones + `try/finally` para cerrar cursores — *Hecho el 07/11/2026 en una parte (`9c417de`, solo backend). Decisiones del dueño: pool de 10 (`DB_POOL_SIZE`, de 1 a 32), consola y `seed.py` en el mismo pool, 4.15 aparte. `ConexionBD` presta conexiones de un `MySQLConnectionPool`; si está lleno espera hasta 5 s y luego 503; el log no trae usuario ni host. `conexion_y_cursor()` (el `try/finally` escrito una vez) en los 32 métodos de los 5 DAO y en las 4 consultas de `api.py`; `_get_conn()` (pedía y nunca devolvía) → `_verificar_bd()`. `tests/test_pool.py` (25; 3 con MariaDB): sin fugas en 32 métodos y 14 rutas × 3 escenarios. Suite 256 (229 + 27 omitidas). Contraprueba: con el código viejo fallan 20 de 22; cada archivo arreglado tiene su prueba. NC-003 sigue abierta (4.6, 4.12; paginación e índices sin ítem)* | 🟡 |
-| [ ] | 4.6 | A-12 | NC-003 | OTP en tabla de la BD (hash del código, intentos, expiración) o 1 worker con hilos; limpiar vencidos y acotar `_mx_cache` | 🟡 |
+| [x] | 4.6 | A-12 | NC-003 | OTP en tabla de la BD (hash del código, intentos, expiración) o 1 worker con hilos; limpiar vencidos y acotar `_mx_cache` — *Hecho el 07/11/2026 en dos partes (solo backend): `_mx_cache` de 1.000 dominios con LRU y candado (`9ccd379`) y tabla `otp_pendientes` (`24ed52c`). Decisiones del dueño: opción A, código cifrado con Fernet (no hash: hay que reenviar el mismo código), datos del registro pendiente borrados al verificar, bloquearse o vencer. `AlmacenOTP(proposito, repositorio)` conserva las reglas y guarda en `OtpDAO` (API) o `RepositorioMemoria` (pruebas); el intento se reserva antes de comparar (un `UPDATE` atómico); crear un código y arrancar la API borran los vencidos; sin la tabla la API no arranca y lo avisa; correos de más de 120 caracteres → 400. `tests/test_otp_bd.py` (47; 16 con MariaDB). Suite 310 (267 + 43 omitidas). Contraprueba: con el código viejo 20 intentos a la vez comparan 20 veces y los vencidos no se borran. **Falta del dueño: aplicar la migración (con respaldo)**; opcional: las pruebas con `PETCONNECT_PRUEBA_BD=1`. Hallazgo: A.11 de la política dice que el registro pendiente nunca llega a la BD (decisión D.7 del borrador). NC-003 sigue abierta (4.17, 4.12)* | 🟡 |
 | [ ] | 4.7 | A-24 | — | Web: validar sesión con `/auth/me` al iniciar y cerrar sesión ante 401 | 🟢 |
 | [ ] | 4.8 | A-13 | — | Fernet: usarlo para el teléfono o quitarlo; corregir comentario `api.py:400`; `decrypt` debe fallar | 🟢 |
 | [ ] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README | 🟢 |
@@ -147,8 +147,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 07/11/2026, actualizada al terminar el 4.5 (A-11, NC-003: pool de conexiones + `try/finally`, una
-parte). El próximo ítem es el 4.6 (A-12, NC-003: OTP fuera de la memoria del proceso).
+*Versión del 07/11/2026, actualizada al terminar el 4.6 (A-12, NC-003: OTP en la tabla `otp_pendientes` y
+`_mx_cache` acotado, dos partes). El próximo ítem es el 4.7 (A-24: la web revalida la sesión con `/auth/me`).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -174,6 +174,35 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.6 HECHO el 07/11/2026 (A-12; commits 9ccd379 y 24ed52c, solo
+  backend; NC-003 sigue abierta hasta el 4.17 y el 4.12). Decisiones del
+  dueño: opción A (tabla otp_pendientes), código cifrado con Fernet (con
+  hash no se podría reenviar el mismo código, A-09), datos del registro
+  pendiente borrados al verificar, al bloquearse y al vencer, _mx_cache
+  de 1.000 dominios (MX_CACHE_MAXIMO, LRU con candado).
+  otp/servicio.py: AlmacenOTP(proposito, repositorio) tiene las reglas;
+  OtpDAO (dao/otp_dao.py, 7 métodos, deja subir errores) en la API y
+  RepositorioMemoria (candado) en las pruebas: _importar_api() de
+  test_errores.py pasa los almacenes de la API a un RepositorioMemoria
+  compartido (las pruebas de rutas simulan la BD). test_errores.py pone
+  FERNET_KEY y JWT_SECRET de prueba al importarse. El intento se reserva
+  antes de comparar (UPDATE ... intentos < 5) y se devuelve si acierta;
+  crear un código borra todos los vencidos; api._preparar_otp() al
+  arrancar los borra y, sin la tabla (errno 1146), avisa y no arranca.
+  decrypt_estricto nuevo en security/crypto.py (el 4.8 ya no puede
+  "quitar Fernet": lo usan los OTP). CORREO_MAX = 120 en _validar_correo.
+  /register/resend ahora usa la BD (sin BD, 503). tests/test_otp_bd.py
+  (47; 16 con PETCONNECT_PRUEBA_BD=1 en petconnect_prueba_otp y
+  petconnect_prueba_otp_migracion); test_esquema 34 tablas; test_pool
+  39 métodos de DAO. Suite 310 (267 + 43 omitidas). Contraprueba en el
+  scratchpad (git archive + pruebas nuevas): todo viejo → 20 != 5 en la
+  carrera y 100 vencidos sin borrar; solo api.py viejo → 5 fallan;
+  _mx_cache viejo → 1.500 != 1.000. PENDIENTE DEL DUEÑO: aplicar
+  sql/migraciones/2026-11-07_otp_pendientes.sql con respaldo (sin eso la
+  API nueva no arranca) y, opcional, las pruebas con MariaDB. Hallazgo:
+  la política (A.11) dice que el registro pendiente "nunca llega a la
+  base de datos"; corregirla obliga a subir la versión (C.9): decisión
+  D.7 del borrador, pendiente del dueño.
 - 4.5 HECHO el 07/11/2026 (A-11; commit 9c417de, solo backend; NC-003
   sigue abierta). Decisiones del dueño: pool de 10 (DB_POOL_SIZE en
   .env.example, vacío = 10, de 1 a 32; otro valor detiene el arranque),
@@ -896,40 +925,19 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.6, A-12, NC-003: OTP fuera de la memoria):
-- La fila dice "OTP en tabla de la BD (hash del código, intentos,
-  expiración) o 1 worker con hilos; limpiar vencidos y acotar _mx_cache".
-  A-12: api.py crea _otp_registro y _otp_login = AlmacenOTP() en memoria
-  (otp/servicio.py: diccionario _pendientes, sin candado entre hilos, los
-  vencidos solo se borran si alguien vuelve a consultar ese correo). Con
-  varios procesos (Gunicorn), el código se guarda en uno y la verificación
-  llega a otro → "No hay verificación pendiente"; al reiniciar se pierden.
-  _mx_cache (api.py, junto a _validar_correo) crece sin límite.
-- Reglas que hoy cumple AlmacenOTP y que no se pueden perder (pruebas en
-  test_otp.py, test_registro.py, test_endpoints.py y otros): 10 min de
-  vigencia, 5 fallos → bloqueado (429), comparación en tiempo constante,
-  reenvío del MISMO código con 60 s de espera y máximo 3 (A-09), pedir uno
-  nuevo reinicia el contador. 8 archivos de tests/ usan
-  api._otp_login/_otp_registro (crear, descartar, verificar): conservar esa
-  interfaz o adaptar las pruebas sin perder lo que prueban.
-- Opciones para el dueño (plan primero; la opción A toca la BD):
-  A) Tabla otp_pendientes (sql/schema.sql + migración en sql/migraciones/
-     con su prueba en test_esquema.py): guardar solo el HASH del código
-     (nunca el código), intentos, vence, reenvíos; DAO nuevo con
-     conexion_y_cursor (4.5) que propague errores como SolicitudDAO; los
-     datos del pendiente de registro (nombre, hash de la contraseña, fecha
-     y versión de la política) también tendrían que ir en la tabla, y son
-     datos personales (Ley 1581): borrarlos al verificar o al vencer.
-  B) Seguir en memoria con 1 proceso y varios hilos: candado
-     (threading.Lock) en AlmacenOTP, limpieza periódica de vencidos y
-     _mx_cache con tamaño máximo. Más simple, pero no deja escalar a
-     varios procesos.
-  OJO: Gunicorn no corre en Windows (el dueño desarrolla en Windows; en
-  Docker, 5.2, sí). Con varios procesos, cada uno tiene su pool de 10:
-  procesos × 10 debe quedar bajo las 151 conexiones de MariaDB.
-- La medición de carga (CP-008/CP-017) es el 4.12, después del 4.6 y del
-  4.17 (paginación e índices, la otra parte de NC-003). Después del 4.6,
-  el siguiente en orden es el 4.7; el 4.12 se salta hasta tener el 4.17.
+Contexto del próximo paso (4.7, A-24: la sesión web nunca se revalida):
+- A-24: PetConnect.Front/petconnect-app/src/context/AuthContext.jsx
+  carga el usuario de localStorage y lo da por bueno siempre, aunque el
+  token (24 h) haya vencido. Arreglo: llamar a GET /api/auth/me al
+  iniciar (el móvil ya lo hace: PetConnect.Mobile/src/services/api.js) y
+  cerrar sesión ante un 401. Solo web (🟢); no toca la API ni la BD.
+- Revisar src/services/api.js (lee el token de localStorage) y
+  FormularioSolicitud.jsx, que ya trata el 401. Ojo con no cerrar la
+  sesión si la API no responde (503 o red caída): eso no es un token malo.
+- Pruebas: npm run lint, npm test y npm run build en la web; prueba nueva
+  del AuthContext (token vencido → sesión cerrada; 503 → sesión intacta).
+- Después del 4.7 siguen 4.8 a 4.11; el 4.12 se salta hasta tener el
+  4.17. El 4.8 (Fernet) ya no puede quitar Fernet: lo usan los OTP.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -968,6 +976,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.6** (A-12, NC-003): OTP fuera de la memoria del proceso (tabla en la BD o 1 proceso con
-hilos), limpiar vencidos y acotar `_mx_cache`; plan primero (puede tocar la BD). El 4.5 quedó hecho el 07/11/2026
-(pool de conexiones, `9c417de`); NC-003 sigue abierta hasta el 4.6 y la medición del 4.12.
+**Próximo ítem: 4.7** (A-24): la web revalida la sesión con `/auth/me` al iniciar y la cierra ante un 401 (solo web). El 4.6 quedó hecho el 07/11/2026 (`9ccd379` y `24ed52c`); falta que el dueño aplique la migración `otp_pendientes`. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
