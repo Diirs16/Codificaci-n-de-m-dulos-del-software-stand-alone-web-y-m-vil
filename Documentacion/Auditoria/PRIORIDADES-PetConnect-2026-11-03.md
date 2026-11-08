@@ -90,7 +90,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) — *Hecho el 08/11/2026 en una parte (`8668680`, solo backend; no toca el esquema). Decisión del dueño: opción A, respuesta neutra + correo de aviso al titular. Un correo con cuenta recibe lo mismo que uno nuevo (200 “Codigo enviado”) por el mismo camino: bcrypt + un correo la primera vez, nada si se repite antes de 10 min, el mismo 503 si el correo falla. Nunca crea OTP. El aviso (`enviar_aviso_cuenta_existente`, plantilla `HTML_AVISO_REGISTRO`) lleva el nombre de la cuenta y no lleva código; la memoria de avisos guarda el SHA-256 del correo. Hueco tapado: `/verify` respondía distinto sin pendiente (“No hay verificación pendiente”) que con código incorrecto; ahora un solo mensaje para sin pendiente, vencido e incorrecto. Web y móvil sin cambios. Regresión: `tests/test_registro_neutro.py` (18) + 7 pruebas viejas ajustadas. Suite 339 (294 + 45 omitidas). Contraprueba: con el `api.py` viejo dan error 52; 9 sabotajes sobre el código nuevo, todos detectados (volver al 409: fallan 11). CP-002 de la GA9 aprobado en la API. Hallazgo → 4.18 (tiempo de `/login`). Opcional del dueño: probarlo con la API real* | 🟢 |
 | [x] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos — *Hecho el 08/11/2026 en una parte (`3e814e3`, solo backend; no toca el esquema). Decisiones del dueño (las recomendadas): la consola no da la autorización por el titular (Ley 1581, art. 9; política C.6): guarda `acepta_datos = False` explícito y avisa que el titular la dará al iniciar sesión (3.5); nombre, apellidos y formato del correo como la API (sin DNS); correo repetido → “Ese correo ya tiene una cuenta”, sin repetirlo ni calcular bcrypt; contraseña dos veces con `getpass` y sin `.strip()`, por `validar_contrasena`. Módulo común nuevo `security/datos_usuario.py` (sacado de `api.py`; la consola no importa `api.py`, A-41). Regresión: `tests/test_consola_registro.py` (26). Suite 365 (320 + 45 omitidas). Contraprueba: con la consola vieja fallan 13 (registraba `PETCONNECT1!`) y pasan a propósito 13; con el `api.py` viejo falla 1. No cierra NC. Hallazgo → 4.19. Opcional del dueño: probarlo con `python main.py`* | 🟢 |
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
-| [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 | 🟡 |
+| [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 — *Parte 1 de 3 (API y BD) hecha el 08/11/2026 (`3c039ec`). Decisiones del dueño (las recomendadas): ruta `POST /api/auth/logout` y botones por partes (cierra la sesión en todos los aparatos: un contador por cuenta); `require_auth` rechaza con 401 las cuentas con estado distinto de `activo`; los tokens viejos sin versión no valen. Columna `usuarios.version_sesion` (migración `2026-11-08_version_sesion.sql`), token con `sub`, `ver`, `iat` y `exp` (sin correo), `require_auth` consulta la sesión en cada petición (BD caída → 503), la API no arranca sin la columna. `tests/test_sesiones.py` (26; 5 con MariaDB). Suite 395 (345 + 50 omitidas). Contraprueba: fallan las 21 nuevas sin BD. **Falta del dueño: aplicar la migración (con respaldo).** Faltan la parte 2 (web: “Cerrar sesión” llama a la ruta) y la 3 (móvil)* | 🟡 |
 | [ ] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` | 🟢 |
 | [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`* | 🟡 |
 | [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
@@ -149,9 +149,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 08/11/2026, actualizada al terminar el 4.11 (A-18: la consola registra con `getpass`, la política de
-contraseñas y las validaciones de nombre y correo de la API, sin inventar la autorización de datos; solo backend; no
-cierra NC). El próximo ítem es el 4.13 (A-03: revocar sesiones; toca la BD). El 4.12 se salta hasta tener el 4.17.
+*Versión del 08/11/2026, actualizada al terminar la parte 1 del 4.13 (A-03: `usuarios.version_sesion` en el token y
+comparada en `require_auth`, ruta `POST /api/auth/logout`, token sin correo; solo backend; no cierra NC). Lo próximo es
+la parte 2 del 4.13 (web: el botón “Cerrar sesión” llama a la ruta). El 4.12 se salta hasta tener el 4.17.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -177,6 +177,44 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.13 PARTE 1 de 3 HECHA el 08/11/2026 (A-03; commit 3c039ec, solo
+  backend; TOCA EL ESQUEMA; no cierra NC). Decisiones del dueño (las
+  recomendadas): (1) ruta POST /api/auth/logout + botones por partes
+  (API → web → móvil); un solo contador por cuenta, así que cerrar
+  sesión cierra en TODOS los aparatos (tabla de sesiones por aparato
+  descartada); (2) require_auth rechaza con 401 (no 403) las cuentas con
+  estado != "activo" (la web solo cierra la sesión con 401, 4.7); (3) los
+  tokens viejos sin "ver" no valen (todos inician sesión otra vez).
+  Columna usuarios.version_sesion int(10) unsigned NOT NULL DEFAULT 0
+  (schema.sql + sql/migraciones/2026-11-08_version_sesion.sql, ADD
+  COLUMN IF NOT EXISTS de MariaDB; pasos en sql/README.md).
+  jwt_helper.generate_token(user_id, version_sesion): token con sub,
+  ver, iat y exp (sin correo); ver entero >= 0 (True no vale).
+  UsuarioDAO.consultar_sesion(id) -> (version, estado) o None y
+  cerrar_sesiones(id) (suma 1; fecha_actualizacion = fecha_actualizacion
+  para no cambiarla); ambos dejan subir los errores (503). api.py:
+  _datos_del_token(); require_auth consulta la sesión en cada petición,
+  mismo 401 _MENSAJE_SESION_INVALIDA para todo; ya no existe
+  request.current_user_email; /login/verify firma con la versión de la
+  BD (consultar_sesion) y /register/verify con VERSION_SESION_INICIAL =
+  0; POST /api/auth/logout (@require_auth, sin limitador) → 200
+  {"message": "Sesion cerrada"}; _preparar_sesiones() al arrancar
+  (errno 1054 → aviso y no arranca). _cuenta_que_envia() sigue como 2.ª
+  barrera. tests/test_sesiones.py (26: 21 sin BD, 5 con
+  PETCONNECT_PRUEBA_BD=1 en petconnect_prueba_sesion y
+  petconnect_prueba_sesion_migracion); test_esquema +3; ajustadas las
+  pruebas que fabricaban tokens con el correo (test_endpoints: /me con
+  usuario borrado → 401; test_esquema con BD crea 2 cuentas activas
+  porque el refugio de la semilla está inactivo); test_pool 41 métodos
+  (22 escrituras, 19 lecturas); RUTAS_PRIVADAS incluye logout. Suite 395
+  (345 + 50 omitidas). Contraprueba (git stash de api.py, jwt_helper.py
+  y usuario_dao.py): fallan las 21 nuevas sin BD (37 resultados con
+  subcasos), ninguna pasa a propósito. PENDIENTE DEL DUEÑO: aplicar la
+  migración con respaldo (sin ella la API nueva no arranca) y, opcional,
+  test_sesiones y test_esquema con PETCONNECT_PRUEBA_BD=1. Nota: la
+  Figura 4 de la GA9 (ejemplo de CP-012) usa generate_token(2, correo),
+  la firma vieja. No existe "cambiar contraseña": cuando exista, debe
+  llamar a cerrar_sesiones().
 - 4.11 HECHO el 08/11/2026 (A-18; commit 3e814e3, solo backend; no toca
   el esquema; no cierra NC). Decisiones del dueño (las recomendadas):
   (1) la consola NO da la autorización por el titular (Ley 1581 art. 9,
@@ -1060,35 +1098,30 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.13, A-03: revocar sesiones; TOCA LA BD):
-- Hoy require_auth (api.py, ~línea 324) acepta el token solo por su firma
-  (verify_token de security/jwt_helper.py), sin consultar la BD: una
-  sesión vale 24 h (_EXPIRE) aunque se quiera cerrar o se bloquee la
-  cuenta. generate_token(user_id, email) mete el CORREO en el token (un
-  JWT se puede leer: base64, no cifrado; Ley 1581). require_auth guarda
-  request.current_user_email (línea ~340): revisar quién lo usa antes de
-  quitarlo. generate_token se llama en /login/verify (~608) y en
-  /register/verify (~865). No existe ruta de cerrar sesión ni de cambiar
-  contraseña: la web y el móvil solo borran el token en su lado.
-- Propuesta de A-03: columna usuarios.version_sesion (INT NOT NULL
-  DEFAULT 0) que viaja en el token y require_auth compara con la BD
-  (sumar 1 cierra todas las sesiones de esa cuenta). Suma una consulta
-  por petición (por eso iba después del pool, 4.5, hecho). Si algún día
-  se guardan ids de sesión, solo su hash SHA-256. No reemplaza el secreto
-  obligatorio (2.2).
-- Decidir con el dueño: (1) ¿se agrega una ruta POST /api/auth/logout
-  (suma 1) y botones en web/móvil, o solo la columna y la comparación
-  (por partes: API, web, móvil)? (2) ¿require_auth también rechaza una
-  cuenta con estado != "activo" (la consola puede bloquearla)? (3) qué
-  pasa con los tokens viejos (sin versión) al desplegar: rechazarlos
-  (todos inician sesión otra vez) o aceptarlos como versión 0.
-- Toca la BD: sql/schema.sql + migración en sql/migraciones/ con su
-  prueba en tests/test_esquema.py; plan primero, y el dueño la aplica con
-  respaldo (dar los comandos para PowerShell 5.1). También security/ (con
-  prueba nueva) y api.py. Suite hoy: 365 (320 + 45 omitidas).
-- Después del 4.13 sigue el 4.14 (el 4.12 se salta hasta tener el 4.17).
-  El 4.18 (tiempo de /login, 🟢) y el 4.19 (consola: "Actualizar
-  usuario" sin validar, 🟢) se pueden adelantar si el dueño quiere.
+Contexto del próximo paso (4.13 parte 2 de 3, A-03: web; no toca la BD):
+- La API ya tiene POST /api/auth/logout (con @require_auth): suma 1 a
+  usuarios.version_sesion y responde 200 {"message": "Sesion cerrada"};
+  con un token que ya no vale responde 401. Cierra la sesión en TODOS
+  los aparatos de la cuenta.
+- Web hoy: AuthContext.jsx tiene logout() síncrono que solo borra el
+  token y el usuario del navegador. Lo usan Header.jsx (botón "Cerrar
+  sesión", líneas ~68 y ~117: escritorio y menú móvil) y
+  FormularioSolicitud.jsx (~101, tras un 401: ahí el token ya no vale,
+  así que NO debe llamar a la API; conviene un cierre "solo local").
+- Plan sugerido: logoutEnServidor() en src/services/api.js (POST
+  /auth/logout con el token); el botón llama a la API y SIEMPRE borra la
+  sesión local, aunque la API responda 401, 503 o no haya red (que el
+  usuario nunca quede "atrapado"). Decidir con el dueño si se avisa
+  cuando la API no pudo cerrar la sesión en el servidor (p. ej. 503) y
+  si el botón se desactiva mientras se envía. Prueba en tests/ (npm
+  test) + contraprueba con git stash; npm run lint y npm run build;
+  revisión a 375 px con /impeccable audit si cambia la interfaz.
+- Para verlo con la API real, el dueño debe haber aplicado la migración
+  2026-11-08_version_sesion.sql (sin ella python api.py no arranca).
+- Después: parte 3 (móvil: ProfileScreen.js y FormularioSolicitud.js,
+  logout() de src/context/AuthContext.js). Al terminarla, marcar [x] el
+  4.13. Luego sigue el 4.14 (el 4.12 se salta hasta tener el 4.17). El
+  4.18 y el 4.19 se pueden adelantar si el dueño quiere.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -1127,4 +1160,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.13** (A-03): revocar sesiones (columna `usuarios.version_sesion` dentro del token y comparada en `require_auth`; quitar el correo del token). **Toca la BD**: plan primero y migración que aplica el dueño con respaldo. El 4.12 se salta hasta tener el 4.17. El 4.11 quedó hecho el 08/11/2026 (`3e814e3`: la consola registra con `getpass`, la misma política y las mismas validaciones que la API, y sin inventar la autorización de datos). Hallazgos abiertos: 4.18 (`/login` revela cuentas por tiempo) y 4.19 (consola: “Actualizar usuario” sin validar). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.13, parte 2 de 3 (web)** (A-03): el botón “Cerrar sesión” de la web llama a `POST /api/auth/logout` y siempre borra la sesión local. La parte 1 (API y BD) quedó hecha el 08/11/2026 (`3c039ec`: `usuarios.version_sesion` en el token y comparada en `require_auth`, token sin correo, cuentas no activas → 401, la API no arranca sin la columna). Después, la parte 3 (móvil). El 4.12 se salta hasta tener el 4.17. Hallazgos abiertos: 4.18 (`/login` revela cuentas por tiempo) y 4.19 (consola: “Actualizar usuario” sin validar). **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar) y `2026-11-08_version_sesion.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.

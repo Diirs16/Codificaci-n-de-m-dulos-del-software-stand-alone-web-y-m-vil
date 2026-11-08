@@ -105,7 +105,35 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   (`test_sin_jwt_secret_no_arranca`, `test_secreto_publico_de_ejemplo_no_arranca`, `test_secreto_de_31_bytes_no_arranca`:
   el código viejo arrancaba igual) y `test_secreto_de_64_caracteres_importa_bien` pasa con ambos (una clave válida
   nunca fue el problema). NC-007 sigue en corrección (2.3 y 4.8).
-- **Pendiente relacionado (ítem 4.13, sin implementar):** hoy `require_auth` acepta el token solo por su firma, sin
+- **Estado del ítem 4.13 (revocar sesiones): parte 1 de 3 (API y BD) hecha el 08/11/2026 (commit `3c039ec`); faltan la web y el móvil.**
+  Decisiones del dueño (las recomendadas): (1) ruta `POST /api/auth/logout` y botones por partes (API → web → móvil);
+  como hay un solo contador por cuenta, cerrar sesión cierra **en todos los aparatos**; descartada la tabla de sesiones
+  por aparato (más tabla, limpieza y pruebas); (2) `require_auth` también rechaza cuentas con estado distinto de
+  `activo`, con **401** (la web solo cierra la sesión ante un 401, 4.7); (3) los tokens viejos sin versión **no valen**
+  (todos inician sesión una vez más). Cambios: columna `usuarios.version_sesion int(10) unsigned NOT NULL DEFAULT 0`
+  (`sql/schema.sql` y la migración `sql/migraciones/2026-11-08_version_sesion.sql`, `ADD COLUMN IF NOT EXISTS`, propia
+  de MariaDB; pasos en `sql/README.md`). `security/jwt_helper.py`: `generate_token(user_id, version_sesion)`; el token
+  lleva solo `sub`, `ver`, `iat` y `exp` (**sin el correo**); `ver` debe ser un entero ≥ 0 (`True` no vale).
+  `dao/usuario_dao.py`: `consultar_sesion(id)` (`SELECT version_sesion, estado`) y `cerrar_sesiones(id)` (suma 1 y
+  reasigna `fecha_actualizacion` a sí misma para que su regla *on update* no la cambie); ambos dejan subir los errores
+  de la BD. `api.py`: `require_auth` consulta la sesión en cada petición y responde el mismo 401 si la cuenta no
+  existe, no está `activo` o la versión no coincide (y sin consultar la BD si el token no trae `ver`); si la BD no
+  responde, **503** (nunca 401: una caída no saca a nadie); ya no existe `request.current_user_email` (nadie lo usaba).
+  `/login/verify` firma con la versión de la BD y `/register/verify` con `VERSION_SESION_INICIAL = 0` (DEFAULT de la
+  columna). Ruta nueva `POST /api/auth/logout` (`@require_auth`): 200 `{"message": "Sesion cerrada"}`. Al arrancar,
+  `_preparar_sesiones()` comprueba la columna (errno 1054) y, sin ella, avisa qué migración falta y no arranca.
+  `_cuenta_que_envia()` de las solicitudes se mantiene como segunda barrera. Regresión: `tests/test_sesiones.py`
+  (26: 21 sin BD y 5 con `PETCONNECT_PRUEBA_BD=1` en las bases temporales `petconnect_prueba_sesion` y
+  `petconnect_prueba_sesion_migracion`); `tests/test_esquema.py` +3 (la columna y la migración); ajustadas las pruebas
+  que fabricaban tokens con el correo (`test_endpoints`, `test_solicitudes`, `test_mascotas`, `test_ficha_mascota`,
+  `test_pool`, `test_seguridad`, y `test_esquema` con BD, que ahora crea dos cuentas activas porque el refugio de la
+  semilla está inactivo); `/me` con un usuario borrado pasa de 404 a 401. `test_pool`: 41 métodos de DAO (22
+  escrituras, 19 lecturas). Suite 395 (345 + 50 omitidas). Contraprueba (`git stash` de `api.py`, `jwt_helper.py` y
+  `usuario_dao.py`): fallan las 21 pruebas nuevas sin BD de `test_sesiones.py` (37 resultados contando subcasos: 28
+  fallos y 9 errores) y 45 resultados en toda la suite; ninguna pasa a propósito (todas prueban comportamiento nuevo). **Falta del dueño:** aplicar la
+  migración con respaldo (sin ella la API nueva no arranca) y, opcional, las pruebas con MariaDB. Fuera de alcance:
+  no existe “cambiar contraseña”; cuando exista, debe llamar a `cerrar_sesiones()`.
+- **Pendiente relacionado (ítem 4.13, texto original del 03/11/2026):** hoy `require_auth` acepta el token solo por su firma, sin
   consultar la BD, así que una sesión no se puede cerrar antes de 24 h (ni al cambiar la contraseña). Además el token
   lleva el **correo**, y el contenido de un JWT se puede leer (base64, no cifrado). Propuesta: columna
   `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 cierra todas las sesiones) y
