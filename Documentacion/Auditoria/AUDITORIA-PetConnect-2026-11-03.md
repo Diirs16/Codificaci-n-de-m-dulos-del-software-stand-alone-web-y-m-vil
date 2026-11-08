@@ -396,6 +396,20 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   **no se cifra nada**. `security/crypto.py:14-18` impide arrancar sin `FERNET_KEY`; **comprobado**: hasta importar
   `security.jwt_helper` falla sin esa clave. `decrypt()` (`:30-37`) se traga cualquier error y devuelve el texto cifrado.
 - **Arreglo:** usarlo de verdad (teléfono) o quitarlo; corregir el comentario; que `decrypt` lance error.
+- **Estado: resuelto el 08/11/2026 (ítem 4.8 de PRIORIDADES, commit `979cdf3`, solo backend; no toca la BD). Cierra
+  NC-007.** Fernet ya no se puede quitar: desde el 4.6 cifra los códigos OTP. Decisión del dueño: **opción A**, el
+  teléfono sigue en texto plano y se corrige el comentario. Se descartó la opción B (cifrarlo): las columnas
+  `varchar(20)` no alcanzan (un teléfono cifrado ocupa unos 120 caracteres), habría que migrar las filas existentes y,
+  mientras `generate_keys.py` pueda sobrescribir el `.env` (A-16), cambiar la `FERNET_KEY` dejaría ilegibles todos los
+  teléfonos; además, hoy ninguna pantalla los lee. Retomarla cuando A-16 esté corregido y exista una vista que los use.
+  Cambios: `decrypt()` lanza `InvalidToken` si no puede descifrar (vacío o `None` se devuelven igual);
+  `decrypt_estricto` se fusionó con ella y `otp/servicio.py` usa `decrypt`; `api.py` ya no importa
+  `encrypt/decrypt` (no los usaba) y su comentario dice la verdad: el registro no pide teléfono y el de las solicitudes
+  de adopción va en claro. La política no prometía cifrar el teléfono (revisado). Regresión: `PruebasDescifrado` en
+  `tests/test_seguridad.py` (5); las 2 de `decrypt_estricto` de `test_otp_bd.py` pasaron ahí. Suite: 314 (271 + 43
+  omitidas). Contraprueba con el `crypto.py` anterior: fallan las 3 de texto ilegible y
+  `test_codigo_ilegible_se_borra_y_no_se_reenvia` (con un `decrypt` permisivo, el OTP compararía el texto cifrado);
+  pasan a propósito la ida y vuelta y la de vacío o `None`.
 
 #### A-14 · 🟡 Media · Enumeración de correos en el registro [N, ya en el plan A07]
 - `api.py:359-360` responde **409 “El correo ya está registrado”**: permite saber quién tiene cuenta.

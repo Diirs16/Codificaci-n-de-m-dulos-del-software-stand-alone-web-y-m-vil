@@ -46,7 +46,7 @@ Dentro de cada fase van primero los arreglos más rápidos.
 | [x] | 2.8 | A-10 | — | Imprimir el OTP solo si `APP_ENV=desarrollo`; nunca el correo en logs de producción | 🟢 | Con `APP_ENV` distinto, la salida no contiene el código — *Hecho el 04/11/2026: `api.py` (`_es_desarrollo`, `_avisar_fallo_envio`; fuera de desarrollo, 503 y se descarta el código) + `.env.example`; `tests/test_logs.py` (falla con el código viejo, pasa con el nuevo)* |
 | [x] | 2.9 | A-07 | NC-002 | `/api/mascotas/<id>` solo devuelve `en_adopcion` (404 si no); ruta privada con `@require_auth` + dueño | 🟡 | Sin token y mascota no en adopción → 404 — *Hecho el 05/11/2026: `api.py` (filtro en SQL + revisión en Python; ruta privada `GET /api/usuarios/me/mascotas/<id>`, ajena → mismo 404); `tests/test_mascotas.py` (falla con el código viejo, pasa con el nuevo) + `test_esquema.py` con MariaDB temporal. NC-002 cerrada* |
 
-> Al cerrar 2.2 + 2.3 se cierra **NC-007** · 2.5 + 2.6 cierran **NC-006** · 2.9 cierra **NC-002**.
+> Al cerrar 2.2 + 2.3 + 4.8 (`decrypt`) se cierra **NC-007** (cerrada el 08/11/2026) · 2.5 + 2.6 cierran **NC-006** · 2.9 cierra **NC-002**.
 
 ---
 
@@ -85,7 +85,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.5 | A-11 | NC-003 | Pool de conexiones + `try/finally` para cerrar cursores — *Hecho el 07/11/2026 en una parte (`9c417de`, solo backend). Decisiones del dueño: pool de 10 (`DB_POOL_SIZE`, de 1 a 32), consola y `seed.py` en el mismo pool, 4.15 aparte. `ConexionBD` presta conexiones de un `MySQLConnectionPool`; si está lleno espera hasta 5 s y luego 503; el log no trae usuario ni host. `conexion_y_cursor()` (el `try/finally` escrito una vez) en los 32 métodos de los 5 DAO y en las 4 consultas de `api.py`; `_get_conn()` (pedía y nunca devolvía) → `_verificar_bd()`. `tests/test_pool.py` (25; 3 con MariaDB): sin fugas en 32 métodos y 14 rutas × 3 escenarios. Suite 256 (229 + 27 omitidas). Contraprueba: con el código viejo fallan 20 de 22; cada archivo arreglado tiene su prueba. NC-003 sigue abierta (4.6, 4.12; paginación e índices sin ítem)* | 🟡 |
 | [x] | 4.6 | A-12 | NC-003 | OTP en tabla de la BD (hash del código, intentos, expiración) o 1 worker con hilos; limpiar vencidos y acotar `_mx_cache` — *Hecho el 07/11/2026 en dos partes (solo backend): `_mx_cache` de 1.000 dominios con LRU y candado (`9ccd379`) y tabla `otp_pendientes` (`24ed52c`). Decisiones del dueño: opción A, código cifrado con Fernet (no hash: hay que reenviar el mismo código), datos del registro pendiente borrados al verificar, bloquearse o vencer. `AlmacenOTP(proposito, repositorio)` conserva las reglas y guarda en `OtpDAO` (API) o `RepositorioMemoria` (pruebas); el intento se reserva antes de comparar (un `UPDATE` atómico); crear un código y arrancar la API borran los vencidos; sin la tabla la API no arranca y lo avisa; correos de más de 120 caracteres → 400. `tests/test_otp_bd.py` (48; 16 con MariaDB). Suite 311 (268 + 43 omitidas). El 08/11/2026, con MariaDB, la carrera dio 4 != 5: `verificar()` ahora lee la fila antes de reservar el intento (prueba nueva sin MariaDB). Con MariaDB, 48/48 OK. Contraprueba: con el código viejo 20 intentos a la vez comparan 20 veces y los vencidos no se borran. **Falta del dueño: aplicar la migración (con respaldo)**; opcional: las pruebas con `PETCONNECT_PRUEBA_BD=1`. Hallazgo: A.11 de la política dice que el registro pendiente nunca llega a la BD (decisión D.7 del borrador). NC-003 sigue abierta (4.17, 4.12)* | 🟡 |
 | [x] | 4.7 | A-24 | — | Web: validar sesión con `/auth/me` al iniciar y cerrar sesión ante 401 — *Hecho el 08/11/2026 en una parte (`3606c5d`, solo web). Decisión del dueño: opción A, solo el 401 cierra la sesión (503, 502, 500, 404 o red caída no la tocan). `getPerfil()` en `src/services/api.js`, `src/utils/sesion.js` decide (cerrar / mantener / actualizar / ignorar si la sesión cambió mientras llegaba la respuesta) y `AuthContext.jsx` lo llama al iniciar. Regresión: `tests/sesion.test.js` (9; `npm test` 51/51). Contraprueba: con el código viejo fallan 5 y pasan a propósito 4. Visto en el navegador a 375 px con la API real: token falso → 401 → sesión cerrada. No cierra NC* | 🟢 |
-| [ ] | 4.8 | A-13 | — | Fernet: usarlo para el teléfono o quitarlo; corregir comentario `api.py:400`; `decrypt` debe fallar | 🟢 |
+| [x] | 4.8 | A-13 | NC-007 | Fernet: usarlo para el teléfono o quitarlo; corregir comentario `api.py:400`; `decrypt` debe fallar — *Hecho el 08/11/2026 en una parte (`979cdf3`, solo backend, no toca la BD). Fernet se queda (lo usan los OTP desde el 4.6). Decisión del dueño: opción A, el teléfono sigue en texto plano y se corrige el comentario de `api.py` (cifrarlo pedía migrar columnas `varchar(20)` y, con A-16 abierto, perder la `FERNET_KEY` dejaría ilegibles los teléfonos). `decrypt()` lanza `InvalidToken` si no puede descifrar; `decrypt_estricto` se fusionó con ella; `api.py` ya no importa `encrypt/decrypt`. Regresión: `PruebasDescifrado` en `tests/test_seguridad.py` (5). Suite 314 (271 + 43 omitidas). Contraprueba: con el `crypto.py` viejo fallan 4 (3 nuevas + el OTP ilegible) y pasan a propósito 2. NC-007 cerrada* | 🟢 |
 | [ ] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README | 🟢 |
 | [ ] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) | 🟢 |
 | [ ] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos | 🟢 |
@@ -147,8 +147,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 08/11/2026, actualizada al terminar el 4.7 (A-24: la web revalida la sesión con `/auth/me`, solo
-web). El próximo ítem es el 4.8 (A-13: Fernet para el teléfono, comentario de `api.py` y `decrypt` que falle).
+*Versión del 08/11/2026, actualizada al terminar el 4.8 (A-13: `decrypt()` falla en vez de devolver el texto
+cifrado y el comentario del teléfono dice la verdad; solo backend; cierra NC-007). El próximo ítem es el 4.9
+(A-15: decidir `autocommit` y alinear código y README).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -174,6 +175,22 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.8 HECHO el 08/11/2026 (A-13; commit 979cdf3, solo backend; no toca
+  la BD; CIERRA NC-007). Decisión del dueño: opción A, el teléfono sigue
+  en texto plano (usuarios.telefono lo llena solo la consola;
+  solicitudes.telefono, el de adopción, nadie lo lee aún) y se corrigió
+  el comentario de api.py. Opción B (cifrarlo) descartada por ahora:
+  varchar(20) no alcanza (~120 caracteres cifrado), migrar filas y, con
+  A-16 abierto, perder la FERNET_KEY dejaría ilegibles los teléfonos.
+  security/crypto.py: decrypt() lanza InvalidToken si no puede descifrar
+  ("" y None se devuelven igual); decrypt_estricto ya no existe (los OTP
+  usan decrypt en otp/servicio.py). api.py ya no importa encrypt/decrypt.
+  tests/test_seguridad.py: PruebasDescifrado (5); las 2 de
+  decrypt_estricto de test_otp_bd.py se movieron ahí. Suite 314 (271 +
+  43 omitidas). Contraprueba (git stash de crypto.py): fallan 4 (texto
+  no Fernet, token alterado, otra clave y
+  test_codigo_ilegible_se_borra_y_no_se_reenvia del OTP), pasan a
+  propósito 2 (ida y vuelta, vacío/None).
 - 4.7 HECHO el 08/11/2026 (A-24; commit 3606c5d, solo web; no toca API
   ni BD; no cierra NC). Decisión del dueño: opción A, solo el 401 cierra
   la sesión (404 "Usuario no encontrado" no: puede venir de una API mal
@@ -489,8 +506,8 @@ Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el g
   (registrarse otra vez con un código vigente no manda otro y los 10 minutos
   siguen desde el primero; tras vencer, "Reenviar código" no envía nada y la
   web no dice que venció; ver A-09 de la AUDITORÍA).
-- NC-007 solo espera decrypt() (4.8). NC-006 cerrada el 04/11/2026. NC-002
-  cerrada el 05/11/2026.
+- NC-007 cerrada el 08/11/2026 (4.8, decrypt() que falla). NC-006 cerrada el
+  04/11/2026. NC-002 cerrada el 05/11/2026.
 - Mascotas (2.9): GET /api/mascotas/<id> pública solo devuelve en_adopcion (SQL
   + revisión en Python); si no, 404 "Mascota no encontrada". Ruta privada
   GET /api/usuarios/me/mascotas/<id> con @require_auth (ajena → mismo 404). En
@@ -955,22 +972,21 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.8, A-13: Fernet a medias):
-- A-13: security/crypto.py exige FERNET_KEY para arrancar; desde el 4.6
-  los OTP SÍ usan Fernet (otp/servicio.py con encrypt y decrypt_estricto),
-  así que ya NO se puede "quitar Fernet". Quedan dos cosas:
-  1) decrypt() (security/crypto.py) se traga cualquier error y devuelve
-     el texto cifrado tal cual: debe fallar (o desaparecer si nadie lo
-     usa; decrypt_estricto ya hace lo correcto). Revisar quién lo llama.
-  2) El comentario de api.py (cerca de la línea 764) dice que el teléfono
-     se guarda cifrado y no es cierto. Decidir: cifrar el teléfono de
-     verdad (usuarios.telefono y solicitudes.telefono, que guarda el 3.6)
-     o corregir el comentario. Cifrarlo toca la BD (datos existentes,
-     tamaño de columna, búsquedas) y el DAO: plan primero y, si toca la
-     BD, migración con respaldo que aplica el dueño.
-- Solo backend. Pruebas: unittest (suite 311 hoy) + regresión nueva de
-  decrypt; contraprueba con git stash.
-- Después del 4.8 siguen 4.9 a 4.11; el 4.12 se salta hasta tener el
+Contexto del próximo paso (4.9, A-15: autocommit):
+- A-15: config/db_config.py (~línea 48) pone "autocommit": True, pero los
+  DAO llaman commit()/rollback() como si hubiera transacciones (16
+  rollback() en mascota, otp, producto, proveedor, solicitud y
+  usuario_dao.py): con autocommit cada sentencia se guarda sola y el
+  rollback no deshace nada. El README de la raíz (líneas ~116 y 128) dice
+  False. tests/test_pool.py (con MariaDB) comprueba hoy autocommit = 1.
+- Decidir: (A) dejar True, quitar los rollback() inútiles y corregir el
+  README, o (B) False + commit() explícito en cada escritura (lo que dice
+  el README; revisar que ningún SELECT quede con una transacción abierta
+  en el pool y que el UPDATE atómico de OtpDAO siga igual). Primero
+  buscar si alguna operación hace varios pasos que deban ser atómicos.
+- Solo backend; no toca el esquema de la BD. Pruebas: unittest (suite 314
+  hoy) + regresión nueva; contraprueba con git stash.
+- Después del 4.9 siguen 4.10 y 4.11; el 4.12 se salta hasta tener el
   4.17.
 
 Luego:
@@ -1010,4 +1026,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.8** (A-13): Fernet ya lo usan los OTP, así que no se quita: que `decrypt()` falle en vez de devolver el texto cifrado y decidir si el teléfono se cifra de verdad o se corrige el comentario de `api.py` (solo backend; si toca la BD, plan y migración). El 4.7 quedó hecho el 08/11/2026 (`3606c5d`). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.9** (A-15): `autocommit=True` en `config/db_config.py` vuelve inútiles los `rollback()` de los DAO y el README dice `False`: decidir y alinear código y README (solo backend). El 4.8 quedó hecho el 08/11/2026 (`979cdf3`, cierra NC-007). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
