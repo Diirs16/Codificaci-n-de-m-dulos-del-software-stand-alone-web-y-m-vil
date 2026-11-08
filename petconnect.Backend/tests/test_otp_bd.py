@@ -132,6 +132,26 @@ class PruebasAlmacenEnMemoria(_ConReloj):
         r = self.almacen.verificar(CORREO, codigo)            # ni el correcto entra ya
         self.assertEqual(r, (None, "no_pendiente"))
 
+    def test_quien_gana_un_intento_compara_aunque_otro_borre_la_fila(self):
+        """
+        Visto el 08/11/2026 con MariaDB (4 != 5): quien ganaba un intento leia la fila
+        DESPUES, y un 6.o intento ("bloqueado") ya la habia borrado: respondia
+        "no_pendiente" sin comparar, aunque trajera el codigo correcto. Aqui los 5 que
+        ganan se demoran 0,2 s para que el borrado siempre llegue antes.
+        """
+        class ReservaLenta(RepositorioMemoria):
+            def reservar_intento(self, *argumentos):
+                gano = super().reservar_intento(*argumentos)
+                if gano:
+                    time.sleep(0.2)          # como una BD ocupada justo despues
+                return gano
+
+        almacen = AlmacenOTP("registro", ReservaLenta())
+        codigo = almacen.crear(CORREO, {"name": NOMBRE, "password_hash": "hash"})
+        comparaciones, motivos = _veinte_a_la_vez(almacen, CORREO, codigo)
+        self.assertEqual(len(comparaciones), servicio.MAX_INTENTOS)
+        self.assertEqual(motivos.count("incorrecto"), servicio.MAX_INTENTOS)
+
     def test_crear_un_codigo_borra_los_vencidos_de_otros_correos(self):
         correos = [f"spam{i}@ejemplo.test" for i in range(100)]
         for correo in correos:

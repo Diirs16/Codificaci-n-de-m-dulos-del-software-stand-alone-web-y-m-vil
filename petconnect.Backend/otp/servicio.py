@@ -156,14 +156,20 @@ class AlmacenOTP:
         en la base de datos) haya terminado con exito. Asi, si esa logica
         falla, el codigo sigue siendo valido para reintentar.
         """
+        # 1. Se lee la fila ANTES de gastar el intento. Si se leyera despues, otra
+        #    peticion que llego tarde (6.o intento, "bloqueado") podria borrarla en
+        #    medio y quien si gano su intento no tendria con que comparar: respondia
+        #    "no_pendiente" aunque trajera el codigo correcto (visto con MariaDB).
+        fila = self._repositorio.obtener(clave, self._proposito)
+        if fila is None:
+            return None, "no_pendiente"
+
+        # 2. Se gasta un intento, de una vez en la BD; sin intento no se compara
         ahora = time.time()
-        # Primero se gasta un intento (de una vez, en la BD) y despues se compara
         if not self._repositorio.reservar_intento(clave, self._proposito, ahora, MAX_INTENTOS):
             return None, self._motivo_sin_intento(clave, ahora)
 
-        fila = self._repositorio.obtener(clave, self._proposito)
-        if fila is None:                      # otra peticion la borro en este instante
-            return None, "no_pendiente"
+        # 3. Se compara con el codigo leido en el paso 1
         guardado = _descifrar(fila["codigo_cifrado"])
         if guardado is None:
             # Ilegible (cambio la FERNET_KEY): nadie puede acertarlo, se pide otro
@@ -173,8 +179,7 @@ class AlmacenOTP:
             return None, "incorrecto"         # el intento ya quedo contado
 
         self._repositorio.devolver_intento(clave, self._proposito)   # acertar no gasta
-        fila = {**fila, "intentos": max(fila["intentos"] - 1, 0)}
-        return self._pendiente(fila), None
+        return self._pendiente(fila), None      # intentos: los de antes de este acierto
 
     def descartar(self, clave: str):
         self._repositorio.borrar(clave, self._proposito)

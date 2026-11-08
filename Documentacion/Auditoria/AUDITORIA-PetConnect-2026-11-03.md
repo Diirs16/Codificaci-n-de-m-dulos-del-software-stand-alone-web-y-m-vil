@@ -377,7 +377,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
     `FERNET_KEY`) se borra y se pide otro (`decrypt_estricto` nuevo en `security/crypto.py`). Correos de más de 120
     caracteres se rechazan (antes daban 500 al guardar). `/register/resend` ahora usa la BD (sin BD, 503). El correo
     usa la intercalación `utf8mb4_spanish_ci`: mayúsculas y minúsculas comparten pendiente.
-  - **Regresión:** `tests/test_otp_bd.py` (47; 16 con MariaDB en bases temporales): 20 hilos con código malo solo
+  - **Regresión:** `tests/test_otp_bd.py` (48; 16 con MariaDB en bases temporales): 20 hilos con código malo solo
     comparan 5 veces, crear borra 100 vencidos de otros correos, código cifrado, las reglas con un repositorio
     compartido (dos “procesos”), SQL parametrizado y errores que suben, la API crea los almacenes con `OtpDAO`, sin
     BD las rutas de código responden 503, otro proceso completa el registro y no queda nada del pendiente,
@@ -387,7 +387,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
     `test_endpoints.py`. Las pruebas de rutas usan un `RepositorioMemoria` (`_importar_api`). Suite: 310 (267 + 43
     omitidas). Contraprueba en copias fuera del repositorio: con el código anterior, 20 intentos comparan 20 veces
     (`20 != 5`) y los 100 vencidos nunca se borran; con solo el `api.py` anterior fallan 5 (los almacenes en memoria,
-    los 120 caracteres y el arranque); con el `_mx_cache` anterior, 1.500 entradas en vez de 1.000.
+    los 120 caracteres y el arranque); con el `_mx_cache` anterior, 1.500 entradas en vez de 1.000. Corrección del 08/11/2026: con MariaDB, la prueba de 20 intentos dio 4 en vez de 5. Quien ganaba un intento leía la fila después, y un 6.º intento ya la había borrado al bloquearla: respondía “no hay pendiente” sin comparar, aunque trajera el código correcto. Ahora `verificar()` lee la fila antes de reservar el intento. Prueba sin MariaDB que lo fuerza siempre (los 5 que ganan se demoran 0,2 s); con el código anterior da `0 != 5`. Suite: 311 (268 + 43 omitidas).
   - **Hallazgo:** el borrador de la política (A.11) dice que un registro sin terminar “nunca llega a la base de
     datos”: ya no es cierto. Corregirlo obliga a subir la versión (C.9): decisión D.7 del borrador.
 
