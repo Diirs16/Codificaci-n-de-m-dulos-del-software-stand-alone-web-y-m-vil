@@ -88,7 +88,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.8 | A-13 | NC-007 | Fernet: usarlo para el teléfono o quitarlo; corregir comentario `api.py:400`; `decrypt` debe fallar — *Hecho el 08/11/2026 en una parte (`979cdf3`, solo backend, no toca la BD). Fernet se queda (lo usan los OTP desde el 4.6). Decisión del dueño: opción A, el teléfono sigue en texto plano y se corrige el comentario de `api.py` (cifrarlo pedía migrar columnas `varchar(20)` y, con A-16 abierto, perder la `FERNET_KEY` dejaría ilegibles los teléfonos). `decrypt()` lanza `InvalidToken` si no puede descifrar; `decrypt_estricto` se fusionó con ella; `api.py` ya no importa `encrypt/decrypt`. Regresión: `PruebasDescifrado` en `tests/test_seguridad.py` (5). Suite 314 (271 + 43 omitidas). Contraprueba: con el `crypto.py` viejo fallan 4 (3 nuevas + el OTP ilegible) y pasan a propósito 2. NC-007 cerrada* | 🟢 |
 | [x] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README — *Hecho el 08/11/2026 en una parte (`a25224d`, solo backend; no toca el esquema). Decisión del dueño: opción B, `autocommit: False` (lo que ya decía el README). Ninguna operación de los DAO tenía varios pasos (cada escritura es una sentencia con su `commit()`); la única con varios pasos en una conexión es `seed.py`, que ahora es “todo o nada”. Los DAO no cambian: sus `rollback()` ya sirven. El pool se crea con `pool_reset_session=True` explícito: al devolver la conexión se descarta lo no confirmado. README: 5.1, 5.2, 5.3 y 7.2 (pool y `commit()` sobre la conexión prestada). Regresión en `tests/test_pool.py`: 5 sin BD (inventario automático de 21 escrituras y 18 lecturas por su SQL) y 2 nuevas + 1 ajustada con MariaDB. Suite 321 (276 + 45 omitidas). Contraprueba: con el código viejo fallan 2 y pasan a propósito 3; al quitar un `commit()` a propósito, la prueba lo detecta. Opcional del dueño: las pruebas con `PETCONNECT_PRUEBA_BD=1`. No cierra NC* | 🟢 |
 | [x] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) — *Hecho el 08/11/2026 en una parte (`8668680`, solo backend; no toca el esquema). Decisión del dueño: opción A, respuesta neutra + correo de aviso al titular. Un correo con cuenta recibe lo mismo que uno nuevo (200 “Codigo enviado”) por el mismo camino: bcrypt + un correo la primera vez, nada si se repite antes de 10 min, el mismo 503 si el correo falla. Nunca crea OTP. El aviso (`enviar_aviso_cuenta_existente`, plantilla `HTML_AVISO_REGISTRO`) lleva el nombre de la cuenta y no lleva código; la memoria de avisos guarda el SHA-256 del correo. Hueco tapado: `/verify` respondía distinto sin pendiente (“No hay verificación pendiente”) que con código incorrecto; ahora un solo mensaje para sin pendiente, vencido e incorrecto. Web y móvil sin cambios. Regresión: `tests/test_registro_neutro.py` (18) + 7 pruebas viejas ajustadas. Suite 339 (294 + 45 omitidas). Contraprueba: con el `api.py` viejo dan error 52; 9 sabotajes sobre el código nuevo, todos detectados (volver al 409: fallan 11). CP-002 de la GA9 aprobado en la API. Hallazgo → 4.18 (tiempo de `/login`). Opcional del dueño: probarlo con la API real* | 🟢 |
-| [ ] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos | 🟢 |
+| [x] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos — *Hecho el 08/11/2026 en una parte (`3e814e3`, solo backend; no toca el esquema). Decisiones del dueño (las recomendadas): la consola no da la autorización por el titular (Ley 1581, art. 9; política C.6): guarda `acepta_datos = False` explícito y avisa que el titular la dará al iniciar sesión (3.5); nombre, apellidos y formato del correo como la API (sin DNS); correo repetido → “Ese correo ya tiene una cuenta”, sin repetirlo ni calcular bcrypt; contraseña dos veces con `getpass` y sin `.strip()`, por `validar_contrasena`. Módulo común nuevo `security/datos_usuario.py` (sacado de `api.py`; la consola no importa `api.py`, A-41). Regresión: `tests/test_consola_registro.py` (26). Suite 365 (320 + 45 omitidas). Contraprueba: con la consola vieja fallan 13 (registraba `PETCONNECT1!`) y pasan a propósito 13; con el `api.py` viejo falla 1. No cierra NC. Hallazgo → 4.19. Opcional del dueño: probarlo con `python main.py`* | 🟢 |
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
 | [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 | 🟡 |
 | [ ] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` | 🟢 |
@@ -96,6 +96,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
 | [ ] | 4.17 | A-11 | NC-003 | Paginación e índices (la otra mitad de la acción correctiva de NC-003). **Paginación:** `GET /api/productos` y `GET /api/mascotas/adopcion` devuelven todas las filas sin `LIMIT`; la web y el móvil las consumen (`src/services/api.js` en ambos), así que cambiar la forma de la respuesta toca los 3 módulos: decidir antes si se usan parámetros opcionales (`?pagina=&por_pagina=` con un máximo fijo, parametrizados) que mantengan la lista de hoy o un objeto con `total`, y hacerlo por partes (API, web, móvil). **Índices:** `mascotas` solo tiene la clave primaria y `id_usuario` (falta `estado`), `productos` no tiene índice en `activo` y `proveedores_servicio` solo la clave primaria (`ciudad`, `activo`, `nombre`); el `LIKE '%texto%'` no usa índice. Va en `sql/schema.sql` y en una migración de `sql/migraciones/` con su prueba en `tests/test_esquema.py` (toca la BD: plan primero, respaldo y que el dueño la aplique). Agregado el 07/11/2026 con el sí del dueño, al cerrar el 4.5. Hacerlo antes del 4.12 | 🟡 |
 | [ ] | 4.18 | A-14 | — | `/api/auth/login` revela cuentas por **tiempo**: si el correo no existe responde enseguida (`usuario is None` corta antes de bcrypt) y si existe calcula bcrypt (~0,3 s) aunque la contraseña sea mala. Arreglo: comparar contra un hash bcrypt fijo de relleno cuando no hay usuario (mismo costo 12), responder el mismo 401 y una prueba que cuente las llamadas a `verificar_password`/bcrypt en los dos casos. Solo backend. Surgió en el 4.10 (08/11/2026) | 🟢 |
+| [ ] | 4.19 | A-18 | — | Consola, “6. Actualizar usuario” (`vista/menu_usuarios.py`, `_actualizar_usuario`): cambia nombres, apellidos y correo **sin validar** (acepta una URL como nombre o `x` como correo) y un correo que ya tiene otra cuenta hace fallar el `UPDATE`, cuyo `print` muestra el mensaje de MySQL con el correo (Ley 1581). Arreglo: usar `validar_nombre` y `validar_formato_correo` de `security/datos_usuario.py` (ya comunes desde el 4.11) y avisar “ese correo ya tiene una cuenta” como el registro; prueba en `tests/test_consola_registro.py` o una nueva. Solo backend. Surgió en el 4.11 (08/11/2026) | 🟢 |
 
 ---
 
@@ -148,9 +149,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 08/11/2026, actualizada al terminar el 4.10 (A-14: el registro responde igual con o sin cuenta y avisa
-al titular por correo; `/verify` con un solo mensaje; solo backend; no cierra NC). El próximo ítem es el 4.11 (A-18:
-la consola registra usuarios saltándose las reglas).
+*Versión del 08/11/2026, actualizada al terminar el 4.11 (A-18: la consola registra con `getpass`, la política de
+contraseñas y las validaciones de nombre y correo de la API, sin inventar la autorización de datos; solo backend; no
+cierra NC). El próximo ítem es el 4.13 (A-03: revocar sesiones; toca la BD). El 4.12 se salta hasta tener el 4.17.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -176,6 +177,33 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.11 HECHO el 08/11/2026 (A-18; commit 3e814e3, solo backend; no toca
+  el esquema; no cierra NC). Decisiones del dueño (las recomendadas):
+  (1) la consola NO da la autorización por el titular (Ley 1581 art. 9,
+  política C.6): acepta_datos = False explícito, sin fecha ni versión, y
+  avisa (AVISO_SIN_AUTORIZACION) que el titular autoriza al iniciar
+  sesión (3.5); (2) nombre, apellidos y formato del correo como la API,
+  sin DNS; (3) correo repetido → "Ese correo ya tiene una cuenta" sin
+  repetirlo, sin bcrypt ni INSERT, y sin pedir la contraseña; (4) la
+  contraseña se pide 2 veces. vista/menu_usuarios.py _registrar_usuario:
+  getpass (from getpass import getpass), sin .strip(), validar_contrasena;
+  valida en orden nombre → apellidos (opcionales) → correo → ¿existe? →
+  teléfono → contraseña ×2; cualquier error vuelve al menú sin guardar.
+  Módulo común nuevo security/datos_usuario.py: validar_nombre(nombre,
+  etiqueta="El nombre") y validar_formato_correo(correo) (vacío, formato,
+  máximo 120), sacados de api.py; la consola no importa api.py (A-41).
+  api.py: _validar_nombre = validar_nombre (alias) y _validar_correo usa
+  validar_formato_correo y luego el DNS; NOMBRE_MIN/MAX, CORREO_MAX y los
+  regex ya no están en api.py. tests/test_consola_registro.py (26; simula
+  input, getpass, UsuarioDAO y hash_password; desactiva load_dotenv al
+  importar). Suite 365 (320 + 45 omitidas). Contraprueba (git stash de
+  menu_usuarios.py): fallan 13 (registraba PETCONNECT1! y Abc12!x, input
+  visible, quitaba espacios, sin aviso de autorización ni de correo
+  repetido), pasan a propósito 13; git stash de api.py: falla 1. Política:
+  nota "Fuera del 3.1" (no cambia la Parte A ni la versión). Queda: un
+  INSERT simultáneo del mismo correo aún imprime el mensaje de MySQL
+  (4.15). Hallazgo → 4.19. Opcional del dueño: probarlo con python
+  main.py (usa su .env).
 - 4.10 HECHO el 08/11/2026 (A-14; commit 8668680, solo backend; no toca
   el esquema; no cierra NC; CP-002 de la GA9 aprobado en la API).
   Decisión del dueño: opción A (respuesta neutra + aviso al titular); la B
@@ -1032,33 +1060,35 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.11, A-18: la consola registra usuarios
-saltándose las reglas):
-- A-18: vista/menu_usuarios.py, _registrar_usuario() (~línea 54): pide la
-  contraseña con input() (se ve en pantalla; usar getpass), le hace
-  .strip() (la API no, así que la misma contraseña puede no coincidir al
-  iniciar sesión por la web), no aplica validar_contrasena
-  (security/politica.py, ya común desde el 4.1) y no pide la autorización
-  de datos: guarda acepta_datos = 0 (lo honesto, por el valor por defecto
-  del modelo desde el 3.1), así que esa cuenta tendrá que autorizar al
-  iniciar sesión (3.5).
-- Decidir con el dueño: (1) ¿la consola pide la autorización (casilla con
-  el texto de B.1, fecha y VERSION_POLITICA_DATOS) o la deja en 0 y la
-  cuenta autoriza al entrar por la web o el móvil? (2) ¿valida también el
-  nombre (_validar_nombre, A-05) y el formato del correo como la API, o
-  solo la contraseña? Hoy esas validaciones viven en api.py: moverlas a
-  un módulo común sin importar api.py (A-41, 4.14). (3) Correo repetido:
-  hoy UsuarioDAO.insertar falla y su print muestra el mensaje de MySQL,
-  que trae el correo (Ley 1581; el arreglo general es el 4.15). La consola
-  es del administrador, no pública: puede decir "ese correo ya tiene
-  cuenta" sin el problema de A-14.
-- Probablemente solo backend (vista/menu_usuarios.py y quizá un módulo de
-  validación común); no toca el esquema. Pruebas: unittest (suite 339
-  hoy) + regresión nueva simulando input/getpass y el DAO (sin BD);
-  contraprueba con git stash. El dueño puede probarlo con python main.py
-  (usa su .env: dar el comando, no correrlo).
-- Después del 4.11 sigue el 4.13 (el 4.12 se salta hasta tener el 4.17).
-  El 4.18 (tiempo de /login, 🟢) se puede adelantar si el dueño quiere.
+Contexto del próximo paso (4.13, A-03: revocar sesiones; TOCA LA BD):
+- Hoy require_auth (api.py, ~línea 324) acepta el token solo por su firma
+  (verify_token de security/jwt_helper.py), sin consultar la BD: una
+  sesión vale 24 h (_EXPIRE) aunque se quiera cerrar o se bloquee la
+  cuenta. generate_token(user_id, email) mete el CORREO en el token (un
+  JWT se puede leer: base64, no cifrado; Ley 1581). require_auth guarda
+  request.current_user_email (línea ~340): revisar quién lo usa antes de
+  quitarlo. generate_token se llama en /login/verify (~608) y en
+  /register/verify (~865). No existe ruta de cerrar sesión ni de cambiar
+  contraseña: la web y el móvil solo borran el token en su lado.
+- Propuesta de A-03: columna usuarios.version_sesion (INT NOT NULL
+  DEFAULT 0) que viaja en el token y require_auth compara con la BD
+  (sumar 1 cierra todas las sesiones de esa cuenta). Suma una consulta
+  por petición (por eso iba después del pool, 4.5, hecho). Si algún día
+  se guardan ids de sesión, solo su hash SHA-256. No reemplaza el secreto
+  obligatorio (2.2).
+- Decidir con el dueño: (1) ¿se agrega una ruta POST /api/auth/logout
+  (suma 1) y botones en web/móvil, o solo la columna y la comparación
+  (por partes: API, web, móvil)? (2) ¿require_auth también rechaza una
+  cuenta con estado != "activo" (la consola puede bloquearla)? (3) qué
+  pasa con los tokens viejos (sin versión) al desplegar: rechazarlos
+  (todos inician sesión otra vez) o aceptarlos como versión 0.
+- Toca la BD: sql/schema.sql + migración en sql/migraciones/ con su
+  prueba en tests/test_esquema.py; plan primero, y el dueño la aplica con
+  respaldo (dar los comandos para PowerShell 5.1). También security/ (con
+  prueba nueva) y api.py. Suite hoy: 365 (320 + 45 omitidas).
+- Después del 4.13 sigue el 4.14 (el 4.12 se salta hasta tener el 4.17).
+  El 4.18 (tiempo de /login, 🟢) y el 4.19 (consola: "Actualizar
+  usuario" sin validar, 🟢) se pueden adelantar si el dueño quiere.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -1097,4 +1127,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.11** (A-18): la consola (`vista/menu_usuarios.py`) registra usuarios con la contraseña visible (`input()` en vez de `getpass`), con `.strip()`, sin la política de contraseñas y sin la autorización de datos. El 4.10 quedó hecho el 08/11/2026 (`8668680`: el registro responde igual con o sin cuenta, aviso al titular por correo y `/verify` con un solo mensaje). Hallazgo nuevo: 4.18 (`/login` revela cuentas por tiempo). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.13** (A-03): revocar sesiones (columna `usuarios.version_sesion` dentro del token y comparada en `require_auth`; quitar el correo del token). **Toca la BD**: plan primero y migración que aplica el dueño con respaldo. El 4.12 se salta hasta tener el 4.17. El 4.11 quedó hecho el 08/11/2026 (`3e814e3`: la consola registra con `getpass`, la misma política y las mismas validaciones que la API, y sin inventar la autorización de datos). Hallazgos abiertos: 4.18 (`/login` revela cuentas por tiempo) y 4.19 (consola: “Actualizar usuario” sin validar). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.

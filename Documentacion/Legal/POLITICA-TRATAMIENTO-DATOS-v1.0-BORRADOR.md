@@ -283,7 +283,10 @@ API respondió 201.
 | C.15 | Conservación | Decreto 1377, art. 11 | Si se borra la cuenta o la mascota, se borran sus solicitudes (`ON DELETE CASCADE`); A.11 | 3.6 (parte 1, BD) |
 
 **Fuera del 3.1** (no mezclar): la consola (`vista/menu_usuarios.py`) es el 4.11. Desde el 3.1 guardará
-`acepta_datos = 0` por el nuevo valor por defecto del modelo, que es lo honesto. Los formularios de adopción y contacto
+`acepta_datos = 0` por el nuevo valor por defecto del modelo, que es lo honesto. *Hecho el 08/11/2026 (4.11): la
+consola no pide la casilla, porque quien escribe es el administrador y no el titular (C.6); guarda `acepta_datos = 0`
+explícito, sin fecha ni versión, y avisa que el titular autorizará al iniciar sesión (C.10, ítem 3.5). No cambia la
+Parte A ni la versión.* Los formularios de adopción y contacto
 se rotularon como demo en el 3.2 y envían datos desde el 3.6, con esta política en su versión 1.1 (C.12 a C.15).
 
 ---

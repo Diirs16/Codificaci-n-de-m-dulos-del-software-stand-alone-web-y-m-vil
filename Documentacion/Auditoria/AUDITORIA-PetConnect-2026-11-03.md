@@ -503,6 +503,23 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `.strip()` (la API no, así que la misma contraseña puede no coincidir) y **no aplica** `_validate_password` ni pide
   autorización de datos.
 - **Arreglo:** mover la validación a un módulo común (`security/politica.py`) y usarlo en API y consola.
+- **Estado: resuelto el 08/11/2026 (ítem 4.11 de PRIORIDADES, commit `3e814e3`; solo backend, no toca el esquema;
+  no cierra NC).**
+  Decisiones del dueño (las recomendadas): (1) la consola **no** da la autorización de datos en nombre del titular
+  (Ley 1581, art. 9; política C.6 y C.10): guarda `acepta_datos = False` explícito, sin fecha ni versión, y avisa que el
+  titular la dará al iniciar sesión (3.5); (2) nombre, apellidos y formato del correo con las reglas de la API, sin
+  DNS; (3) correo repetido: “Ese correo ya tiene una cuenta”, sin repetir el correo; (4) la contraseña se pide dos
+  veces. `vista/menu_usuarios.py`, `_registrar_usuario()`: contraseña con `getpass` (no se ve) y sin `.strip()`, pasa
+  por `validar_contrasena` (`security/politica.py`); valida antes de la BD y busca el correo antes de pedir la
+  contraseña (sin bcrypt ni `INSERT` si ya existe); ante cualquier error vuelve al menú sin guardar. Módulo común nuevo
+  `security/datos_usuario.py` (`validar_nombre`, `validar_formato_correo`, sacados de `api.py`): la consola no importa
+  `api.py` (A-41); `api.py` lo importa (`_validar_nombre` queda como alias y `_validar_correo` hace el formato con la
+  función común y luego el DNS). Regresión: `tests/test_consola_registro.py` (26, sin BD, sin `.env`, sin DNS).
+  Suite 365 (320 + 45 omitidas). Contraprueba con `git stash`: con la consola anterior fallan 13 (registraba
+  `PETCONNECT1!` y `Abc12!x`, pedía la contraseña con `input()`, le quitaba los espacios, no avisaba de la autorización
+  ni del correo repetido) y pasan a propósito 13 (módulo común, valores que el código viejo ya guardaba bien); con el
+  `api.py` anterior falla 1 (la API no usaba la función común). Queda: un `INSERT` simultáneo del mismo correo aún
+  imprime el mensaje de MySQL desde el DAO (4.15). Hallazgo → 4.19 (“6. Actualizar usuario” no valida nombre ni correo).
 
 #### A-19 · ⚪ Baja · Búsqueda de proveedores devuelve inactivos — NC-011
 - `dao/proveedor_dao.py:49-54` (falta `AND activo = TRUE`, que sí tiene `:56-62`). Una línea.
