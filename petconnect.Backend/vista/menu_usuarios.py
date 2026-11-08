@@ -3,9 +3,21 @@ Vista del módulo de Usuarios.
 Interfaz de consola para gestionar las operaciones CRUD de usuarios.
 """
 
+from getpass import getpass
+
 from dao.usuario_dao import UsuarioDAO
 from modelo.usuario import Usuario
+from security.datos_usuario import validar_formato_correo, validar_nombre
 from security.passwords import hash_password
+from security.politica import validar_contrasena
+
+# Item 4.11 (A-18): la consola no puede dar la autorizacion de datos en nombre del
+# titular (Ley 1581, art. 9; politica C.6 y C.10). La cuenta queda en
+# acepta_datos = 0 y el titular la da al iniciar sesion (item 3.5).
+AVISO_SIN_AUTORIZACION = (
+    "  [i] La cuenta queda SIN autorizacion de tratamiento de datos. El titular\n"
+    "      debe darla al iniciar sesion por la web o el movil (casilla + codigo)."
+)
 
 
 class MenuUsuarios:
@@ -52,30 +64,68 @@ class MenuUsuarios:
                 print("  [!] Opcion no valida.")
 
     def _registrar_usuario(self):
-        """Solicita datos y registra un nuevo usuario."""
+        """Solicita datos y registra un nuevo usuario con las mismas reglas que la API.
+
+        Item 4.11 (A-18): nombre, correo y contrasena pasan por las mismas
+        funciones que /api/auth/register (security/datos_usuario.py y
+        security/politica.py). La contrasena se escribe sin verse (getpass), dos
+        veces, y se guarda tal cual (sin .strip(), como la API). Ante cualquier
+        error se vuelve al menu sin guardar nada.
+        """
         print("\n--- Registro de nuevo usuario ---")
         nombres = input("  Nombres: ").strip()
-        apellidos = input("  Apellidos: ").strip()
-        correo = input("  Correo electronico: ").strip()
-        telefono = input("  Telefono: ").strip()
-        contrasena = input("  Contrasena: ").strip()
-
-        if not nombres or not correo or not contrasena:
+        if not nombres:
             print("  [!] Nombres, correo y contrasena son obligatorios.")
             return
+        error = validar_nombre(nombres, "El nombre")
+        if error:
+            print(f"  [!] {error}")
+            return
 
-        password_hash = hash_password(contrasena)
+        apellidos = input("  Apellidos (opcional): ").strip()
+        if apellidos:
+            error = validar_nombre(apellidos, "Los apellidos")
+            if error:
+                print(f"  [!] {error}")
+                return
+
+        correo = input("  Correo electronico: ").strip()
+        error = validar_formato_correo(correo)
+        if error:
+            print(f"  [!] {error}")
+            return
+        # La consola es del administrador: puede decir que el correo ya existe
+        # (en la API publica no, A-14). El mensaje no repite el correo (Ley 1581).
+        if self._usuario_dao.consultar_por_correo(correo) is not None:
+            print("  [!] Ese correo ya tiene una cuenta. No se registro nada.")
+            return
+
+        telefono = input("  Telefono (opcional): ").strip()
+
+        contrasena = getpass("  Contrasena (no se vera al escribir): ")
+        if not contrasena:
+            print("  [!] Nombres, correo y contrasena son obligatorios.")
+            return
+        error = validar_contrasena(contrasena)
+        if error:
+            print(f"  [!] {error}")
+            return
+        if getpass("  Repita la contrasena: ") != contrasena:
+            print("  [!] Las contrasenas no coinciden. No se registro nada.")
+            return
 
         usuario = Usuario(
             nombres=nombres,
             apellidos=apellidos,
             correo=correo,
             telefono=telefono,
-            password_hash=password_hash
+            password_hash=hash_password(contrasena),
+            acepta_datos=False,     # explicito: ver AVISO_SIN_AUTORIZACION
         )
 
         if self._usuario_dao.insertar(usuario):
             print(f"  [OK] Usuario registrado con ID: {usuario.id_usuario}")
+            print(AVISO_SIN_AUTORIZACION)
         else:
             print("  [!] No se pudo registrar el usuario.")
 

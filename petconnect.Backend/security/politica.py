@@ -1,9 +1,9 @@
 """
 Politica de contrasenas de PetConnect (requisito RS03; item 4.1, A-17, NC-004).
 
-Una sola funcion para todo el backend: la API (/api/auth/register) la usa hoy y
-la consola (vista/menu_usuarios.py) la usara en el item 4.11 (A-18), para que
-las dos acepten y rechacen exactamente las mismas contrasenas.
+Una sola funcion para todo el backend: la API (/api/auth/register) y, desde el
+item 4.11 (A-18), la consola (vista/menu_usuarios.py), para que las dos acepten
+y rechacen exactamente las mismas contrasenas.
 
 Reglas, en este orden (se devuelve el mensaje de la PRIMERA que falla):
   1. Minimo 8 caracteres.

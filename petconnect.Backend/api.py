@@ -41,6 +41,9 @@ from otp import AlmacenOTP
 from security.jwt_helper import generate_token, verify_token
 from security.passwords import hash_password, verificar_password, es_hash_heredado
 from security.politica import validar_contrasena
+# Item 4.11 (A-18): nombre y formato del correo se validan en un modulo comun que
+# tambien usa la consola (vista/menu_usuarios.py) sin importar este archivo
+from security.datos_usuario import validar_formato_correo, validar_nombre
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -244,25 +247,10 @@ def _row_to_dict(row):
 _validate_password = validar_contrasena
 
 
-# A-05: un nombre son palabras de letras (con tildes y ñ) separadas por espacios.
-# Dentro de una palabra se permite ' o - (O'Neil, Pérez-Gil) y al final un punto
-# (Ma. José). Sin numeros, ':', '/', '<' ni un punto pegado a otra palabra, asi
-# que no cabe una URL (https://..., sitio-falso.example) ni HTML.
-_PALABRA_NOMBRE = r"[^\W\d_]+(?:['\-][^\W\d_]+)*\.?"
-_NOMBRE_REGEX = re.compile(rf"{_PALABRA_NOMBRE}(?: +{_PALABRA_NOMBRE})*")
-NOMBRE_MIN, NOMBRE_MAX = 2, 60
-
-
-def _validar_nombre(nombre: str) -> str | None:
-    """Mensaje de error si el nombre no parece un nombre de persona; None si es valido."""
-    if not (NOMBRE_MIN <= len(nombre) <= NOMBRE_MAX) or not _NOMBRE_REGEX.fullmatch(nombre):
-        return (f"El nombre debe tener entre {NOMBRE_MIN} y {NOMBRE_MAX} caracteres y solo "
-                "letras, espacios, guiones, apostrofos o puntos")
-    return None
-
-
-_EMAIL_REGEX =re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
-CORREO_MAX = 120     # como usuarios.correo y otp_pendientes.correo
+# A-05: la regla del nombre (palabras de letras; sin numeros, URL ni HTML) vive
+# desde el 4.11 en security/datos_usuario.py, comun con la consola. Se conserva el
+# nombre viejo para no cambiar las llamadas de este archivo.
+_validar_nombre = validar_nombre
 
 # Item 4.6 (A-12): memoria de "este dominio tiene o no servidor de correo", para no
 # preguntar al DNS cada vez. Antes crecia sin limite (spam con dominios inventados).
@@ -303,14 +291,11 @@ def _validar_correo(email: str) -> tuple[bool, str]:
     """
     email = (email or "").strip()
 
-    if not email:
-        return False, "El correo es requerido"
-    if not _EMAIL_REGEX.match(email):
-        return False, "El formato del correo no es valido"
-    # Item 4.6: usuarios.correo y otp_pendientes.correo son varchar(120); en modo
-    # estricto uno mas largo daria error al guardar (500)
-    if len(email) > CORREO_MAX:
-        return False, f"El correo no puede tener mas de {CORREO_MAX} caracteres"
+    # Nivel 1 (vacio, formato y maximo de 120 caracteres): comun con la
+    # consola desde el 4.11, en security/datos_usuario.py
+    error_formato = validar_formato_correo(email)
+    if error_formato:
+        return False, error_formato
 
     dominio = email.rsplit("@", 1)[-1].lower()
 
