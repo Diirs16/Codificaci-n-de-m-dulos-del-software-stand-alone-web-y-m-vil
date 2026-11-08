@@ -86,6 +86,12 @@ export function verifyLoginCode(email, code) {
   });
 }
 
+// Ítem 4.7 (A-24): pregunta a la API si el token guardado sigue vigente.
+// 200 → datos de la cuenta (id, name, email); 401 → token vencido o falso.
+export function getPerfil() {
+  return apiFetch("/auth/me");
+}
+
 export function validarCorreo(email) {
   return apiFetch("/utils/validar-correo", {
     method: "POST",

@@ -1,10 +1,12 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import {
+  getPerfil,
   loginUser,
   registerUser,
   verifyCode as apiVerifyCode,
   verifyLoginCode as apiVerifyLoginCode,
 } from "../services/api";
+import { revalidarSesion } from "../utils/sesion";
 
 const AuthContext = createContext();
 const SESSION_KEY = "petconnect_session";
@@ -36,6 +38,30 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError]     = useState(null);
   const [pendingEmail, setPendingEmail] = useState(null);
   const [pendingLoginEmail, setPendingLoginEmail] = useState(null);
+
+  // Ítem 4.7 (A-24): la sesión guardada se muestra de inmediato, pero al abrir la
+  // web se pregunta a la API (/auth/me) si el token sigue vigente. Solo un 401
+  // la cierra; si la API no responde (503, red caída) la sesión no se toca.
+  useEffect(() => {
+    if (!loadSession()) return;
+    let vigente = true; // React (StrictMode) puede montar dos veces: vale la última
+    revalidarSesion({
+      leerToken: () => localStorage.getItem(TOKEN_KEY),
+      obtenerPerfil: getPerfil,
+    }).then(({ accion, perfil }) => {
+      if (!vigente) return;
+      if (accion === "cerrar") {
+        setUser(null);
+        clearSession();
+      } else if (accion === "actualizar") {
+        setUser(perfil); // nombre y correo al día; el token guardado se conserva
+        saveSession(perfil);
+      }
+    });
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   const _setUser = (userData, token) => {
     setUser(userData);
