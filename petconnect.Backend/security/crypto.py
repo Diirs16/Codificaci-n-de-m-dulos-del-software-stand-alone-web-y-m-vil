@@ -27,6 +27,15 @@ def encrypt(value: str) -> str:
     return _fernet.encrypt(value.encode()).decode()
 
 
+def decrypt_estricto(value: str) -> str:
+    """
+    Como decrypt(), pero si el texto no se puede descifrar (clave cambiada o dato
+    alterado) lanza InvalidToken en vez de devolver el texto cifrado. Lo usan los
+    codigos OTP (item 4.6): un codigo ilegible nunca debe compararse ni enviarse.
+    """
+    return _fernet.decrypt(value.encode()).decode()
+
+
 def decrypt(value: str) -> str:
     """Descifra un valor previamente cifrado con encrypt()."""
     if not value:

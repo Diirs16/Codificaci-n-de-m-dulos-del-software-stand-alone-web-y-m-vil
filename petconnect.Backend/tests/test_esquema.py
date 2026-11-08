@@ -24,6 +24,9 @@ y modo estricto) y NC-010 (fechas de vacunas).
   SolicitudDAO y la regla chk_solicitud_tipo con la base real, y
   PruebasMigracionSolicitudesEnBD (PETCONNECT_PRUEBA_BD=1) aplica la migracion en
   "petconnect_prueba_solicitudes" y la borra al final.
+- A-12 (item 4.6): PruebasEsquemaSinBD y PruebasMigracionOtpSinBD revisan la tabla
+  otp_pendientes y su migracion del 07/11/2026. OtpDAO con MariaDB y la migracion en
+  una base vieja se prueban en tests/test_otp_bd.py (PETCONNECT_PRUEBA_BD=1).
   Ninguna toca la base "petconnect".
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
@@ -51,6 +54,12 @@ BD_PRUEBA_AUTORIZACION = "petconnect_prueba_autorizacion"
 BD_PRUEBA_EJEMPLO = "petconnect_prueba_ejemplo"
 RUTA_MIGRACION_SOLICITUDES = os.path.join(RAIZ, "sql", "migraciones", "2026-11-07_solicitudes.sql")
 BD_PRUEBA_SOLICITUDES = "petconnect_prueba_solicitudes"
+RUTA_MIGRACION_OTP = os.path.join(RAIZ, "sql", "migraciones", "2026-11-07_otp_pendientes.sql")
+
+# Item 4.6 (A-12): nombre y hash solo en el registro, usuario solo en el inicio de sesion
+REGLA_OTP = ("(`proposito` = 'registro' AND `nombre` IS NOT NULL AND `password_hash` IS NOT NULL "
+             "AND `id_usuario` IS NULL OR `proposito` = 'login' AND `id_usuario` IS NOT NULL "
+             "AND `nombre` IS NULL AND `password_hash` IS NULL)")
 
 # Item 3.6 (A-21): regla de la tabla solicitudes, igual en schema.sql y en la migracion
 REGLA_SOLICITUDES = ("(`tipo` = 'adopcion' AND `id_mascota` IS NOT NULL OR `tipo` = 'contacto' "
@@ -134,9 +143,37 @@ class PruebasEsquemaSinBD(unittest.TestCase):
             "AND `version_politica_datos` IS NOT NULL))",
         )
 
-    def test_tiene_las_33_tablas(self):
-        # 32 hasta el 07/11/2026, + solicitudes (item 3.6)
-        self.assertEqual(len(_tablas_del_esquema(self.sql)), 33)
+    def test_tiene_las_34_tablas(self):
+        # 32 hasta el 07/11/2026, + solicitudes (item 3.6) + otp_pendientes (item 4.6)
+        self.assertEqual(len(_tablas_del_esquema(self.sql)), 34)
+
+    def test_otp_pendientes_guarda_el_codigo_cifrado_y_sus_contadores(self):
+        """A-12 (item 4.6): una fila por correo y proposito, sin el codigo en claro."""
+        bloque = _bloque_tabla(self.sql, "otp_pendientes")
+        for columna in ("`correo` varchar(120) NOT NULL",
+                        "`proposito` enum('registro','login') NOT NULL",
+                        "`codigo_cifrado` varchar(255) NOT NULL",
+                        "`intentos` tinyint(3) unsigned NOT NULL DEFAULT 0",
+                        "`reenvios` tinyint(3) unsigned NOT NULL DEFAULT 0",
+                        "`vence` double NOT NULL",
+                        "`ultimo_envio` double NOT NULL",
+                        "`fecha_autorizacion_datos` datetime DEFAULT NULL",
+                        "`version_politica_datos` varchar(20) DEFAULT NULL",
+                        "PRIMARY KEY (`correo`,`proposito`)",
+                        "KEY `idx_otp_vence` (`vence`)"):
+            with self.subTest(columna=columna):
+                self.assertIn(columna, bloque)
+        self.assertNotRegex(bloque, r"`(codigo|code)`")        # nunca el codigo en claro
+        self.assertEqual(_regla_otp(bloque), REGLA_OTP)
+        # Si se borra la cuenta, se borra su inicio de sesion pendiente
+        self.assertIn("FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) "
+                      "ON DELETE CASCADE", bloque)
+
+    def test_las_columnas_de_otp_son_las_del_dao(self):
+        from dao.otp_dao import COLUMNAS
+        bloque = _bloque_tabla(self.sql, "otp_pendientes")
+        columnas = re.findall(r"^\s*`(\w+)`", bloque, re.MULTILINE)
+        self.assertEqual(tuple(columnas), COLUMNAS)
 
     def test_solicitudes_guardan_la_prueba_y_no_repiten_datos_de_la_cuenta(self):
         """A-21 (item 3.6): usuario, version de la politica y fecha; nombre y correo no."""
@@ -505,6 +542,11 @@ def _regla_fechas(sql):
 def _regla_autorizacion(sql):
     encontrada = re.search(r"`chk_autorizacion_datos` CHECK (\(.*\))", sql)
     return encontrada.group(1) if encontrada else None
+
+
+def _regla_otp(sql):
+    encontrado = re.search(r"CONSTRAINT `chk_otp_proposito` CHECK (.*)", sql)
+    return encontrado.group(1).strip() if encontrado else ""
 
 
 def _regla_solicitudes(sql):
@@ -993,6 +1035,32 @@ class PruebasMigracionSolicitudesSinBD(unittest.TestCase):
             # "ON DELETE / ON UPDATE CASCADE" son parte de las claves foraneas, no ordenes
             sin_claves = re.sub(r"\bON (DELETE|UPDATE)\b", "", sentencia)
             self.assertNotRegex(sin_claves, r"\b(DROP|ALTER|DELETE|UPDATE|INSERT|TRUNCATE)\b")
+
+
+class PruebasMigracionOtpSinBD(unittest.TestCase):
+    """A-12 (item 4.6): la migracion del 07/11/2026 crea la misma tabla que schema.sql."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sql = _leer(RUTA_MIGRACION_OTP)
+        cls.sentencias = _sentencias(cls.sql)
+
+    def test_crea_la_misma_tabla_que_el_esquema(self):
+        bloque = _bloque_tabla(self.sql, "otp_pendientes")
+        self.assertNotEqual(bloque, "")
+        self.assertEqual(bloque, _bloque_tabla(_leer(RUTA_ESQUEMA), "otp_pendientes"))
+
+    def test_nunca_apaga_el_modo_estricto(self):
+        self.assertTrue(self.sentencias[0].startswith("SET SESSION sql_mode"))
+        for modo in (s for s in self.sentencias if "sql_mode" in s):
+            self.assertIn("STRICT_TRANS_TABLES", modo)
+
+    def test_solo_crea_la_tabla(self):
+        """No borra ni cambia nada: se puede correr en la BD del dueno sin riesgo."""
+        self.assertEqual(len(self.sentencias), 2)
+        self.assertTrue(self.sentencias[1].startswith("CREATE TABLE IF NOT EXISTS `otp_pendientes`"))
+        sin_claves = re.sub(r"\bON (DELETE|UPDATE)\b", "", self.sentencias[1])
+        self.assertNotRegex(sin_claves, r"\b(DROP|ALTER|DELETE|UPDATE|INSERT|TRUNCATE)\b")
 
 
 @unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",

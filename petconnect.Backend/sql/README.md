@@ -173,6 +173,37 @@ copies en capturas ni documentos):
 mysql -u root -p -P 3310 petconnect -e "SELECT id_solicitud, tipo, id_mascota, id_usuario, fecha_envio, mensaje FROM solicitudes ORDER BY fecha_envio DESC"
 ```
 
+## ¿Ya tenías la base creada antes del ítem 4.6? (códigos de verificación, A-12)
+
+Desde el ítem 4.6 los códigos de verificación del registro y del inicio de sesión ya no viven en la memoria de la
+API sino en la tabla nueva `otp_pendientes`, para que funcionen con varios procesos (Gunicorn) y sobrevivan a un
+reinicio. El código se guarda **cifrado** con la `FERNET_KEY` del `.env`. Los datos del registro pendiente (nombre,
+hash de la contraseña y prueba de la autorización) se borran solos al verificar, al bloquearse con 5 fallos y al
+vencer (los vencidos se borran cada vez que se pide un código y al arrancar la API).
+
+La migración `migraciones/2026-11-07_otp_pendientes.sql` solo crea esa tabla: no cambia ni borra nada más y se puede
+ejecutar varias veces.
+
+**Hazlo antes de arrancar la API nueva:** sin la tabla, `python api.py` se detiene con el aviso
+"Falta la tabla otp_pendientes". Desde la carpeta `petconnect.Backend`, con un respaldo nuevo como el del paso 1 de
+arriba:
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "source sql/migraciones/2026-11-07_otp_pendientes.sql"
+```
+
+**Comprobar** (solo muestra la estructura y un conteo, no datos personales):
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SHOW COLUMNS FROM otp_pendientes"
+```
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SELECT proposito, COUNT(*) AS pendientes FROM otp_pendientes GROUP BY proposito"
+```
+
+Si cambias la `FERNET_KEY`, los códigos pendientes quedan ilegibles: la API los borra y la persona pide otro.
+
 ## Prueba automática
 
 `tests/test_esquema.py` revisa este archivo sin conectarse a la base. Para probarlo de verdad contra MariaDB,

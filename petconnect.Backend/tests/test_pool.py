@@ -376,6 +376,7 @@ DAOS = {
     "dao.producto_dao": "ProductoDAO",
     "dao.proveedor_dao": "ProveedorDAO",
     "dao.solicitud_dao": "SolicitudDAO",
+    "dao.otp_dao": "OtpDAO",            # item 4.6: codigos OTP en la BD
 }
 
 
@@ -390,7 +391,8 @@ class PruebasDAOSinFugas(unittest.TestCase):
 
     def test_todos_los_metodos_publicos_se_revisan(self):
         nombres = {f"{clase}.{nombre}" for clase, _, nombre, _ in self._metodos()}
-        self.assertEqual(len(nombres), 32, sorted(nombres))   # si se agrega uno, entra solo
+        # 32 hasta el 4.5 + 7 de OtpDAO (item 4.6); si se agrega uno, entra solo
+        self.assertEqual(len(nombres), 39, sorted(nombres))
 
     def test_cada_metodo_devuelve_la_conexion_y_cierra_el_cursor(self):
         for escenario, error in ESCENARIOS.items():
@@ -405,7 +407,7 @@ class PruebasDAOSinFugas(unittest.TestCase):
                         try:
                             getattr(dao, nombre)(*argumentos)
                         except (errores_bd.Error, RuntimeError):
-                            pass        # SolicitudDAO deja subir el error; los viejos no (4.15)
+                            pass        # SolicitudDAO y OtpDAO dejan subir el error; los viejos no (4.15)
                     self.assertEqual(len(bd.conexiones), 1, "pide una sola conexion por operacion")
                     bd.revisar(self)
 
@@ -415,6 +417,8 @@ class PruebasDAOSinFugas(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 # Cuerpo que lleva cada ruta hasta la BD. Las que no la usan lo dicen (None).
+# Los OTP van a un RepositorioMemoria (_importar_api, item 4.6): resend no toca la BD
+# en estas pruebas; las conexiones de OtpDAO se revisan en PruebasDAOSinFugas.
 _MENSAJE = "Quiero conocer a esta mascota, tengo patio grande."
 PETICIONES = {
     ("GET", "/api/productos"): {},

@@ -25,12 +25,14 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from mysql.connector.errors import InterfaceError, OperationalError
+from mysql.connector import errorcode
+from mysql.connector.errors import InterfaceError, OperationalError, ProgrammingError
 from werkzeug.exceptions import BadRequest, HTTPException
 
 from conexion.conexion_bd import ConexionBD, conexion_y_cursor
 from dao.usuario_dao import UsuarioDAO
 from dao.solicitud_dao import SolicitudDAO
+from dao.otp_dao import OtpDAO
 from modelo.usuario import Usuario
 from correo import enviar_codigo, enviar_bienvenida
 from otp import AlmacenOTP
@@ -75,8 +77,11 @@ _MENSAJE_LOGIN_SIN_AUTORIZACION = (
 )
 
 _conexion_bd = ConexionBD()
-_otp_registro = AlmacenOTP()
-_otp_login = AlmacenOTP()
+# Item 4.6 (A-12, NC-003): los codigos se guardan en la tabla otp_pendientes y no en
+# la memoria del proceso: asi los ven todos los procesos (Gunicorn) y sobreviven a un
+# reinicio. Las reglas (10 min, 5 fallos, reenvios) estan en otp/servicio.py.
+_otp_registro = AlmacenOTP("registro", OtpDAO())
+_otp_login = AlmacenOTP("login", OtpDAO())
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +261,7 @@ def _validar_nombre(nombre: str) -> str | None:
 
 
 _EMAIL_REGEX =re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+CORREO_MAX = 120     # como usuarios.correo y otp_pendientes.correo
 
 # Item 4.6 (A-12): memoria de "este dominio tiene o no servidor de correo", para no
 # preguntar al DNS cada vez. Antes crecia sin limite (spam con dominios inventados).
@@ -300,6 +306,10 @@ def _validar_correo(email: str) -> tuple[bool, str]:
         return False, "El correo es requerido"
     if not _EMAIL_REGEX.match(email):
         return False, "El formato del correo no es valido"
+    # Item 4.6: usuarios.correo y otp_pendientes.correo son varchar(120); en modo
+    # estricto uno mas largo daria error al guardar (500)
+    if len(email) > CORREO_MAX:
+        return False, f"El correo no puede tener mas de {CORREO_MAX} caracteres"
 
     dominio = email.rsplit("@", 1)[-1].lower()
 
@@ -698,7 +708,8 @@ def register_resend():
     del primer registro y sin reiniciar el contador de intentos ni alargar el
     vencimiento. Las reglas (60 s entre correos, maximo 3 reenvios, no reenviar un
     codigo bloqueado) estan en AlmacenOTP.para_reenviar(). Haya o no pendiente, la
-    respuesta es la misma (A-14). No consulta la BD ni el DNS.
+    respuesta es la misma (A-14). No consulta el DNS. Desde el item 4.6 el pendiente
+    esta en la tabla otp_pendientes: sin BD responde 503.
     """
     email = _texto(_cuerpo_json(), "email").strip()
     if not email:
@@ -919,11 +930,30 @@ def me():
 # Inicio
 # ---------------------------------------------------------------------------
 
+def _preparar_otp() -> bool:
+    """
+    Item 4.6: al arrancar borra los codigos que vencieron mientras la API estaba
+    apagada (Ley 1581) y, de paso, comprueba que exista la tabla otp_pendientes.
+    Sin ella, cada registro o inicio de sesion daria 500: mejor no arrancar.
+    """
+    try:
+        _otp_registro.limpiar_vencidos()      # una sola tabla para registro y login
+    except ProgrammingError as e:
+        if e.errno != errorcode.ER_NO_SUCH_TABLE:
+            raise
+        print("[ERROR] Falta la tabla otp_pendientes. Aplica la migracion "
+              "sql/migraciones/2026-11-07_otp_pendientes.sql (pasos en sql/README.md).")
+        return False
+    return True
+
+
 if __name__ == "__main__":
     try:
         _verificar_bd()
     except BDNoDisponible:
         print("[ERROR] No se pudo conectar a la base de datos.")
+        sys.exit(1)
+    if not _preparar_otp():
         sys.exit(1)
     print("[OK] Conexion a la base de datos establecida.")
     modo_debug = _modo_debug()

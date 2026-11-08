@@ -19,6 +19,13 @@ from mysql.connector.errors import OperationalError  # noqa: E402
 CORREO_PRUEBA = "laura@ejemplo.test"    # inventado
 CONTRASENA = "Firulais2026!"
 
+# Claves de prueba desde que se importa este archivo: los codigos OTP se guardan
+# cifrados (item 4.6) y varias pruebas usan AlmacenOTP sin importar api.py. Importar
+# security.crypto carga el paquete security, que tambien exige JWT_SECRET.
+from cryptography.fernet import Fernet  # noqa: E402
+os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
+os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
+
 
 def _importar_api():
     """
@@ -29,15 +36,17 @@ def _importar_api():
 
     El limite de peticiones por IP (item 2.6) queda apagado: estas pruebas mandan
     muchas peticiones seguidas. Solo tests/test_limite.py lo enciende.
+
+    Item 4.6: la API guarda los OTP en la tabla otp_pendientes (OtpDAO). Estas pruebas
+    simulan la BD, asi que los OTP de la API pasan a un RepositorioMemoria (mismas
+    reglas de otp/servicio.py, otro lugar de guardado). OtpDAO se prueba aparte en
+    test_otp_bd.py y test_pool.py.
     """
     if "api" in sys.modules:
         api = sys.modules["api"]
     else:
-        from cryptography.fernet import Fernet
         import dotenv
 
-        os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
-        os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
         load_dotenv_original = dotenv.load_dotenv
         dotenv.load_dotenv = lambda *a, **k: False
         try:
@@ -47,7 +56,19 @@ def _importar_api():
 
     if hasattr(api, "limiter"):
         api.limiter.enabled = False
+    _otp_en_memoria(api)
     return api
+
+
+def _otp_en_memoria(api):
+    """Un solo RepositorioMemoria para registro y login, como la tabla real."""
+    from otp.servicio import RepositorioMemoria
+
+    almacenes = (api._otp_registro, api._otp_login)
+    if not all(isinstance(a._repositorio, RepositorioMemoria) for a in almacenes):
+        repositorio = RepositorioMemoria()
+        for almacen in almacenes:
+            almacen._repositorio = repositorio
 
 
 class PruebasRespuestasDeError(unittest.TestCase):

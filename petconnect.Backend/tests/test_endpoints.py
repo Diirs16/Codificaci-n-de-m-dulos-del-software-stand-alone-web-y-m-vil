@@ -458,7 +458,8 @@ class PruebasVerificacionDelCodigo(_BaseEndpoints):
         for ruta, (almacen, mensaje) in casos.items():
             with self.subTest(ruta=ruta):
                 codigo = almacen.crear(CORREO, {"id_usuario": ID_USUARIO, "name": "Laura Gomez"})
-                almacen._pendientes[CORREO]["expires"] = 0      # vencio hace mucho
+                # vencio hace mucho (fila del RepositorioMemoria de _importar_api, item 4.6)
+                almacen._repositorio._filas[(CORREO, almacen._proposito)]["vence"] = 0
                 r = self._verificar(ruta, codigo)                # aunque sea el correcto
                 self.assertEqual(r.status_code, 400)
                 self.assertEqual(r.get_json(), {"error": mensaje})

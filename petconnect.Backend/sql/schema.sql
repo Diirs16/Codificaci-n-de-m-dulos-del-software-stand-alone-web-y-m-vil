@@ -299,6 +299,37 @@ CREATE TABLE IF NOT EXISTS `solicitudes` (
   CONSTRAINT `chk_solicitud_tipo` CHECK (`tipo` = 'adopcion' AND `id_mascota` IS NOT NULL OR `tipo` = 'contacto' AND `id_mascota` IS NULL AND `telefono` IS NULL)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
+-- Item 4.6 (A-12, NC-003, 07/11/2026): codigos de un solo uso (OTP) del
+-- registro y del inicio de sesion. Antes vivian en la memoria de la API y se
+-- perdian al reiniciar o con varios procesos. Una fila por correo y proposito.
+-- El codigo va cifrado con Fernet (FERNET_KEY), nunca en claro. vence y
+-- ultimo_envio son segundos desde 1970 (time.time() de Python). Los datos del
+-- registro pendiente (nombre, hash bcrypt y prueba de la autorizacion) son
+-- datos personales (Ley 1581): la API borra la fila al verificar, al
+-- bloquearse con 5 fallos y al vencer (los vencidos se borran cada vez que se
+-- crea un codigo y al arrancar). La regla chk_otp_proposito deja el nombre y
+-- el hash solo para el registro y el usuario solo para el inicio de sesion.
+-- Misma definicion en migraciones/2026-11-07_otp_pendientes.sql
+CREATE TABLE IF NOT EXISTS `otp_pendientes` (
+  `correo` varchar(120) NOT NULL,
+  `proposito` enum('registro','login') NOT NULL,
+  `codigo_cifrado` varchar(255) NOT NULL,
+  `intentos` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `reenvios` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `vence` double NOT NULL,
+  `ultimo_envio` double NOT NULL,
+  `nombre` varchar(60) DEFAULT NULL,
+  `password_hash` varchar(255) DEFAULT NULL,
+  `id_usuario` int(11) DEFAULT NULL,
+  `fecha_autorizacion_datos` datetime DEFAULT NULL,
+  `version_politica_datos` varchar(20) DEFAULT NULL,
+  PRIMARY KEY (`correo`,`proposito`),
+  KEY `idx_otp_vence` (`vence`),
+  KEY `fk_otp_usuario` (`id_usuario`),
+  CONSTRAINT `fk_otp_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_otp_proposito` CHECK (`proposito` = 'registro' AND `nombre` IS NOT NULL AND `password_hash` IS NOT NULL AND `id_usuario` IS NULL OR `proposito` = 'login' AND `id_usuario` IS NOT NULL AND `nombre` IS NULL AND `password_hash` IS NULL)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+
 CREATE TABLE IF NOT EXISTS `vacunas` (
   `id_vacuna` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(100) NOT NULL,
