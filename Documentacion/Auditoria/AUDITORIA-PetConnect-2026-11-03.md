@@ -783,6 +783,18 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
 #### A-24 · 🟡 Media · La sesión web nunca se revalida [A]
 - `AuthContext.jsx:23-33` carga el usuario de `localStorage` y lo da por bueno siempre, aunque el token (24 h) venza.
 - **Arreglo:** llamar a `/auth/me` al iniciar (como el móvil) y cerrar sesión ante un 401.
+- **Estado: resuelto el 08/11/2026 (ítem 4.7 de PRIORIDADES, `3606c5d`); solo web, sin tocar la API ni la BD.**
+  Decisión del dueño: opción A, **solo el 401 cierra la sesión** (un 404 “Usuario no encontrado” no, porque también
+  puede venir de una API mal desplegada; el token vence en 24 h). `getPerfil()` nuevo en `src/services/api.js`;
+  `src/utils/sesion.js` (JS puro) decide: 401 o datos sin token → cerrar; 503, 502, 500, 404 o red caída → mantener;
+  200 → actualizar nombre y correo; si el token cambió mientras llegaba la respuesta → ignorar (una respuesta
+  atrasada no cierra una sesión nueva). `AuthContext.jsx` lo llama en un `useEffect` al iniciar y sigue mostrando la
+  sesión guardada mientras tanto (sin pantalla de carga). El 401 a mitad de sesión lo sigue tratando
+  `FormularioSolicitud.jsx`. Prueba: `tests/sesion.test.js` (9; `npm test` 51/51, lint sin errores, build OK).
+  Contraprueba (`git stash` de `api.js` y `AuthContext.jsx`): fallan 5; pasan a propósito 4 (503/502/500, red caída,
+  404 y datos sin token: con el código viejo no hay llamada y “mantener” coincide). En el navegador del panel a 375 px,
+  con la API del dueño en :5000: sesión inventada con token falso → `/auth/me` 401 → sesión borrada y botón “Iniciar
+  sesión”, sin desplazamiento horizontal.
 
 #### A-25 · ⚪ Baja · `innerHTML` con el nombre del producto [A]
 - `assets/js/addToCartToast.js:23-28`. Hoy el nombre viene de la BD, pero es XSS en potencia. Usar `textContent`.

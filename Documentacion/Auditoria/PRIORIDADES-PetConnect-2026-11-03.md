@@ -84,7 +84,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.4 | A-31 | todas | Pruebas de endpoints con el cliente de Flask (mascotas, productos, auth, errores) — *Hecho el 07/11/2026 en una parte (`37f8126`, solo pruebas; `api.py` sin tocar). Primero un inventario ruta × caso y NC × prueba: de 14 rutas, 6 tenían huecos (`/api/auth/me` sin ninguna prueba) y NC-001, NC-008 y NC-009 no tenían regresión por la API. `tests/test_endpoints.py` (31, BD/DNS/correo simulados, sin `.env`): inventario vivo de rutas (ruta nueva sin pruebas → falla; privadas → 401 sin token), productos, filtro de adopción, `/me` con token real, migración del hash, login, verificación del código, registro y `validar-correo`. Suite 231 (207 + 24 omitidas). Contraprueba en una copia temporal: 28 roturas, todas detectadas; cada prueba falla con al menos una. A-31 resuelto (falta ver la CI en GitHub con el push). Hallazgo → 4.16* | 🟡 |
 | [x] | 4.5 | A-11 | NC-003 | Pool de conexiones + `try/finally` para cerrar cursores — *Hecho el 07/11/2026 en una parte (`9c417de`, solo backend). Decisiones del dueño: pool de 10 (`DB_POOL_SIZE`, de 1 a 32), consola y `seed.py` en el mismo pool, 4.15 aparte. `ConexionBD` presta conexiones de un `MySQLConnectionPool`; si está lleno espera hasta 5 s y luego 503; el log no trae usuario ni host. `conexion_y_cursor()` (el `try/finally` escrito una vez) en los 32 métodos de los 5 DAO y en las 4 consultas de `api.py`; `_get_conn()` (pedía y nunca devolvía) → `_verificar_bd()`. `tests/test_pool.py` (25; 3 con MariaDB): sin fugas en 32 métodos y 14 rutas × 3 escenarios. Suite 256 (229 + 27 omitidas). Contraprueba: con el código viejo fallan 20 de 22; cada archivo arreglado tiene su prueba. NC-003 sigue abierta (4.6, 4.12; paginación e índices sin ítem)* | 🟡 |
 | [x] | 4.6 | A-12 | NC-003 | OTP en tabla de la BD (hash del código, intentos, expiración) o 1 worker con hilos; limpiar vencidos y acotar `_mx_cache` — *Hecho el 07/11/2026 en dos partes (solo backend): `_mx_cache` de 1.000 dominios con LRU y candado (`9ccd379`) y tabla `otp_pendientes` (`24ed52c`). Decisiones del dueño: opción A, código cifrado con Fernet (no hash: hay que reenviar el mismo código), datos del registro pendiente borrados al verificar, bloquearse o vencer. `AlmacenOTP(proposito, repositorio)` conserva las reglas y guarda en `OtpDAO` (API) o `RepositorioMemoria` (pruebas); el intento se reserva antes de comparar (un `UPDATE` atómico); crear un código y arrancar la API borran los vencidos; sin la tabla la API no arranca y lo avisa; correos de más de 120 caracteres → 400. `tests/test_otp_bd.py` (48; 16 con MariaDB). Suite 311 (268 + 43 omitidas). El 08/11/2026, con MariaDB, la carrera dio 4 != 5: `verificar()` ahora lee la fila antes de reservar el intento (prueba nueva sin MariaDB). Con MariaDB, 48/48 OK. Contraprueba: con el código viejo 20 intentos a la vez comparan 20 veces y los vencidos no se borran. **Falta del dueño: aplicar la migración (con respaldo)**; opcional: las pruebas con `PETCONNECT_PRUEBA_BD=1`. Hallazgo: A.11 de la política dice que el registro pendiente nunca llega a la BD (decisión D.7 del borrador). NC-003 sigue abierta (4.17, 4.12)* | 🟡 |
-| [ ] | 4.7 | A-24 | — | Web: validar sesión con `/auth/me` al iniciar y cerrar sesión ante 401 | 🟢 |
+| [x] | 4.7 | A-24 | — | Web: validar sesión con `/auth/me` al iniciar y cerrar sesión ante 401 — *Hecho el 08/11/2026 en una parte (`3606c5d`, solo web). Decisión del dueño: opción A, solo el 401 cierra la sesión (503, 502, 500, 404 o red caída no la tocan). `getPerfil()` en `src/services/api.js`, `src/utils/sesion.js` decide (cerrar / mantener / actualizar / ignorar si la sesión cambió mientras llegaba la respuesta) y `AuthContext.jsx` lo llama al iniciar. Regresión: `tests/sesion.test.js` (9; `npm test` 51/51). Contraprueba: con el código viejo fallan 5 y pasan a propósito 4. Visto en el navegador a 375 px con la API real: token falso → 401 → sesión cerrada. No cierra NC* | 🟢 |
 | [ ] | 4.8 | A-13 | — | Fernet: usarlo para el teléfono o quitarlo; corregir comentario `api.py:400`; `decrypt` debe fallar | 🟢 |
 | [ ] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README | 🟢 |
 | [ ] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) | 🟢 |
@@ -147,8 +147,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 07/11/2026, actualizada al terminar el 4.6 (A-12, NC-003: OTP en la tabla `otp_pendientes` y
-`_mx_cache` acotado, dos partes). El próximo ítem es el 4.7 (A-24: la web revalida la sesión con `/auth/me`).
+*Versión del 08/11/2026, actualizada al terminar el 4.7 (A-24: la web revalida la sesión con `/auth/me`, solo
+web). El próximo ítem es el 4.8 (A-13: Fernet para el teléfono, comentario de `api.py` y `decrypt` que falle).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -173,7 +173,28 @@ Lee primero:
   pregunta (push normal, nunca --force). Sin subir todavía: desde 240116e
   (4.1) en adelante.
 
-Estado conocido (7/11/2026; si el git log muestra más ítems hechos, manda el git log):
+Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.7 HECHO el 08/11/2026 (A-24; commit 3606c5d, solo web; no toca API
+  ni BD; no cierra NC). Decisión del dueño: opción A, solo el 401 cierra
+  la sesión (404 "Usuario no encontrado" no: puede venir de una API mal
+  desplegada y el token vence en 24 h). getPerfil() en src/services/api.js
+  (GET /auth/me); src/utils/sesion.js: revalidarSesion({ leerToken,
+  obtenerPerfil }) → "cerrar" (401 o datos sin token), "mantener" (503,
+  502, 500, 404, red caída), "actualizar" con el perfil (200) o "ignorar"
+  si el token cambió mientras llegaba la respuesta. AuthContext.jsx la
+  llama en un useEffect al iniciar (con bandera "vigente" por StrictMode,
+  que monta dos veces en desarrollo: se ven 2 llamadas a /auth/me) y
+  muestra la sesión guardada mientras tanto. El 401 a mitad de sesión lo
+  sigue tratando FormularioSolicitud.jsx (no se cerró sesión ante
+  cualquier 401 para no perder su mensaje). tests/sesion.test.js (9);
+  npm test 51/51, lint 0 errores (2 avisos viejos de only-export-
+  components), build OK. Contraprueba (git stash de api.js y
+  AuthContext.jsx): fallan 5, pasan a propósito 4. Navegador a 375 px
+  con la API del dueño: token falso → 401 → sesión borrada.
+- 4.6 CORREGIDO el 08/11/2026 (d040676 y f2214e6): verificar() lee la
+  fila antes de reservar el intento; el dueño corrió test_otp_bd.py con
+  MariaDB: 48/48. Sigue pendiente confirmar que aplicó la migración
+  otp_pendientes en su BD real (sin ella la API nueva no arranca).
 - 4.6 HECHO el 07/11/2026 (A-12; commits 9ccd379 y 24ed52c, solo
   backend; NC-003 sigue abierta hasta el 4.17 y el 4.12). Decisiones del
   dueño: opción A (tabla otp_pendientes), código cifrado con Fernet (con
@@ -934,19 +955,23 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.7, A-24: la sesión web nunca se revalida):
-- A-24: PetConnect.Front/petconnect-app/src/context/AuthContext.jsx
-  carga el usuario de localStorage y lo da por bueno siempre, aunque el
-  token (24 h) haya vencido. Arreglo: llamar a GET /api/auth/me al
-  iniciar (el móvil ya lo hace: PetConnect.Mobile/src/services/api.js) y
-  cerrar sesión ante un 401. Solo web (🟢); no toca la API ni la BD.
-- Revisar src/services/api.js (lee el token de localStorage) y
-  FormularioSolicitud.jsx, que ya trata el 401. Ojo con no cerrar la
-  sesión si la API no responde (503 o red caída): eso no es un token malo.
-- Pruebas: npm run lint, npm test y npm run build en la web; prueba nueva
-  del AuthContext (token vencido → sesión cerrada; 503 → sesión intacta).
-- Después del 4.7 siguen 4.8 a 4.11; el 4.12 se salta hasta tener el
-  4.17. El 4.8 (Fernet) ya no puede quitar Fernet: lo usan los OTP.
+Contexto del próximo paso (4.8, A-13: Fernet a medias):
+- A-13: security/crypto.py exige FERNET_KEY para arrancar; desde el 4.6
+  los OTP SÍ usan Fernet (otp/servicio.py con encrypt y decrypt_estricto),
+  así que ya NO se puede "quitar Fernet". Quedan dos cosas:
+  1) decrypt() (security/crypto.py) se traga cualquier error y devuelve
+     el texto cifrado tal cual: debe fallar (o desaparecer si nadie lo
+     usa; decrypt_estricto ya hace lo correcto). Revisar quién lo llama.
+  2) El comentario de api.py (cerca de la línea 764) dice que el teléfono
+     se guarda cifrado y no es cierto. Decidir: cifrar el teléfono de
+     verdad (usuarios.telefono y solicitudes.telefono, que guarda el 3.6)
+     o corregir el comentario. Cifrarlo toca la BD (datos existentes,
+     tamaño de columna, búsquedas) y el DAO: plan primero y, si toca la
+     BD, migración con respaldo que aplica el dueño.
+- Solo backend. Pruebas: unittest (suite 311 hoy) + regresión nueva de
+  decrypt; contraprueba con git stash.
+- Después del 4.8 siguen 4.9 a 4.11; el 4.12 se salta hasta tener el
+  4.17.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -985,4 +1010,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.7** (A-24): la web revalida la sesión con `/auth/me` al iniciar y la cierra ante un 401 (solo web). El 4.6 quedó hecho el 07/11/2026 (`9ccd379` y `24ed52c`); falta que el dueño aplique la migración `otp_pendientes`. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.8** (A-13): Fernet ya lo usan los OTP, así que no se quita: que `decrypt()` falle en vez de devolver el texto cifrado y decidir si el teléfono se cifra de verdad o se corrige el comentario de `api.py` (solo backend; si toca la BD, plan y migración). El 4.7 quedó hecho el 08/11/2026 (`3606c5d`). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
