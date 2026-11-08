@@ -419,6 +419,26 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - `config/db_config.py:13` → `autocommit: True`; los DAO llaman `commit()/rollback()` como si hubiera transacciones.
   Una operación de varios pasos no es atómica. El README (`README.md:116,128`) dice `False`.
 - **Arreglo:** decidir: `False` + `commit` explícito (lo que documenta el README) o dejar `True` y quitar los `rollback`.
+- **Estado: resuelto el 08/11/2026 (ítem 4.9 de PRIORIDADES, en una parte, `a25224d`, solo backend; no toca el esquema ni cierra
+  NC).** Antes se buscaron operaciones de varios pasos: cada escritura de los DAO es una sola sentencia con su
+  `commit()`, y el `UPDATE ... intentos < 5` de `OtpDAO` es una sola sentencia (no cambia). Los flujos de
+  `/register/verify` (crear usuario y luego borrar el OTP) y `/login/verify` usan conexiones distintas, así que el
+  autocommit no los afecta, y el orden ya es seguro. La única operación de varios pasos en una conexión es `seed.py`
+  (un solo `commit()` al final). Decisión del dueño: **opción B**, `autocommit: False`, que es lo que ya documentaba el
+  README. Los DAO no cambian porque ya confirmaban cada escritura; ahora sus `rollback()` sí deshacen y `seed.py` es
+  "todo o nada". `conexion/conexion_bd.py` crea el pool con `pool_reset_session=True` explícito: al devolver una
+  conexión, la librería (mysql-connector 9.1.0) hace `reset_session()`, que descarta lo no confirmado (incluida la
+  transacción que abre un SELECT) y vuelve a aplicar autocommit y `sql_mode`. README: tabla de `DB_CONFIG`, 5.2
+  (pool y `commit()`/`rollback()` sobre la conexión prestada), 5.3 (flujo) y el ejemplo de 7.2. Regresión en
+  `tests/test_pool.py`, sin BD (5): autocommit apagado; pool con `pool_reset_session=True`; inventario automático por
+  el SQL que manda cada método (21 escrituras y 18 lecturas); cada escritura hace `commit()` una vez y las lecturas no;
+  con error de la BD no hay `commit()` y la escritura hace `rollback()`. Con MariaDB (2 nuevas + 1 ajustada):
+  autocommit = 0 tras devolver la conexión, un INSERT sin `commit()` se descarta al devolverla y `rollback()` deshace
+  los dos pasos de una operación. Las conexiones auxiliares de `PruebasPoolEnBD` y `PruebasEsquemaEnBD` fijan
+  `autocommit = True` para leer siempre lo último guardado. Suite 321 (276 + 45 omitidas). Contraprueba con
+  `git stash` de `db_config.py` y `conexion_bd.py`: fallan 2 (autocommit y `pool_reset_session`) y pasan a propósito
+  las 3 de los DAO (protegen los cambios futuros). Además, al quitar a propósito el `commit()` de
+  `ProductoDAO.actualizar`, la prueba lo detecta. Las pruebas con MariaDB quedan para que las corra el dueño.
 
 #### A-16 · 🟡 Media · `generate_keys.py` borra el `.env` existente sin preguntar [N]
 - `generate_keys.py:41` abre el archivo de entorno en modo `"w"`: si se corre dos veces, **borra** la contraseña de la

@@ -86,7 +86,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.6 | A-12 | NC-003 | OTP en tabla de la BD (hash del código, intentos, expiración) o 1 worker con hilos; limpiar vencidos y acotar `_mx_cache` — *Hecho el 07/11/2026 en dos partes (solo backend): `_mx_cache` de 1.000 dominios con LRU y candado (`9ccd379`) y tabla `otp_pendientes` (`24ed52c`). Decisiones del dueño: opción A, código cifrado con Fernet (no hash: hay que reenviar el mismo código), datos del registro pendiente borrados al verificar, bloquearse o vencer. `AlmacenOTP(proposito, repositorio)` conserva las reglas y guarda en `OtpDAO` (API) o `RepositorioMemoria` (pruebas); el intento se reserva antes de comparar (un `UPDATE` atómico); crear un código y arrancar la API borran los vencidos; sin la tabla la API no arranca y lo avisa; correos de más de 120 caracteres → 400. `tests/test_otp_bd.py` (48; 16 con MariaDB). Suite 311 (268 + 43 omitidas). El 08/11/2026, con MariaDB, la carrera dio 4 != 5: `verificar()` ahora lee la fila antes de reservar el intento (prueba nueva sin MariaDB). Con MariaDB, 48/48 OK. Contraprueba: con el código viejo 20 intentos a la vez comparan 20 veces y los vencidos no se borran. **Falta del dueño: aplicar la migración (con respaldo)**; opcional: las pruebas con `PETCONNECT_PRUEBA_BD=1`. Hallazgo: A.11 de la política dice que el registro pendiente nunca llega a la BD (decisión D.7 del borrador). NC-003 sigue abierta (4.17, 4.12)* | 🟡 |
 | [x] | 4.7 | A-24 | — | Web: validar sesión con `/auth/me` al iniciar y cerrar sesión ante 401 — *Hecho el 08/11/2026 en una parte (`3606c5d`, solo web). Decisión del dueño: opción A, solo el 401 cierra la sesión (503, 502, 500, 404 o red caída no la tocan). `getPerfil()` en `src/services/api.js`, `src/utils/sesion.js` decide (cerrar / mantener / actualizar / ignorar si la sesión cambió mientras llegaba la respuesta) y `AuthContext.jsx` lo llama al iniciar. Regresión: `tests/sesion.test.js` (9; `npm test` 51/51). Contraprueba: con el código viejo fallan 5 y pasan a propósito 4. Visto en el navegador a 375 px con la API real: token falso → 401 → sesión cerrada. No cierra NC* | 🟢 |
 | [x] | 4.8 | A-13 | NC-007 | Fernet: usarlo para el teléfono o quitarlo; corregir comentario `api.py:400`; `decrypt` debe fallar — *Hecho el 08/11/2026 en una parte (`979cdf3`, solo backend, no toca la BD). Fernet se queda (lo usan los OTP desde el 4.6). Decisión del dueño: opción A, el teléfono sigue en texto plano y se corrige el comentario de `api.py` (cifrarlo pedía migrar columnas `varchar(20)` y, con A-16 abierto, perder la `FERNET_KEY` dejaría ilegibles los teléfonos). `decrypt()` lanza `InvalidToken` si no puede descifrar; `decrypt_estricto` se fusionó con ella; `api.py` ya no importa `encrypt/decrypt`. Regresión: `PruebasDescifrado` en `tests/test_seguridad.py` (5). Suite 314 (271 + 43 omitidas). Contraprueba: con el `crypto.py` viejo fallan 4 (3 nuevas + el OTP ilegible) y pasan a propósito 2. NC-007 cerrada* | 🟢 |
-| [ ] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README | 🟢 |
+| [x] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README — *Hecho el 08/11/2026 en una parte (`a25224d`, solo backend; no toca el esquema). Decisión del dueño: opción B, `autocommit: False` (lo que ya decía el README). Ninguna operación de los DAO tenía varios pasos (cada escritura es una sentencia con su `commit()`); la única con varios pasos en una conexión es `seed.py`, que ahora es “todo o nada”. Los DAO no cambian: sus `rollback()` ya sirven. El pool se crea con `pool_reset_session=True` explícito: al devolver la conexión se descarta lo no confirmado. README: 5.1, 5.2, 5.3 y 7.2 (pool y `commit()` sobre la conexión prestada). Regresión en `tests/test_pool.py`: 5 sin BD (inventario automático de 21 escrituras y 18 lecturas por su SQL) y 2 nuevas + 1 ajustada con MariaDB. Suite 321 (276 + 45 omitidas). Contraprueba: con el código viejo fallan 2 y pasan a propósito 3; al quitar un `commit()` a propósito, la prueba lo detecta. Opcional del dueño: las pruebas con `PETCONNECT_PRUEBA_BD=1`. No cierra NC* | 🟢 |
 | [ ] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) | 🟢 |
 | [ ] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos | 🟢 |
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
@@ -147,9 +147,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 08/11/2026, actualizada al terminar el 4.8 (A-13: `decrypt()` falla en vez de devolver el texto
-cifrado y el comentario del teléfono dice la verdad; solo backend; cierra NC-007). El próximo ítem es el 4.9
-(A-15: decidir `autocommit` y alinear código y README).
+*Versión del 08/11/2026, actualizada al terminar el 4.9 (A-15: `autocommit: False`, cada escritura con
+`commit()` y el pool descarta lo no confirmado; README alineado; solo backend; no cierra NC). El próximo ítem es el
+4.10 (A-14: registro con respuesta neutra, sin el 409 que revela cuentas).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -175,6 +175,29 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.9 HECHO el 08/11/2026 (A-15; commit a25224d, solo backend; no toca
+  el esquema; no cierra NC). Decisión del dueño: opción B, autocommit
+  False en config/db_config.py (lo que ya decía el README). Búsqueda de
+  operaciones de varios pasos: cada escritura de los DAO es una sentencia
+  con su commit(); el UPDATE atómico de OtpDAO no cambió; /register/verify
+  y /login/verify usan conexiones distintas (el autocommit no los toca);
+  la única con varios pasos en una conexión es seed.py, que ahora es
+  "todo o nada". Los DAO no cambiaron (sus rollback() ya sirven).
+  conexion/conexion_bd.py: MySQLConnectionPool(..., pool_reset_session=
+  True) explícito; al devolver la conexión, reset_session() descarta lo
+  no confirmado y reaplica autocommit y sql_mode (mysql-connector 9.1.0).
+  README: 5.1, 5.2, 5.3 y 7.2 (pool, commit() sobre la conexión
+  prestada). tests/test_pool.py: PruebasTransacciones (4) + 1 en
+  PruebasConexionBD (pool_reset_session); el inventario clasifica cada
+  método por el SQL que manda (21 escrituras, 18 lecturas). Con MariaDB:
+  autocommit = 0 (antes 1) y 2 nuevas (lo no confirmado se descarta;
+  rollback deshace los dos pasos). Las conexiones auxiliares de
+  PruebasPoolEnBD y PruebasEsquemaEnBD fijan autocommit = True. Suite 321
+  (276 + 45 omitidas). Contraprueba (git stash de db_config.py y
+  conexion_bd.py): fallan 2, pasan a propósito 3 (las de los DAO); al
+  quitar a propósito el commit() de ProductoDAO.actualizar, la prueba lo
+  detecta. Opcional del dueño: test_pool, test_esquema y test_otp_bd con
+  PETCONNECT_PRUEBA_BD=1.
 - 4.8 HECHO el 08/11/2026 (A-13; commit 979cdf3, solo backend; no toca
   la BD; CIERRA NC-007). Decisión del dueño: opción A, el teléfono sigue
   en texto plano (usuarios.telefono lo llena solo la consola;
@@ -972,22 +995,29 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.9, A-15: autocommit):
-- A-15: config/db_config.py (~línea 48) pone "autocommit": True, pero los
-  DAO llaman commit()/rollback() como si hubiera transacciones (16
-  rollback() en mascota, otp, producto, proveedor, solicitud y
-  usuario_dao.py): con autocommit cada sentencia se guarda sola y el
-  rollback no deshace nada. El README de la raíz (líneas ~116 y 128) dice
-  False. tests/test_pool.py (con MariaDB) comprueba hoy autocommit = 1.
-- Decidir: (A) dejar True, quitar los rollback() inútiles y corregir el
-  README, o (B) False + commit() explícito en cada escritura (lo que dice
-  el README; revisar que ningún SELECT quede con una transacción abierta
-  en el pool y que el UPDATE atómico de OtpDAO siga igual). Primero
-  buscar si alguna operación hace varios pasos que deban ser atómicos.
-- Solo backend; no toca el esquema de la BD. Pruebas: unittest (suite 314
-  hoy) + regresión nueva; contraprueba con git stash.
-- Después del 4.9 siguen 4.10 y 4.11; el 4.12 se salta hasta tener el
-  4.17.
+Contexto del próximo paso (4.10, A-14: registro con respuesta neutra):
+- A-14: POST /api/auth/register (api.py, ~línea 663) responde 409 "El
+  correo ya esta registrado": cualquiera puede saber si un correo tiene
+  cuenta (enumeración). El resto del registro ya es neutro: un registro
+  pendiente vigente y /register/resend responden igual haya o no
+  pendiente. tests/test_endpoints.py:548 espera hoy el 409 (tiene la nota
+  del 4.10). La web y el móvil no revisan el 409: muestran el "error" que
+  manda la API (confirmarlo antes de cambiar la respuesta).
+- Arreglo de la auditoría: responder igual que un registro nuevo ("Codigo
+  enviado") y avisar por correo al titular. Decidir con el dueño: (A)
+  respuesta neutra + correo de aviso al titular ("alguien intentó
+  registrarse con tu correo; si eras tú, inicia sesión"), plantilla nueva
+  en correo/plantillas.py; o (B) respuesta neutra sin correo. Cuidar que
+  el tiempo de respuesta no delate la cuenta (hoy el 409 sale antes del
+  bcrypt y del envío) y que no se cree ningún OTP para una cuenta que ya
+  existe. Revisar si /login o /utils/validar-correo revelan cuentas por
+  otro lado (anotarlo como hallazgo si no es de este ítem). Si se agrega
+  un texto al usuario, ver la Parte B de la política (borrador).
+- Probablemente solo backend (api.py, correo/ y pruebas); no toca el
+  esquema. Pruebas: unittest (suite 321 hoy) + regresión nueva (misma
+  respuesta y código para correo nuevo y existente, sin OTP para el
+  existente); contraprueba con git stash.
+- Después del 4.10 sigue el 4.11; el 4.12 se salta hasta tener el 4.17.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -1026,4 +1056,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.9** (A-15): `autocommit=True` en `config/db_config.py` vuelve inútiles los `rollback()` de los DAO y el README dice `False`: decidir y alinear código y README (solo backend). El 4.8 quedó hecho el 08/11/2026 (`979cdf3`, cierra NC-007). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.10** (A-14): `POST /api/auth/register` responde 409 “El correo ya está registrado” y eso revela quién tiene cuenta: respuesta neutra (y decidir si se avisa por correo al titular). El 4.9 quedó hecho el 08/11/2026 (`a25224d`: `autocommit: False`, cada escritura con `commit()`, README alineado). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
