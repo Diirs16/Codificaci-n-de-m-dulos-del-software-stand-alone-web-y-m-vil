@@ -414,6 +414,45 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 #### A-14 · 🟡 Media · Enumeración de correos en el registro [N, ya en el plan A07]
 - `api.py:359-360` responde **409 “El correo ya está registrado”**: permite saber quién tiene cuenta.
 - **Arreglo:** respuesta neutra (“Si el correo es válido te enviamos un código”) y avisar por correo al titular.
+- **Estado: resuelto el 08/11/2026 (ítem 4.10 de PRIORIDADES, en una parte, `8668680`; solo backend; no toca el esquema ni cierra
+  NC; el caso CP-002 de la GA9 pasa a aprobado en la API).** Decisión del dueño: **opción A**, respuesta neutra + correo
+  de aviso al titular (la B, sin correo, dejaba el camino de la cuenta existente mucho más rápido: el tiempo seguía
+  delatándola). `api.py`: si el correo ya tiene cuenta, `register()` llama a `_registro_con_cuenta_existente()`, que
+  responde **exactamente** lo mismo que un registro nuevo (200 `{"message": "Codigo enviado", "email": ...}`) y por el
+  mismo camino: la primera vez calcula bcrypt (y lo descarta) y envía un correo; un segundo intento antes de 10 minutos
+  no calcula ni envía nada (como un registro nuevo con su código vigente, A-09); si el correo falla, el mismo 503 fuera
+  de desarrollo y el mismo 200 con `APP_ENV=desarrollo`. **Nunca crea un OTP** para una cuenta que ya existe. El aviso
+  (`enviar_aviso_cuenta_existente` en `correo/servicio.py`, plantilla `HTML_AVISO_REGISTRO`, asunto “PetConnect -
+  Intento de registro con tu correo”) lleva el nombre **de la cuenta**, no el que se escribió en el formulario (A-05), no
+  lleva código y remite a `proyectopetconnect+atencion@gmail.com` si olvidó la contraseña (no hay recuperación). La
+  memoria de avisos recientes guarda el SHA-256 del correo en minúsculas (no el correo), como mucho 1.000, con candado,
+  y olvida el aviso si no salió para que el siguiente intento lo envíe. Está en la memoria del proceso: con varios
+  procesos, en el peor caso un aviso por proceso cada 10 minutos. **Hueco encontrado al revisar:** tras un `/register`
+  neutro, bastaba probar un código en `/api/auth/verify`: “No hay verificación pendiente” delataba la cuenta y “Código
+  incorrecto”, no. Ahora “sin pendiente”, “vencido” e “incorrecto” responden el mismo 400 “Codigo incorrecto o vencido.
+  Si pasaron mas de 10 minutos, vuelve a registrarte” (`/login/verify` no cambia: exige la contraseña antes). La web y el
+  móvil no cambian: no miraban el 409 (muestran `data.error`) y con el 200 pasan al paso del código.
+  Regresión: `tests/test_registro_neutro.py` (18, BD/DNS/correo y relojes simulados, correos `@ejemplo.test`): misma
+  respuesta para correo nuevo y con cuenta (también inactiva o bloqueada), sin OTP ni código enviado, aviso con el
+  nombre de la cuenta, bcrypt calculado, segundo intento igual que uno nuevo, de nuevo tras 10 minutos, mayúsculas,
+  503/200 igual que uno nuevo sin el correo en el log, memoria con hash y con tope; `/verify` igual sin pendiente,
+  vencido e incorrecto; el código correcto sigue creando la cuenta; la plantilla escapa el nombre y no lleva código.
+  Se ajustaron 6 pruebas viejas que comparaban los mensajes de `/verify` (`test_endpoints.py`, `test_otp.py`,
+  `test_registro.py`; la de “no alarga el vencimiento” ahora comprueba que el pendiente se borró) y la del 409 de
+  `test_endpoints.py`. Suite 339 (294 + 45 omitidas). Contraprueba: con el `api.py` anterior (`git stash`) dan error
+  52 (las funciones nuevas no existen), así que se hizo además en una copia con un sabotaje a la vez sobre el código
+  nuevo, y los 9 se detectan: volver al 409 → fallan 11 (10 de las 18 nuevas + la de `test_endpoints.py`; pasan a
+  propósito la de “sin OTP”, porque el 409 tampoco lo creaba, la del tope, las 3 de la plantilla y las 3 de `/verify`,
+  que prueban otras partes); mensajes viejos de `/verify` → 5;
+  sin bcrypt → 2; sin límite de avisos → 4; aviso con el nombre escrito → 2; sin el 503 → 1; sin olvidar el aviso
+  fallido → 1; correo en claro en la memoria → 1; crear un OTP para la cuenta → 3.
+  **Riesgos que siguen abiertos (anotados, no son de este ítem):** (1) `/register/resend` pasados 60 s tarda más si hay
+  pendiente (envía correo) que para una cuenta existente (nunca tiene pendiente); (2) con 6 códigos malos, solo un
+  pendiente real llega al 429 de bloqueo; (3) los tiempos de bcrypt + correo no son idénticos al milisegundo. Taparlos
+  del todo exige enviar los correos en segundo plano, lo que cambia el 503 del 2.8 (A-10). Exigen más trabajo y le
+  mandan correos al titular, que así se entera. **Hallazgo → ítem 4.18:** `/api/auth/login` revela cuentas por
+  tiempo: con un correo sin cuenta responde enseguida y con uno que sí existe calcula bcrypt (~0,3 s) aunque la
+  contraseña sea mala. `/api/utils/validar-correo` no revela cuentas (no consulta la BD).
 
 #### A-15 · 🟡 Media · `autocommit=True` vuelve inútiles los `rollback()` [N]
 - `config/db_config.py:13` → `autocommit: True`; los DAO llaman `commit()/rollback()` como si hubiera transacciones.

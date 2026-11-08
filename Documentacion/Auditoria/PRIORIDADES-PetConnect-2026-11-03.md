@@ -87,7 +87,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.7 | A-24 | — | Web: validar sesión con `/auth/me` al iniciar y cerrar sesión ante 401 — *Hecho el 08/11/2026 en una parte (`3606c5d`, solo web). Decisión del dueño: opción A, solo el 401 cierra la sesión (503, 502, 500, 404 o red caída no la tocan). `getPerfil()` en `src/services/api.js`, `src/utils/sesion.js` decide (cerrar / mantener / actualizar / ignorar si la sesión cambió mientras llegaba la respuesta) y `AuthContext.jsx` lo llama al iniciar. Regresión: `tests/sesion.test.js` (9; `npm test` 51/51). Contraprueba: con el código viejo fallan 5 y pasan a propósito 4. Visto en el navegador a 375 px con la API real: token falso → 401 → sesión cerrada. No cierra NC* | 🟢 |
 | [x] | 4.8 | A-13 | NC-007 | Fernet: usarlo para el teléfono o quitarlo; corregir comentario `api.py:400`; `decrypt` debe fallar — *Hecho el 08/11/2026 en una parte (`979cdf3`, solo backend, no toca la BD). Fernet se queda (lo usan los OTP desde el 4.6). Decisión del dueño: opción A, el teléfono sigue en texto plano y se corrige el comentario de `api.py` (cifrarlo pedía migrar columnas `varchar(20)` y, con A-16 abierto, perder la `FERNET_KEY` dejaría ilegibles los teléfonos). `decrypt()` lanza `InvalidToken` si no puede descifrar; `decrypt_estricto` se fusionó con ella; `api.py` ya no importa `encrypt/decrypt`. Regresión: `PruebasDescifrado` en `tests/test_seguridad.py` (5). Suite 314 (271 + 43 omitidas). Contraprueba: con el `crypto.py` viejo fallan 4 (3 nuevas + el OTP ilegible) y pasan a propósito 2. NC-007 cerrada* | 🟢 |
 | [x] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README — *Hecho el 08/11/2026 en una parte (`a25224d`, solo backend; no toca el esquema). Decisión del dueño: opción B, `autocommit: False` (lo que ya decía el README). Ninguna operación de los DAO tenía varios pasos (cada escritura es una sentencia con su `commit()`); la única con varios pasos en una conexión es `seed.py`, que ahora es “todo o nada”. Los DAO no cambian: sus `rollback()` ya sirven. El pool se crea con `pool_reset_session=True` explícito: al devolver la conexión se descarta lo no confirmado. README: 5.1, 5.2, 5.3 y 7.2 (pool y `commit()` sobre la conexión prestada). Regresión en `tests/test_pool.py`: 5 sin BD (inventario automático de 21 escrituras y 18 lecturas por su SQL) y 2 nuevas + 1 ajustada con MariaDB. Suite 321 (276 + 45 omitidas). Contraprueba: con el código viejo fallan 2 y pasan a propósito 3; al quitar un `commit()` a propósito, la prueba lo detecta. Opcional del dueño: las pruebas con `PETCONNECT_PRUEBA_BD=1`. No cierra NC* | 🟢 |
-| [ ] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) | 🟢 |
+| [x] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) — *Hecho el 08/11/2026 en una parte (`8668680`, solo backend; no toca el esquema). Decisión del dueño: opción A, respuesta neutra + correo de aviso al titular. Un correo con cuenta recibe lo mismo que uno nuevo (200 “Codigo enviado”) por el mismo camino: bcrypt + un correo la primera vez, nada si se repite antes de 10 min, el mismo 503 si el correo falla. Nunca crea OTP. El aviso (`enviar_aviso_cuenta_existente`, plantilla `HTML_AVISO_REGISTRO`) lleva el nombre de la cuenta y no lleva código; la memoria de avisos guarda el SHA-256 del correo. Hueco tapado: `/verify` respondía distinto sin pendiente (“No hay verificación pendiente”) que con código incorrecto; ahora un solo mensaje para sin pendiente, vencido e incorrecto. Web y móvil sin cambios. Regresión: `tests/test_registro_neutro.py` (18) + 7 pruebas viejas ajustadas. Suite 339 (294 + 45 omitidas). Contraprueba: con el `api.py` viejo dan error 52; 9 sabotajes sobre el código nuevo, todos detectados (volver al 409: fallan 11). CP-002 de la GA9 aprobado en la API. Hallazgo → 4.18 (tiempo de `/login`). Opcional del dueño: probarlo con la API real* | 🟢 |
 | [ ] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos | 🟢 |
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
 | [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 | 🟡 |
@@ -95,6 +95,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`* | 🟡 |
 | [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
 | [ ] | 4.17 | A-11 | NC-003 | Paginación e índices (la otra mitad de la acción correctiva de NC-003). **Paginación:** `GET /api/productos` y `GET /api/mascotas/adopcion` devuelven todas las filas sin `LIMIT`; la web y el móvil las consumen (`src/services/api.js` en ambos), así que cambiar la forma de la respuesta toca los 3 módulos: decidir antes si se usan parámetros opcionales (`?pagina=&por_pagina=` con un máximo fijo, parametrizados) que mantengan la lista de hoy o un objeto con `total`, y hacerlo por partes (API, web, móvil). **Índices:** `mascotas` solo tiene la clave primaria y `id_usuario` (falta `estado`), `productos` no tiene índice en `activo` y `proveedores_servicio` solo la clave primaria (`ciudad`, `activo`, `nombre`); el `LIKE '%texto%'` no usa índice. Va en `sql/schema.sql` y en una migración de `sql/migraciones/` con su prueba en `tests/test_esquema.py` (toca la BD: plan primero, respaldo y que el dueño la aplique). Agregado el 07/11/2026 con el sí del dueño, al cerrar el 4.5. Hacerlo antes del 4.12 | 🟡 |
+| [ ] | 4.18 | A-14 | — | `/api/auth/login` revela cuentas por **tiempo**: si el correo no existe responde enseguida (`usuario is None` corta antes de bcrypt) y si existe calcula bcrypt (~0,3 s) aunque la contraseña sea mala. Arreglo: comparar contra un hash bcrypt fijo de relleno cuando no hay usuario (mismo costo 12), responder el mismo 401 y una prueba que cuente las llamadas a `verificar_password`/bcrypt en los dos casos. Solo backend. Surgió en el 4.10 (08/11/2026) | 🟢 |
 
 ---
 
@@ -147,9 +148,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 08/11/2026, actualizada al terminar el 4.9 (A-15: `autocommit: False`, cada escritura con
-`commit()` y el pool descarta lo no confirmado; README alineado; solo backend; no cierra NC). El próximo ítem es el
-4.10 (A-14: registro con respuesta neutra, sin el 409 que revela cuentas).
+*Versión del 08/11/2026, actualizada al terminar el 4.10 (A-14: el registro responde igual con o sin cuenta y avisa
+al titular por correo; `/verify` con un solo mensaje; solo backend; no cierra NC). El próximo ítem es el 4.11 (A-18:
+la consola registra usuarios saltándose las reglas).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -175,6 +176,42 @@ Lee primero:
   (4.1) en adelante.
 
 Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.10 HECHO el 08/11/2026 (A-14; commit 8668680, solo backend; no toca
+  el esquema; no cierra NC; CP-002 de la GA9 aprobado en la API).
+  Decisión del dueño: opción A (respuesta neutra + aviso al titular); la B
+  dejaba el camino de la cuenta existente mucho más rápido. api.py:
+  _registro_con_cuenta_existente() responde 200 {"message": "Codigo
+  enviado", "email"} como un registro nuevo: la 1.ª vez hash_password()
+  (descartado) + enviar_aviso_cuenta_existente(correo de la cuenta,
+  primer nombre de la cuenta); antes de AVISO_REGISTRO_ESPERA (600 s) no
+  calcula ni envía nada (como el pendiente vigente de A-09); si el aviso
+  falla: _liberar_aviso() y el mismo 503 (200 con APP_ENV=desarrollo).
+  Nunca crea OTP. _avisos_registro: OrderedDict con el SHA-256 del correo
+  en minúsculas, AVISOS_MAXIMO = 1000, candado, reloj _reloj_avisos()
+  (time.monotonic, las pruebas lo simulan); en memoria del proceso.
+  _RESPUESTA_REGISTRO = "Codigo enviado". verify(): no_pendiente, expirado
+  e incorrecto → 400 _MENSAJE_CODIGO_REGISTRO ("Codigo incorrecto o
+  vencido. Si pasaron mas de 10 minutos, vuelve a registrarte");
+  bloqueado sigue en 429; /login/verify no cambió. correo/: plantilla
+  HTML_AVISO_REGISTRO, enviar_aviso_cuenta_existente(to_email, name)
+  (escapa el nombre, sin código; remite a proyectopetconnect+atencion@
+  gmail.com porque no hay recuperar contraseña). Web y móvil sin cambios
+  (muestran data.error; no miraban el 409). Política B.3: 2 filas nuevas
+  (el aviso y el mensaje de /verify; no cambia la Parte A ni la versión).
+  tests/test_registro_neutro.py (18); ajustadas 7 viejas (test_endpoints
+  409 → neutro + parche enviar_aviso + _liberar_aviso en setUp; mensajes
+  de /verify en test_endpoints, test_otp y test_registro). Suite 339 (294
+  + 45 omitidas). Contraprueba: git stash de api.py → 52 errores (no
+  existen las funciones nuevas); en una copia del scratchpad, 9
+  sabotajes del código nuevo, todos detectados (409 → 11 fallan; mensajes
+  viejos de /verify → 5; sin bcrypt → 2; sin límite → 4; nombre escrito
+  → 2; sin 503 → 1; sin liberar → 1; correo en claro → 1; crear OTP → 3).
+  Riesgos abiertos anotados en A-14: tiempo de /register/resend pasados
+  60 s, el 429 tras 6 códigos malos solo con pendiente real y tiempos no
+  idénticos al milisegundo (taparlos: correos en segundo plano, que
+  cambia el 503 del 2.8). Hallazgo → 4.18 (/login por tiempo).
+  Opcional del dueño: probarlo con la API real (registrarse con un
+  correo que ya tiene cuenta → "Codigo enviado" y llega el aviso).
 - 4.9 HECHO el 08/11/2026 (A-15; commit a25224d, solo backend; no toca
   el esquema; no cierra NC). Decisión del dueño: opción B, autocommit
   False en config/db_config.py (lo que ya decía el README). Búsqueda de
@@ -995,29 +1032,33 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.10, A-14: registro con respuesta neutra):
-- A-14: POST /api/auth/register (api.py, ~línea 663) responde 409 "El
-  correo ya esta registrado": cualquiera puede saber si un correo tiene
-  cuenta (enumeración). El resto del registro ya es neutro: un registro
-  pendiente vigente y /register/resend responden igual haya o no
-  pendiente. tests/test_endpoints.py:548 espera hoy el 409 (tiene la nota
-  del 4.10). La web y el móvil no revisan el 409: muestran el "error" que
-  manda la API (confirmarlo antes de cambiar la respuesta).
-- Arreglo de la auditoría: responder igual que un registro nuevo ("Codigo
-  enviado") y avisar por correo al titular. Decidir con el dueño: (A)
-  respuesta neutra + correo de aviso al titular ("alguien intentó
-  registrarse con tu correo; si eras tú, inicia sesión"), plantilla nueva
-  en correo/plantillas.py; o (B) respuesta neutra sin correo. Cuidar que
-  el tiempo de respuesta no delate la cuenta (hoy el 409 sale antes del
-  bcrypt y del envío) y que no se cree ningún OTP para una cuenta que ya
-  existe. Revisar si /login o /utils/validar-correo revelan cuentas por
-  otro lado (anotarlo como hallazgo si no es de este ítem). Si se agrega
-  un texto al usuario, ver la Parte B de la política (borrador).
-- Probablemente solo backend (api.py, correo/ y pruebas); no toca el
-  esquema. Pruebas: unittest (suite 321 hoy) + regresión nueva (misma
-  respuesta y código para correo nuevo y existente, sin OTP para el
-  existente); contraprueba con git stash.
-- Después del 4.10 sigue el 4.11; el 4.12 se salta hasta tener el 4.17.
+Contexto del próximo paso (4.11, A-18: la consola registra usuarios
+saltándose las reglas):
+- A-18: vista/menu_usuarios.py, _registrar_usuario() (~línea 54): pide la
+  contraseña con input() (se ve en pantalla; usar getpass), le hace
+  .strip() (la API no, así que la misma contraseña puede no coincidir al
+  iniciar sesión por la web), no aplica validar_contrasena
+  (security/politica.py, ya común desde el 4.1) y no pide la autorización
+  de datos: guarda acepta_datos = 0 (lo honesto, por el valor por defecto
+  del modelo desde el 3.1), así que esa cuenta tendrá que autorizar al
+  iniciar sesión (3.5).
+- Decidir con el dueño: (1) ¿la consola pide la autorización (casilla con
+  el texto de B.1, fecha y VERSION_POLITICA_DATOS) o la deja en 0 y la
+  cuenta autoriza al entrar por la web o el móvil? (2) ¿valida también el
+  nombre (_validar_nombre, A-05) y el formato del correo como la API, o
+  solo la contraseña? Hoy esas validaciones viven en api.py: moverlas a
+  un módulo común sin importar api.py (A-41, 4.14). (3) Correo repetido:
+  hoy UsuarioDAO.insertar falla y su print muestra el mensaje de MySQL,
+  que trae el correo (Ley 1581; el arreglo general es el 4.15). La consola
+  es del administrador, no pública: puede decir "ese correo ya tiene
+  cuenta" sin el problema de A-14.
+- Probablemente solo backend (vista/menu_usuarios.py y quizá un módulo de
+  validación común); no toca el esquema. Pruebas: unittest (suite 339
+  hoy) + regresión nueva simulando input/getpass y el DAO (sin BD);
+  contraprueba con git stash. El dueño puede probarlo con python main.py
+  (usa su .env: dar el comando, no correrlo).
+- Después del 4.11 sigue el 4.13 (el 4.12 se salta hasta tener el 4.17).
+  El 4.18 (tiempo de /login, 🟢) se puede adelantar si el dueño quiere.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -1056,4 +1097,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.10** (A-14): `POST /api/auth/register` responde 409 “El correo ya está registrado” y eso revela quién tiene cuenta: respuesta neutra (y decidir si se avisa por correo al titular). El 4.9 quedó hecho el 08/11/2026 (`a25224d`: `autocommit: False`, cada escritura con `commit()`, README alineado). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.11** (A-18): la consola (`vista/menu_usuarios.py`) registra usuarios con la contraseña visible (`input()` en vez de `getpass`), con `.strip()`, sin la política de contraseñas y sin la autorización de datos. El 4.10 quedó hecho el 08/11/2026 (`8668680`: el registro responde igual con o sin cuenta, aviso al titular por correo y `/verify` con un solo mensaje). Hallazgo nuevo: 4.18 (`/login` revela cuentas por tiempo). Pendiente del dueño: confirmar la migración `otp_pendientes` y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
