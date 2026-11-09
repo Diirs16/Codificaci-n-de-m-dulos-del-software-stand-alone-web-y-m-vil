@@ -466,8 +466,17 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   y la adopción de 12 en 12, con “Ver más” al pie de la `FlatList` (`src/components/BotonVerMas.js`); misma lógica
   que la web en `src/utils/paginacion.js` y `src/hooks/useListaPaginada.js`. Regresión: `tests/paginacion.test.mjs`
   (8); contraprueba: con el código anterior fallan 2. Probado en el export web a 375 px con la API real (servido en
-  el puerto 8081: el 8090 no está en el CORS de la API). **NC-003 sigue abierta** hasta repetir la prueba de carga
+  el puerto 8081: el 8090 no está en el CORS de la API). NC-003 seguía abierta hasta repetir la prueba de carga
   (4.12).
+- **Ítem 4.12 (prueba de carga): hecho el 09/11/2026. NC-003 cerrada.** Script nuevo
+  `Documentacion/Evidencias-4.12-carga/carga_nc003.py` (commit `dde0ce0`): base temporal `petconnect_carga`
+  (`schema.sql` + `seed.py`, borrada al final), Werkzeug con hilos en el puerto 5055 como el 5/10/2026, pool de 10 y
+  `JWT_SECRET` desechable; no toca la base `petconnect`. Cada usuario hace 3 peticiones (catálogo y adopción
+  paginados y la ficha de una mascota; antes 2), 50 usuarios nuevos por segundo, timeout de 30 s. Resultado (lo
+  corrió el dueño): 500 usuarios, 0 % de error y p95 de 0,02 s (RNF04; el 5/10/2026: 56 % y 30 s); 1.000, 0 % y
+  p95 de 0,02 s; 1.500, 0 % y p95 de 0,015 s, recuperación en 0,01 s; la API no registró avisos ni errores.
+  Límites: generador y API en el mismo computador y unos 50 usuarios activos a la vez (no 1.000 simultáneos):
+  CP-017 con JMeter en staging y Gunicorn (5.2) quedan para la Fase 5.
 
 #### A-12 · 🟠 Alta · Pasar a Gunicorn romperá los OTP [N]
 - **Dónde:** `api.py:44-45` (`AlmacenOTP()` en memoria), `otp/servicio.py`.

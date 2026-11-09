@@ -89,7 +89,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.9 | A-15 | — | Decidir `autocommit` y alinear código + README — *Hecho el 08/11/2026 en una parte (`a25224d`, solo backend; no toca el esquema). Decisión del dueño: opción B, `autocommit: False` (lo que ya decía el README). Ninguna operación de los DAO tenía varios pasos (cada escritura es una sentencia con su `commit()`); la única con varios pasos en una conexión es `seed.py`, que ahora es “todo o nada”. Los DAO no cambian: sus `rollback()` ya sirven. El pool se crea con `pool_reset_session=True` explícito: al devolver la conexión se descarta lo no confirmado. README: 5.1, 5.2, 5.3 y 7.2 (pool y `commit()` sobre la conexión prestada). Regresión en `tests/test_pool.py`: 5 sin BD (inventario automático de 21 escrituras y 18 lecturas por su SQL) y 2 nuevas + 1 ajustada con MariaDB. Suite 321 (276 + 45 omitidas). Contraprueba: con el código viejo fallan 2 y pasan a propósito 3; al quitar un `commit()` a propósito, la prueba lo detecta. Opcional del dueño: las pruebas con `PETCONNECT_PRUEBA_BD=1`. No cierra NC* | 🟢 |
 | [x] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) — *Hecho el 08/11/2026 en una parte (`8668680`, solo backend; no toca el esquema). Decisión del dueño: opción A, respuesta neutra + correo de aviso al titular. Un correo con cuenta recibe lo mismo que uno nuevo (200 “Codigo enviado”) por el mismo camino: bcrypt + un correo la primera vez, nada si se repite antes de 10 min, el mismo 503 si el correo falla. Nunca crea OTP. El aviso (`enviar_aviso_cuenta_existente`, plantilla `HTML_AVISO_REGISTRO`) lleva el nombre de la cuenta y no lleva código; la memoria de avisos guarda el SHA-256 del correo. Hueco tapado: `/verify` respondía distinto sin pendiente (“No hay verificación pendiente”) que con código incorrecto; ahora un solo mensaje para sin pendiente, vencido e incorrecto. Web y móvil sin cambios. Regresión: `tests/test_registro_neutro.py` (18) + 7 pruebas viejas ajustadas. Suite 339 (294 + 45 omitidas). Contraprueba: con el `api.py` viejo dan error 52; 9 sabotajes sobre el código nuevo, todos detectados (volver al 409: fallan 11). CP-002 de la GA9 aprobado en la API. Hallazgo → 4.18 (tiempo de `/login`). Opcional del dueño: probarlo con la API real* | 🟢 |
 | [x] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos — *Hecho el 08/11/2026 en una parte (`3e814e3`, solo backend; no toca el esquema). Decisiones del dueño (las recomendadas): la consola no da la autorización por el titular (Ley 1581, art. 9; política C.6): guarda `acepta_datos = False` explícito y avisa que el titular la dará al iniciar sesión (3.5); nombre, apellidos y formato del correo como la API (sin DNS); correo repetido → “Ese correo ya tiene una cuenta”, sin repetirlo ni calcular bcrypt; contraseña dos veces con `getpass` y sin `.strip()`, por `validar_contrasena`. Módulo común nuevo `security/datos_usuario.py` (sacado de `api.py`; la consola no importa `api.py`, A-41). Regresión: `tests/test_consola_registro.py` (26). Suite 365 (320 + 45 omitidas). Contraprueba: con la consola vieja fallan 13 (registraba `PETCONNECT1!`) y pasan a propósito 13; con el `api.py` viejo falla 1. No cierra NC. Hallazgo → 4.19. Opcional del dueño: probarlo con `python main.py`* | 🟢 |
-| [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
+| [x] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) — *Hecho el 09/11/2026 (script `dde0ce0`; la medición la corrió el dueño). Decisiones del dueño: opción A, script nuevo solo de carga (`Documentacion/Evidencias-4.12-carga/carga_nc003.py`, con su `resultados.json` y `carga_nc003.log`; `pruebas_aa2.py` y su evidencia no se tocan), base temporal `petconnect_carga` (`schema.sql` + `seed.py`; si existe se detiene y al final la borra siempre), Werkzeug con hilos en el 5055 como el 5/10, pool de 10 y `JWT_SECRET` desechable (el `.env` solo para MariaDB y `FERNET_KEY`). Escenario: 3 peticiones por usuario (antes 2): productos `?pagina=1&por_pagina=50`, adopción `?pagina=1&por_pagina=12`, 1 s y la ficha de una mascota en adopción; 50 usuarios nuevos por segundo y timeout de 30 s. Revisado sin BD: `py_compile` y prueba de percentil, resumen y veredicto con datos inventados. Resultado: 500 usuarios → 1.500 peticiones, 0 % de error, p95 0,02 s (RNF04 aprobado; el 5/10: 1.000 peticiones, 56 % y 30 s); 1.000 → 3.000, 0 %, p95 0,02 s (RR01 aprobado en local); 1.500 → 4.500, 0 %, p95 0,015 s, máximo 0,066 s, recuperación en 0,01 s; la API no registró avisos ni errores. **NC-003 cerrada el 09/11/2026.** Límites: cliente y API en el mismo PC; a 50 usuarios por segundo hay unos 50 activos a la vez (no 1.000 simultáneos), así que CP-017 formal (JMeter en staging) queda para la Fase 5; Gunicorn sigue en la 5.2* | 🟡 |
 | [x] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 — *Parte 1 de 3 (API y BD) hecha el 08/11/2026 (`3c039ec`). Decisiones del dueño (las recomendadas): ruta `POST /api/auth/logout` y botones por partes (cierra la sesión en todos los aparatos: un contador por cuenta); `require_auth` rechaza con 401 las cuentas con estado distinto de `activo`; los tokens viejos sin versión no valen. Columna `usuarios.version_sesion` (migración `2026-11-08_version_sesion.sql`), token con `sub`, `ver`, `iat` y `exp` (sin correo), `require_auth` consulta la sesión en cada petición (BD caída → 503), la API no arranca sin la columna. `tests/test_sesiones.py` (26; 5 con MariaDB). Suite 395 (345 + 50 omitidas). Contraprueba: fallan las 21 nuevas sin BD. **Migración aplicada por el dueño el 09/11/2026, con respaldo (`SHOW COLUMNS`: `NOT NULL DEFAULT 0`; la API arranca).** Parte 2 de 3 (web) hecha el 08/11/2026 (`aeb6e99`): el botón “Cerrar sesión” llama a `POST /api/auth/logout` y siempre borra la sesión local (401, 503, sin red o 8 s sin respuesta); decisiones del dueño A1 (aviso `role="status"` si el servidor no confirmó) y B1 (botón desactivado, “Cerrando sesión…”); `FormularioSolicitud` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.js` (10); `npm test` 61. Contraprueba: fallan las 10 nuevas. Parte 3 de 3 (móvil) hecha el 08/11/2026 (`383beb0`): el botón “Cerrar sesión” de `ProfileScreen` llama a `POST /api/auth/logout` con límite de 8 s (`AbortController`) y siempre borra la sesión del celular; mismas reglas que la web (A1, B1); decisión del dueño para el aviso: opción A, `Alert.alert` (la pantalla Perfil desaparece al cerrar sesión: un texto no alcanzaría a verse). `FormularioSolicitud.js` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.mjs` (12); `npm test` 47; `expo export` web OK. Contraprueba: fallan las 12 nuevas y pasan las 35 de antes. **Ítem cerrado.** Opcional del dueño: probarlo con la API real (necesita la migración)* | 🟡 |
 | [x] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` — *Hecho el 09/11/2026 en una parte (`08e61ec`, solo pruebas del backend; no toca la BD ni `api.py`). Revisión con un “espía” (cambia `load_dotenv` por una función que no carga nada y cuenta las llamadas): `test_seguridad.py` lo cargaba también en la suite completa (unittest importa todos los archivos antes de correr la primera prueba y era el primero en importar `api.py`), y `test_esquema.py` corrido solo lo cargaba en `PruebasEsquemaSinBD` (`config.db_config` y `seed.py`, que pedía la `FERNET_KEY` real). Decisión del dueño: opción A, `_importar_api()` de `tests/test_errores.py`, y opción 2, arreglar también `test_esquema.py`. `test_seguridad.py`: `api = _importar_api()` al importarse (la ruta de prueba se registra ahí). `test_esquema.py`: `_importar_api()` en el `setUpClass` de `PruebasEsquemaSinBD`; los `import api` de las pruebas con BD (~297 y ~314) se dejan a propósito, con un comentario (solo corren con `PETCONNECT_PRUEBA_BD=1`, cuando el `.env` ya se leyó para conectarse a MariaDB). Regresión: `tests/test_sin_env_real.py` (2): corre cada archivo en un Python aparte con el espía y un entorno mínimo; exige 0 llamadas y 0 fallos. Suite 397 (347 + 50 omitidas); el espía sobre la suite completa: 0 llamadas (antes 1). Contraprueba con `git stash` de los dos archivos: fallan 2 de 2 (`test_seguridad`: 3 llamadas; `test_esquema`: 1 prueba se rompe sin el `.env`). No cierra NC* | 🟢 |
 | [x] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`. **Hecho el 09/11/2026 en 2 partes (solo backend; no toca el esquema).** Parte 1 (`d03871b`): `MascotaDAO` y `ProductoDAO` sin `try/except` + `print` en sus 14 métodos (dejan subir el error; los `rollback()` se quedan); hallazgo del plan: la consola también los usa y se habría cerrado con una traza, así que `vista/menu_mascotas.py` y `vista/menu_productos.py` atrapan el error en su ciclo con `vista/aviso_bd.py` (solo el número del error de MySQL, nunca el mensaje). Parte 2 (`400061f`): las 5 consultas pasan tal cual a `ProductoDAO.consultar_catalogo`/`consultar_catalogo_por_id` y `MascotaDAO.consultar_en_adopcion`/`consultar_en_adopcion_por_id`/`consultar_del_dueno` (diccionarios con los mismos alias: el JSON no cambia); `api.py` sin cursores; `_verificar_bd()` sigue para `UsuarioDAO`. Regresión: `tests/test_dao_errores.py` (9) + 1 caso en `test_sin_env_real.py`; `test_pool.py` cuenta 46 métodos (22 escrituras, 24 lecturas); `test_mascotas`, `test_endpoints` y `test_errores` sin cambios. Suite 407 (357 + 50 omitidas). Contraprueba: DAO viejos → fallan 2 (28 casos); menús viejos → 4; `api.py` viejo → 2 (3 casos). No cierra NC. Opcional del dueño: `PETCONNECT_PRUEBA_BD=1` y la consola. Hallazgo: `UsuarioDAO` y `ProveedorDAO` todavía se tragan los errores y hacen `print` → 4.21* | 🟡 |
@@ -150,9 +150,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 09/11/2026, actualizada al cerrar el 4.17 (paginación e índices en 4 partes: `ea95ed5`, `d5502a8`,
-`55fa8bf` y `a42a038`; migración aplicada por el dueño). Lo próximo es el 4.12 (repetir la prueba de carga, la
-última acción de NC-003); el 4.18, el 4.19 y el 4.21 se pueden adelantar.
+*Versión del 09/11/2026, actualizada al cerrar el 4.12 (prueba de carga: 0 % de error con 500, 1000 y 1500
+usuarios; NC-003 cerrada). Lo próximo es el 4.18 (`/login` revela cuentas por tiempo); después el 4.19 y el 4.21,
+mejor seguidos. Con el último [ ] de la Fase 4 se pregunta por el push.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -179,6 +179,22 @@ Lee primero:
   todavía: desde 240116e (4.1) en adelante.
 
 Estado conocido (9/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.12 HECHO el 09/11/2026 (NC-003 CERRADA; script dde0ce0 + commit de
+  documentación; no toca la API, el esquema ni la BD real). Opción A del
+  dueño: script nuevo Documentacion/Evidencias-4.12-carga/carga_nc003.py
+  (solo carga; todo bajo __main__: importarlo no toca la BD), base
+  temporal petconnect_carga (schema.sql + seed.py; si ya existe se
+  detiene; al final la borra siempre), Werkzeug threaded en el 5055 (el
+  mismo del 5/10), pool de 10, JWT_SECRET desechable; el .env solo para
+  MariaDB y FERNET_KEY. 3 peticiones por usuario (antes 2), 50 usuarios
+  nuevos por segundo, timeout 30 s; --usuarios para elegir escalones.
+  Resultados (los corrió el dueño): 500 → 0 % de error, p95 0,02 s (RNF04
+  OK; el 5/10: 56 % y 30 s); 1000 → 0 %, p95 0,02 s; 1500 → 0 %, p95
+  0,015 s, recuperación 0,01 s; la API no registró avisos. Límites: mismo
+  PC; a 50/s hay unos 50 usuarios activos a la vez, así que CP-017 formal
+  (JMeter en staging, 1000 simultáneos) queda para la Fase 5 y Gunicorn
+  para la 5.2. La evidencia del AA2 (pruebas_aa2.py, resultados.json) no
+  se tocó.
 - 4.17 HECHO el 09/11/2026 en 4 partes (NC-003 sigue abierta hasta el
   4.12). Decisiones del dueño
   (09/11/2026): opción A, ?pagina=&por_pagina= opcionales, 20 por defecto,
@@ -1250,36 +1266,37 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.12: repetir la prueba de carga CP-008/CP-017,
-NC-003; la última acción para cerrar NC-003):
-- Leer la fila del 4.12 en PRIORIDADES, la fila de NC-003 y de CP-017 en
-  la bitácora GA9 y el A-11 en la AUDITORÍA.
-- Ya hechos: pool de conexiones (4.5), OTP en la BD (4.6), paginación e
-  índices (4.17). La medición del 5/10/2026 (500 usuarios, local) dio p95
-  de 30 s y 56 % de errores.
-- La prueba anterior está en Documentacion/Evidencias-GA9-AA2-EV01/
-  pruebas_aa2.py (caso CP-008: 500 usuarios, rampa de 10 s, umbral p95 de
-  2 s; crea datos de prueba inventados y los borra). Revisar si sirve tal
-  cual o si hay que ajustarla a la paginación (?pagina=&por_pagina=).
-- Toca la BD real y la API con el .env: la corre el DUEÑO. Dar los
-  comandos (PowerShell 5.1, uno por bloque), con respaldo previo si la
-  prueba escribe datos, y esperar sus resultados.
-- Ojo: la API se sigue levantando con el servidor de desarrollo de Flask;
-  Gunicorn es de la Fase 5 (5.2). Decidir con el dueño si se mide así o
-  se espera, y anotar en GA9 con qué servidor se midió.
-- Si pasa (p95 ≤ 2 s y sin errores), NC-003 se cierra en GA9 ("Cerrada el
-  dd/mm/2026") y CP-017 se actualiza; si no, anotar la medición y el
-  cuello de botella.
-- Migraciones: el 09/11/2026 el dueño aplicó 2026-11-08_version_sesion.sql
-  y 2026-11-09_indices_listados.sql (con respaldo, comprobadas con SHOW)
-  y quedó confirmada 2026-11-07_otp_pendientes.sql (la API pasa su
-  revisión al arrancar). No quedan migraciones pendientes; la API arranca.
-- El 4.18, el 4.19 y el 4.21 son solo backend y se pueden adelantar si el
-  dueño quiere (el 4.19 y el 4.21 conviene hacerlos seguidos). Con el
-  último [ ] de la Fase 4 se pregunta por el push.
-- Hallazgo del 4.17 (sin ítem): el export web del móvil se sirve en el
-  puerto 8090, que no está en el CORS de api.py (5173, 8081 y 19006);
-  preguntar si se agrega o se sirve el export en el 8081.
+Contexto del próximo paso (4.18: /api/auth/login revela cuentas por
+tiempo, A-14; solo backend, no toca la BD):
+- Leer la fila del 4.18 en PRIORIDADES y el A-14 en la AUDITORÍA (el 4.10
+  ya dejó neutra la respuesta del registro).
+- En api.py, login(): `if usuario is None or not verificar_password(...)`
+  corta antes de bcrypt cuando el correo no existe (responde enseguida);
+  si existe, calcula bcrypt (COSTO_BCRYPT = 12 en security/passwords.py)
+  aunque la contraseña sea mala. La diferencia de tiempo revela si hay
+  cuenta.
+- Arreglo propuesto en la fila: sin usuario, comparar contra un hash
+  bcrypt de relleno con el mismo costo y responder el mismo 401. Revisar
+  que no cambie el camino de es_hash_heredado (SHA-256 de NC-001).
+- Prueba de regresión sin BD (modelos: tests/test_registro_neutro.py y
+  tests/test_errores.py): contar las llamadas a bcrypt con correo
+  inexistente y con correo existente + contraseña mala (deben ser
+  iguales) y que la respuesta sea idéntica. Contraprueba con el api.py
+  anterior.
+- Después: 4.19 (consola, "Actualizar usuario" sin validar) y 4.21
+  (UsuarioDAO/ProveedorDAO se tragan los errores de la BD), seguidos.
+  Con el último [ ] de la Fase 4 se pregunta por el push (uno solo,
+  nunca --force).
+- Pendientes sin ítem: el móvil borra la sesión ante cualquier error de
+  /auth/me (preguntar si se anota como 4.20); el export web del móvil en
+  el 8090 no está en el CORS de api.py (5173, 8081 y 19006); el aviso
+  rojo de validación no se borra al corregir el campo. Decisión D.7 de
+  la política: del dueño.
+- Migraciones: no queda ninguna pendiente (las del 07, 08 y 09/11/2026
+  están aplicadas con respaldo); la API arranca.
+- Para la Fase 5 (anotado en el 4.12): CP-017 formal con JMeter en
+  staging (1000 usuarios simultáneos, generador en otra máquina) y
+  Gunicorn (5.2).
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -1318,4 +1335,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.12 (repetir la prueba de carga CP-008/CP-017)**: la última acción de NC-003. Ya están el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17, hecho el 09/11/2026 en 4 partes: `ea95ed5`, `d5502a8`, `55fa8bf`, `a42a038`). La prueba anterior es `Documentacion/Evidencias-GA9-AA2-EV01/pruebas_aa2.py` (500 usuarios, p95 ≤ 2 s); usa la BD y el `.env`, así que la corre el dueño. La API sigue con el servidor de desarrollo de Flask (Gunicorn es la 5.2): decidir si se mide así. La parte 1 (índices) quedó hecha el 09/11/2026 (`ea95ed5`); su migración `2026-11-09_indices_listados.sql` ya está aplicada (09/11/2026). El 4.15 y el 4.16 quedaron hechos el 09/11/2026 (`d03871b`, `400061f`, `4b5d18e`). El 4.18 (`/login` revela cuentas por tiempo) y el 4.19 (consola: “Actualizar usuario” sin validar) son solo backend y se pueden adelantar. El 4.21 (`UsuarioDAO`/`ProveedorDAO` todavía se tragan los errores de la BD) es solo backend y conviene hacerlo junto al 4.19. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** la decisión D.7 de la política. Las migraciones del 07, 08 y 09/11/2026 ya están aplicadas (09/11/2026, con respaldo) y la API arranca. NC-003 sigue abierta hasta la medición del 4.12.
+**Próximo ítem: 4.18 (`/api/auth/login` revela cuentas por tiempo, A-14)**: solo backend. Sin usuario, comparar contra un hash bcrypt de relleno con el mismo costo, responder el mismo 401 y una prueba que cuente las llamadas a bcrypt en los dos casos. Después el 4.19 (consola: “Actualizar usuario” sin validar) y el 4.21 (`UsuarioDAO`/`ProveedorDAO` se tragan los errores de la BD), mejor seguidos. El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** la decisión D.7 de la política. Al cerrar el último [ ] de la Fase 4 se pregunta por el push.

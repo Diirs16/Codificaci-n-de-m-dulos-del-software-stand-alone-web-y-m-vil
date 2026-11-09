@@ -1,0 +1,265 @@
+{
+  "item": "4.12",
+  "no_conformidad": "NC-003",
+  "casos": [
+    "CP-008",
+    "CP-017"
+  ],
+  "estado": "completo",
+  "ambiente": {
+    "fecha": "09/11/2026",
+    "inicio": "13:04:34",
+    "python": "3.14.0",
+    "sistema": "Windows-11-10.0.26200-SP0",
+    "cpus": 12,
+    "servidor": "Werkzeug con un hilo por petición, puerto 5055",
+    "pool_conexiones": 10,
+    "base": "petconnect_carga (temporal, schema.sql + seed.py)",
+    "bd_version": "10.4.32-MariaDB",
+    "fin": "13:06:11"
+  },
+  "escenario": {
+    "peticiones_por_usuario": 3,
+    "nota": "El 5/10/2026 eran 2 peticiones por usuario (catálogo completo y detalle de una mascota).",
+    "pasos": [
+      "GET /api/productos?pagina=1&por_pagina=50",
+      "GET /api/mascotas/adopcion?pagina=1&por_pagina=12",
+      "espera 1 s",
+      "GET /api/mascotas/{id} (mascota en adopción al azar)"
+    ],
+    "usuarios_nuevos_por_segundo": 50,
+    "timeout_s": 30,
+    "escalones": [
+      500,
+      1000,
+      1500
+    ]
+  },
+  "criterios": {
+    "500": {
+      "nombre": "RNF04 (carga normal)",
+      "umbral_p95_s": 2.0,
+      "error_max_pct": 1.0
+    },
+    "1000": {
+      "nombre": "RR01 (carga pico)",
+      "umbral_p95_s": 5.0,
+      "error_max_pct": 1.0
+    },
+    "1500": {
+      "nombre": "RR01 (estrés: solo recuperación)",
+      "recuperacion_max_s": 300
+    }
+  },
+  "escalones": [
+    {
+      "usuarios": 500,
+      "solicitudes": 1500,
+      "exitosas": 1500,
+      "tasa_error_pct": 0.0,
+      "p50_s": 0.004,
+      "p95_s": 0.02,
+      "p99_s": 0.028,
+      "max_s": 0.031,
+      "promedio_s": 0.006,
+      "duracion_s": 11.0,
+      "rendimiento_rps": 136.2,
+      "por_accion": {
+        "productos": {
+          "solicitudes": 500,
+          "exitosas": 500,
+          "p50_s": 0.004,
+          "p95_s": 0.019,
+          "p99_s": 0.029,
+          "max_s": 0.031,
+          "promedio_s": 0.006
+        },
+        "adopcion": {
+          "solicitudes": 500,
+          "exitosas": 500,
+          "p50_s": 0.005,
+          "p95_s": 0.024,
+          "p99_s": 0.028,
+          "max_s": 0.029,
+          "promedio_s": 0.007
+        },
+        "detalle_mascota": {
+          "solicitudes": 500,
+          "exitosas": 500,
+          "p50_s": 0.004,
+          "p95_s": 0.007,
+          "p99_s": 0.026,
+          "max_s": 0.029,
+          "promedio_s": 0.005
+        }
+      },
+      "errores": {},
+      "errores_5xx": {},
+      "recuperacion_s": 0.0,
+      "intentos_recuperacion": 1,
+      "avisos_servidor": {},
+      "veredicto": {
+        "criterio": "RNF04 (carga normal)",
+        "resultado": "Aprobado",
+        "verificaciones": [
+          {
+            "descripcion": "p95 de cada acción ≤ 2.0 s",
+            "ok": true,
+            "obtenido": "peor p95 = 0.024 s (adopcion)"
+          },
+          {
+            "descripcion": "Tasa de error < 1.0 %",
+            "ok": true,
+            "obtenido": "0.0 % {}"
+          }
+        ]
+      }
+    },
+    {
+      "usuarios": 1000,
+      "solicitudes": 3000,
+      "exitosas": 3000,
+      "tasa_error_pct": 0.0,
+      "p50_s": 0.005,
+      "p95_s": 0.02,
+      "p99_s": 0.03,
+      "max_s": 0.053,
+      "promedio_s": 0.007,
+      "duracion_s": 21.0,
+      "rendimiento_rps": 142.9,
+      "por_accion": {
+        "productos": {
+          "solicitudes": 1000,
+          "exitosas": 1000,
+          "p50_s": 0.005,
+          "p95_s": 0.019,
+          "p99_s": 0.03,
+          "max_s": 0.045,
+          "promedio_s": 0.007
+        },
+        "adopcion": {
+          "solicitudes": 1000,
+          "exitosas": 1000,
+          "p50_s": 0.006,
+          "p95_s": 0.022,
+          "p99_s": 0.03,
+          "max_s": 0.042,
+          "promedio_s": 0.008
+        },
+        "detalle_mascota": {
+          "solicitudes": 1000,
+          "exitosas": 1000,
+          "p50_s": 0.005,
+          "p95_s": 0.016,
+          "p99_s": 0.03,
+          "max_s": 0.053,
+          "promedio_s": 0.007
+        }
+      },
+      "errores": {},
+      "errores_5xx": {},
+      "recuperacion_s": 0.01,
+      "intentos_recuperacion": 1,
+      "avisos_servidor": {},
+      "veredicto": {
+        "criterio": "RR01 (carga pico)",
+        "resultado": "Aprobado",
+        "verificaciones": [
+          {
+            "descripcion": "p95 de cada acción ≤ 5.0 s",
+            "ok": true,
+            "obtenido": "peor p95 = 0.022 s (adopcion)"
+          },
+          {
+            "descripcion": "Tasa de error < 1.0 %",
+            "ok": true,
+            "obtenido": "0.0 % {}"
+          }
+        ]
+      }
+    },
+    {
+      "usuarios": 1500,
+      "solicitudes": 4500,
+      "exitosas": 4500,
+      "tasa_error_pct": 0.0,
+      "p50_s": 0.005,
+      "p95_s": 0.015,
+      "p99_s": 0.029,
+      "max_s": 0.066,
+      "promedio_s": 0.006,
+      "duracion_s": 31.1,
+      "rendimiento_rps": 144.9,
+      "por_accion": {
+        "productos": {
+          "solicitudes": 1500,
+          "exitosas": 1500,
+          "p50_s": 0.005,
+          "p95_s": 0.018,
+          "p99_s": 0.031,
+          "max_s": 0.066,
+          "promedio_s": 0.006
+        },
+        "adopcion": {
+          "solicitudes": 1500,
+          "exitosas": 1500,
+          "p50_s": 0.005,
+          "p95_s": 0.014,
+          "p99_s": 0.029,
+          "max_s": 0.05,
+          "promedio_s": 0.006
+        },
+        "detalle_mascota": {
+          "solicitudes": 1500,
+          "exitosas": 1500,
+          "p50_s": 0.005,
+          "p95_s": 0.014,
+          "p99_s": 0.028,
+          "max_s": 0.064,
+          "promedio_s": 0.006
+        }
+      },
+      "errores": {},
+      "errores_5xx": {},
+      "recuperacion_s": 0.01,
+      "intentos_recuperacion": 1,
+      "avisos_servidor": {},
+      "veredicto": {
+        "criterio": "RR01 (estrés: solo recuperación)",
+        "resultado": "Aprobado",
+        "verificaciones": [
+          {
+            "descripcion": "Vuelve a responder 200 en ≤ 300 s",
+            "ok": true,
+            "obtenido": "0.01 s"
+          }
+        ]
+      }
+    }
+  ],
+  "medicion_anterior_5_10_2026": {
+    "fecha": "05/10/2026",
+    "usuarios": 500,
+    "peticiones_por_usuario": 2,
+    "escenario": "GET /api/productos (catálogo completo), espera 1 s, GET /api/mascotas/{id}",
+    "servidor": "Werkzeug threaded, puerto 5055, una sola conexión compartida",
+    "solicitudes": 1000,
+    "exitosas": 440,
+    "tasa_error_pct": 56.0,
+    "p50_s": 0.103,
+    "p95_s": 30.016,
+    "max_s": 30.04,
+    "rendimiento_rps": 14.2,
+    "errores": {
+      "TimeoutError": 396,
+      "500": 161,
+      "404": 3
+    }
+  },
+  "limitaciones": [
+    "El generador de carga y la API corren en el mismo computador: compiten por la CPU, así que los tiempos son una cota pesimista y no reemplazan CP-017 en staging con JMeter (Fase 5).",
+    "Servidor de desarrollo Werkzeug con un hilo por petición (el mismo del 5/10/2026); Gunicorn es el ítem 5.2.",
+    "Base temporal con los datos de seed.py (12 productos y 6 mascotas), no con el volumen de producción.",
+    "Escenario de solo lectura (catálogo, adopción y ficha); el registro y el login no se cargan aquí."
+  ]
+}
