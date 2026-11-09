@@ -5,7 +5,7 @@ los otros archivos de tests/ no se repite aqui.
 
 - Inventario de rutas: la lista de rutas de la API es la esperada, cada una nombra
   el archivo de pruebas que la cubre y toda ruta privada responde 401 sin token.
-- Productos: lista y detalle (el SQL de la lista filtra activo = TRUE).
+- Productos: lista y detalle (los dos filtran activo = TRUE; el detalle desde el 4.16).
 - Lista de adopcion: el SQL filtra estado = 'en_adopcion' sin MariaDB (NC-009).
 - GET /api/auth/me con el token real de generate_token (NC-008).
 - Login: campos vacios, correo inexistente igual que contrasena mala (no revela
@@ -271,8 +271,23 @@ class PruebasProductos(_BaseEndpoints):
         self.assertEqual(r.status_code, 404)
         self.assertEqual(r.get_json(), {"error": "Producto no encontrado"})
 
-    # Pendiente 4.16: el detalle NO filtra activo = TRUE (un producto descontinuado se
-    # ve si se escribe su URL). Cuando se corrija, agregar aqui su prueba de 404.
+    # Item 4.16: antes el detalle no filtraba activo = TRUE y un producto descontinuado
+    # se veia (y se podia agregar al carrito) escribiendo su URL.
+    def test_el_detalle_solo_trae_productos_activos(self):
+        self.cliente.get(f"/api/productos/{ID_PRODUCTO}")
+        sql, params = self._sql_y_parametros()
+        self.assertIn("WHERE p.id_producto = %s AND p.activo = TRUE", sql)
+        self.assertEqual(params, (ID_PRODUCTO,))
+
+    def test_producto_descontinuado_responde_el_mismo_404(self):
+        # Doble barrera: la BD simulada devuelve la fila aunque el SQL la filtraria
+        for activo in (0, False):
+            with self.subTest(activo=activo):
+                self.cursor.fetchone.return_value = {**_producto(), "activo": activo}
+                r = self.cliente.get(f"/api/productos/{ID_PRODUCTO}")
+                self.assertEqual(r.status_code, 404)
+                self.assertEqual(r.get_json(), {"error": "Producto no encontrado"})
+                self.assertNotIn("Collar de prueba", r.get_data(as_text=True))
 
 
 # ---------------------------------------------------------------------------

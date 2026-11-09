@@ -76,8 +76,10 @@ class ProductoDAO:
                COALESCE(c.nombre, CONCAT('Categoria ', p.id_categoria_producto)) AS category
         FROM productos p
         LEFT JOIN categorias_producto c ON p.id_categoria_producto = c.id_categoria_producto
-        WHERE p.id_producto = %s
+        WHERE p.id_producto = %s AND p.activo = TRUE
     """
+    # Item 4.16: el detalle tambien filtra activo = TRUE. Antes un producto
+    # descontinuado se veia (y se podia agregar al carrito) escribiendo su URL.
 
     def __init__(self):
         self._conexion_bd = ConexionBD()

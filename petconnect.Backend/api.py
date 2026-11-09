@@ -396,7 +396,9 @@ def get_productos():
 @app.route("/api/productos/<int:id_producto>", methods=["GET"])
 def get_producto(id_producto):
     row = ProductoDAO().consultar_catalogo_por_id(id_producto)
-    if row is None:
+    # Item 4.16, doble barrera: el SQL ya filtra activo = TRUE y aqui se vuelve a
+    # revisar. Un producto descontinuado responde como si no existiera.
+    if row is None or not row.get("activo"):
         return jsonify({"error": "Producto no encontrado"}), 404
     return jsonify(_row_to_dict(row))
 
