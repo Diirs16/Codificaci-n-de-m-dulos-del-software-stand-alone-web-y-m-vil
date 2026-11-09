@@ -31,6 +31,12 @@ y modo estricto) y NC-010 (fechas de vacunas).
 - A-03 (item 4.13): PruebasEsquemaSinBD y PruebasMigracionSesionSinBD revisan la
   columna usuarios.version_sesion y su migracion del 08/11/2026. La migracion en una
   base vieja y el cierre de sesion con MariaDB se prueban en tests/test_sesiones.py.
+- NC-003 (item 4.17): PruebasEsquemaSinBD y PruebasMigracionIndicesSinBD revisan los
+  indices de los listados (mascotas.estado, productos.activo y proveedores_servicio
+  ciudad/activo/nombre) y su migracion del 09/11/2026. PruebasMigracionIndicesEnBD
+  (PETCONNECT_PRUEBA_BD=1) quita los indices en "petconnect_prueba_indices" (base vieja),
+  aplica la migracion dos veces, revisa que las consultas de los DAO puedan usarlos
+  y borra esa base al final.
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -v
@@ -59,6 +65,21 @@ RUTA_MIGRACION_SOLICITUDES = os.path.join(RAIZ, "sql", "migraciones", "2026-11-0
 BD_PRUEBA_SOLICITUDES = "petconnect_prueba_solicitudes"
 RUTA_MIGRACION_OTP = os.path.join(RAIZ, "sql", "migraciones", "2026-11-07_otp_pendientes.sql")
 RUTA_MIGRACION_SESION = os.path.join(RAIZ, "sql", "migraciones", "2026-11-08_version_sesion.sql")
+RUTA_MIGRACION_INDICES = os.path.join(RAIZ, "sql", "migraciones", "2026-11-09_indices_listados.sql")
+BD_PRUEBA_INDICES = "petconnect_prueba_indices"
+
+# Item 4.17 (NC-003): (tabla, indice, columnas en orden). Iguales en schema.sql y en la
+# migracion. Las columnas siguen el WHERE (y el ORDER BY) de la consulta que atienden.
+INDICES_LISTADOS = (
+    ("mascotas", "idx_mascotas_estado", ("estado",)),
+    ("productos", "idx_productos_activo", ("activo",)),
+    ("proveedores_servicio", "idx_proveedores_ciudad", ("ciudad", "activo", "nombre")),
+)
+
+
+def _columnas_sql(columnas):
+    """('ciudad', 'activo') -> '`ciudad`,`activo`' (como las escribe schema.sql)."""
+    return ",".join(f"`{c}`" for c in columnas)
 
 # Item 4.13 (A-03): igual en schema.sql y en la migracion. Empieza en 0, que es la
 # version con que /api/auth/verify firma el token de una cuenta nueva.
@@ -160,6 +181,13 @@ class PruebasEsquemaSinBD(unittest.TestCase):
         """Item 4.13: sin NULL (require_auth la compara) y 0 al crear la cuenta."""
         lineas = [l.strip().rstrip(",") for l in _bloque_tabla(self.sql, "usuarios").splitlines()]
         self.assertIn(COLUMNA_VERSION_SESION, lineas)
+
+    def test_los_listados_tienen_sus_indices(self):
+        """NC-003 (item 4.17): antes la base revisaba la tabla entera en cada listado."""
+        for tabla, indice, columnas in INDICES_LISTADOS:
+            with self.subTest(indice=indice):
+                self.assertIn(f"KEY `{indice}` ({_columnas_sql(columnas)})",
+                              _bloque_tabla(self.sql, tabla))
 
     def test_tiene_las_34_tablas(self):
         # 32 hasta el 07/11/2026, + solicitudes (item 3.6) + otp_pendientes (item 4.6)
@@ -1112,6 +1140,134 @@ class PruebasMigracionSesionSinBD(unittest.TestCase):
         self.assertEqual(alter, "ALTER TABLE `usuarios` ADD COLUMN IF NOT EXISTS "
                                 f"{COLUMNA_VERSION_SESION} AFTER `estado`")
         self.assertNotRegex(alter, r"(DROP|DELETE|UPDATE|INSERT|TRUNCATE)")
+
+
+class PruebasMigracionIndicesSinBD(unittest.TestCase):
+    """NC-003 (item 4.17): la migracion del 09/11/2026 crea los mismos indices que schema.sql."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sentencias = _sentencias(_leer(RUTA_MIGRACION_INDICES))
+
+    def test_nunca_apaga_el_modo_estricto(self):
+        self.assertTrue(self.sentencias[0].startswith("SET SESSION sql_mode"))
+        self.assertIn("STRICT_TRANS_TABLES", self.sentencias[0])
+
+    def test_solo_crea_los_indices_y_se_puede_repetir(self):
+        """No borra ni cambia datos: se puede correr en la BD del dueno sin riesgo."""
+        esperadas = [f"CREATE INDEX IF NOT EXISTS `{indice}` ON `{tabla}` ({_columnas_sql(columnas)})"
+                     for tabla, indice, columnas in INDICES_LISTADOS]
+        self.assertEqual([" ".join(s.split()) for s in self.sentencias[1:]], esperadas)
+        for sentencia in self.sentencias:
+            self.assertNotRegex(sentencia, r"\b(DROP|ALTER|DELETE|UPDATE|INSERT|TRUNCATE)\b")
+
+
+@unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",
+                     "Prueba con MariaDB real: activar con PETCONNECT_PRUEBA_BD=1")
+class PruebasMigracionIndicesEnBD(unittest.TestCase):
+    """NC-003 (item 4.17): en una base sin los indices, la migracion los crea, no toca las
+    filas, se puede correr dos veces y las consultas de los DAO pueden usarlos."""
+
+    @classmethod
+    def setUpClass(cls):
+        import mysql.connector
+        from config.db_config import DB_CONFIG
+
+        servidor = {k: v for k, v in DB_CONFIG.items() if k not in ("database", "sql_mode")}
+        try:
+            cls.conn = mysql.connector.connect(**servidor)
+        except mysql.connector.Error:
+            raise unittest.SkipTest("No hay conexion con MariaDB")
+        cls.conn.autocommit = True
+
+        cursor = cls.conn.cursor()
+        # Nombre constante del archivo: los identificadores no van como parametro.
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_INDICES}`")
+        cursor.execute(f"CREATE DATABASE `{BD_PRUEBA_INDICES}` "
+                       "CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci")
+        cls.addClassCleanup(cls._borrar_bd_prueba)
+        cursor.execute(f"USE `{BD_PRUEBA_INDICES}`")
+        for sentencia in _sentencias(_leer(RUTA_ESQUEMA)):
+            cursor.execute(sentencia)
+        # Base "vieja": la misma estructura, pero sin los indices del 4.17
+        for tabla, indice, _ in INDICES_LISTADOS:
+            cursor.execute(f"DROP INDEX `{indice}` ON `{tabla}`")
+        # Filas inventadas (sin datos de personas). Sin claves foraneas: solo importan
+        # las columnas de los indices. Varias filas para que el optimizador no trate la
+        # tabla como una constante.
+        cursor.execute("SET SESSION foreign_key_checks = 0")
+        for i in range(1, 6):
+            cursor.execute("INSERT INTO mascotas (id_usuario, nombre, especie, estado) "
+                           "VALUES (%s, %s, %s, %s)",
+                           (1, f"Mascota {i}", "perro", "en_adopcion" if i % 2 else "activa"))
+            cursor.execute("INSERT INTO productos (id_categoria_producto, nombre, precio, activo) "
+                           "VALUES (%s, %s, %s, %s)", (1, f"Producto {i}", 1000, i % 2))
+            cursor.execute("INSERT INTO proveedores_servicio (nombre, ciudad, activo) "
+                           "VALUES (%s, %s, %s)",
+                           (f"Proveedor {i}", "Ciudad A" if i % 2 else "Ciudad B", 1))
+        cursor.close()
+
+    @classmethod
+    def _borrar_bd_prueba(cls):
+        cursor = cls.conn.cursor()
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_INDICES}`")
+        cursor.close()
+        cls.conn.close()
+
+    @staticmethod
+    def _indices(cursor, tabla):
+        """{nombre del indice: (columnas en orden)} de una tabla."""
+        cursor.execute(f"SHOW INDEX FROM `{tabla}`")
+        nombres = [d[0] for d in cursor.description]
+        filas = [dict(zip(nombres, fila)) for fila in cursor.fetchall()]
+        indices = {}
+        for dato in sorted(filas, key=lambda d: d["Seq_in_index"]):
+            indices[dato["Key_name"]] = indices.get(dato["Key_name"], ()) + (dato["Column_name"],)
+        return indices
+
+    @staticmethod
+    def _contar_filas(cursor):
+        cuentas = []
+        for tabla, _, _ in INDICES_LISTADOS:
+            cursor.execute(f"SELECT COUNT(*) FROM `{tabla}`")
+            cuentas.append(cursor.fetchone()[0])
+        return cuentas
+
+    def test_crea_los_indices_sin_tocar_las_filas_y_se_puede_repetir(self):
+        cursor = self.conn.cursor()
+        antes = self._contar_filas(cursor)
+        for tabla, indice, _ in INDICES_LISTADOS:
+            self.assertNotIn(indice, self._indices(cursor, tabla))     # base vieja de verdad
+        for _ in range(2):
+            for sentencia in _sentencias(_leer(RUTA_MIGRACION_INDICES)):
+                cursor.execute(sentencia)
+        for tabla, indice, columnas in INDICES_LISTADOS:
+            with self.subTest(indice=indice):
+                self.assertEqual(self._indices(cursor, tabla).get(indice), columnas)
+        self.assertEqual(self._contar_filas(cursor), antes)
+        cursor.close()
+
+    def test_las_consultas_de_los_dao_pueden_usar_los_indices(self):
+        """EXPLAIN dice en possible_keys que indices sirven a cada consulta (con pocas filas
+        la base puede preferir leer la tabla entera, por eso no se exige el indice elegido)."""
+        from dao.mascota_dao import MascotaDAO
+        from dao.producto_dao import ProductoDAO
+        from dao.proveedor_dao import ProveedorDAO
+
+        cursor = self.conn.cursor(dictionary=True)
+        for sentencia in _sentencias(_leer(RUTA_MIGRACION_INDICES)):
+            cursor.execute(sentencia)
+        consultas = (
+            ("idx_mascotas_estado", MascotaDAO._EN_ADOPCION, ()),
+            ("idx_productos_activo", ProductoDAO._CATALOGO, ()),
+            ("idx_proveedores_ciudad", ProveedorDAO._CONSULTAR_POR_CIUDAD, ("Ciudad A",)),
+        )
+        for indice, sql, params in consultas:
+            with self.subTest(indice=indice):
+                cursor.execute("EXPLAIN " + sql, params)
+                posibles = " ".join(str(fila.get("possible_keys") or "") for fila in cursor.fetchall())
+                self.assertIn(indice, posibles)
+        cursor.close()
 
 
 @unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",

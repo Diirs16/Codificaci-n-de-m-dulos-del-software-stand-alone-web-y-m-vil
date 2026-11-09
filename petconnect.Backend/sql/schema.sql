@@ -139,6 +139,8 @@ CREATE TABLE IF NOT EXISTS `categorias_producto` (
   UNIQUE KEY `nombre` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
+-- NC-003 (item 4.17): idx_productos_activo sirve al catalogo de la API
+-- (WHERE activo = TRUE ORDER BY id_producto).
 CREATE TABLE IF NOT EXISTS `productos` (
   `id_producto` int(11) NOT NULL AUTO_INCREMENT,
   `id_categoria_producto` int(11) NOT NULL,
@@ -150,6 +152,7 @@ CREATE TABLE IF NOT EXISTS `productos` (
   `activo` tinyint(1) DEFAULT 1,
   PRIMARY KEY (`id_producto`),
   KEY `fk_producto_categoria` (`id_categoria_producto`),
+  KEY `idx_productos_activo` (`activo`),
   CONSTRAINT `fk_producto_categoria` FOREIGN KEY (`id_categoria_producto`) REFERENCES `categorias_producto` (`id_categoria_producto`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
@@ -229,6 +232,8 @@ CREATE TABLE IF NOT EXISTS `pagos` (
 
 -- NC-009: se agrega 'en_adopcion' al enum de estado. Antes no existia
 -- y MariaDB, en modo no estricto, guardaba el estado vacio.
+-- NC-003 (item 4.17): idx_mascotas_estado sirve al listado de adopcion
+-- (WHERE estado = 'en_adopcion' ORDER BY id_mascota).
 CREATE TABLE IF NOT EXISTS `mascotas` (
   `id_mascota` int(11) NOT NULL AUTO_INCREMENT,
   `id_usuario` int(11) NOT NULL,
@@ -246,6 +251,7 @@ CREATE TABLE IF NOT EXISTS `mascotas` (
   `fecha_registro` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id_mascota`),
   KEY `fk_mascota_usuario` (`id_usuario`),
+  KEY `idx_mascotas_estado` (`estado`),
   CONSTRAINT `fk_mascota_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
@@ -421,6 +427,10 @@ CREATE TABLE IF NOT EXISTS `categorias_servicio` (
   UNIQUE KEY `nombre` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
+-- NC-003 (item 4.17): idx_proveedores_ciudad sirve a la busqueda por
+-- ciudad de la consola (WHERE ciudad = ? AND activo = TRUE ORDER BY
+-- nombre). La busqueda por nombre usa LIKE '%texto%', que no puede usar
+-- un indice normal.
 CREATE TABLE IF NOT EXISTS `proveedores_servicio` (
   `id_proveedor` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(120) NOT NULL,
@@ -436,7 +446,8 @@ CREATE TABLE IF NOT EXISTS `proveedores_servicio` (
   `latitud` decimal(10,7) DEFAULT NULL,
   `longitud` decimal(10,7) DEFAULT NULL,
   `activo` tinyint(1) DEFAULT 1,
-  PRIMARY KEY (`id_proveedor`)
+  PRIMARY KEY (`id_proveedor`),
+  KEY `idx_proveedores_ciudad` (`ciudad`,`activo`,`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 CREATE TABLE IF NOT EXISTS `servicios` (

@@ -2,7 +2,7 @@
 
 | Archivo | Qué hace |
 |---|---|
-| `schema.sql` | Crea las 33 tablas y los catálogos fijos (roles y planes). **Solo estructura, sin datos personales.** |
+| `schema.sql` | Crea las 34 tablas y los catálogos fijos (roles y planes). **Solo estructura, sin datos personales.** |
 | `../seed.py` | Inserta datos de ejemplo: categorías, 12 productos, una cuenta ficticia de refugio y 6 mascotas en adopción. |
 
 Motor probado: **MariaDB 10.4.32** (XAMPP) en el puerto **3310**. También sirve en MySQL 8.0.16 o superior
@@ -236,6 +236,42 @@ mysql -u root -p -P 3310 petconnect -e "SELECT version_sesion, COUNT(*) AS cuent
 
 Los tokens emitidos antes de este cambio (llevaban el correo y no traen versión) dejan de valer: cada persona inicia
 sesión una vez más (decisión del dueño, 08/11/2026).
+
+## ¿Ya tenías la base creada antes del ítem 4.17? (índices de los listados, NC-003)
+
+Desde el ítem 4.17, tres tablas tienen un índice para que la base no las revise enteras en cada listado. Un
+*índice* funciona como el índice de un libro: la base salta directo a las filas que necesita.
+
+| Índice | Tabla y columnas | A qué consulta sirve |
+|---|---|---|
+| `idx_mascotas_estado` | `mascotas (estado)` | Listado de adopción de la API (`estado = 'en_adopcion'`) |
+| `idx_productos_activo` | `productos (activo)` | Catálogo de productos de la API (`activo = TRUE`) |
+| `idx_proveedores_ciudad` | `proveedores_servicio (ciudad, activo, nombre)` | Búsqueda de proveedores por ciudad (consola) |
+
+La búsqueda de proveedores **por nombre** usa `LIKE '%texto%'`, que no puede usar un índice normal; por eso no lleva
+uno. Con pocas filas la base puede seguir leyendo la tabla entera (es igual de rápido); la diferencia se nota cuando
+las tablas crecen.
+
+La migración `migraciones/2026-11-09_indices_listados.sql` solo crea esos tres índices: no cambia ni borra ningún
+dato ni ninguna columna y se puede ejecutar varias veces. Usa `CREATE INDEX IF NOT EXISTS`, que existe en MariaDB
+pero no en MySQL. Sin los índices la API funciona igual, así que se puede aplicar antes o después de arrancarla.
+Desde la carpeta `petconnect.Backend`, con un respaldo nuevo como el del paso 1 de arriba:
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "source sql/migraciones/2026-11-09_indices_listados.sql"
+```
+
+**Comprobar** (solo muestra la estructura, no datos):
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SHOW INDEX FROM mascotas WHERE Key_name = 'idx_mascotas_estado'"
+```
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "SHOW INDEX FROM proveedores_servicio WHERE Key_name = 'idx_proveedores_ciudad'"
+```
+
+El segundo debe mostrar 3 filas: `ciudad`, `activo` y `nombre`, en ese orden (columna `Seq_in_index` 1, 2 y 3).
 
 ## Prueba automática
 
