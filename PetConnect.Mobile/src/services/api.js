@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { errorDeApi, cuerpoLogin, cuerpoSolicitudAdopcion, cuerpoMensajeContacto } from "../utils/peticiones";
+import { conLimiteDeTiempo } from "../utils/sesion";
 
 /**
  * URL base de la API PetConnect (mismo backend Flask que usan el módulo
@@ -95,6 +96,14 @@ export function verifyLoginCode(email, code) {
 
 export function getPerfil() {
   return apiFetch("/auth/me");
+}
+
+// Ítem 4.13 (A-03): cierra la sesión EN LA API. La API suma 1 a version_sesion y así
+// el token deja de valer en todos los aparatos de la cuenta (200). Si el token ya no
+// valía responde 401. Se rinde a los TIEMPO_CIERRE_MS (8 s; error sin status, como sin
+// red) para que nadie quede esperando: utils/sesion.js borra la sesión local igual.
+export function cerrarSesionEnServidor() {
+  return conLimiteDeTiempo((signal) => apiFetch("/auth/logout", { method: "POST", signal }));
 }
 
 // --- Solicitudes (ítem 3.6 parte 3, A-21) ---

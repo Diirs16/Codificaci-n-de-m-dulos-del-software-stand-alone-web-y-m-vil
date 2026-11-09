@@ -4,8 +4,10 @@ import {
   getToken,
   saveToken,
   clearToken,
+  cerrarSesionEnServidor,
   verifyLoginCode as apiVerifyLoginCode,
 } from "../services/api";
+import { cerrarSesion } from "../utils/sesion";
 
 const AuthContext = createContext(null);
 
@@ -54,10 +56,23 @@ export function AuthProvider({ children }) {
     setPendingLoginEmail(null);
   }
 
-  async function logout() {
+  // Solo borra la sesión de este celular (sin llamar a la API). Se usa cuando la API
+  // ya dijo que el token no vale (401), p. ej. en FormularioSolicitud.js.
+  async function cerrarSesionLocal() {
     await clearToken();
     setUser(null);
     setPendingLoginEmail(null);
+  }
+
+  // Ítem 4.13 (A-03): botón "Cerrar sesión". Cierra en la API (todos los aparatos) y
+  // siempre en este celular. Devuelve "cerrada", "ya-cerrada" o "sin-confirmar"
+  // (ver utils/sesion.js); con "sin-confirmar" ProfileScreen muestra un aviso.
+  function logout() {
+    return cerrarSesion({
+      leerToken: getToken,
+      cerrarEnServidor: cerrarSesionEnServidor,
+      borrarLocal: cerrarSesionLocal,
+    });
   }
 
   return (
@@ -71,6 +86,7 @@ export function AuthProvider({ children }) {
         verificarLogin,
         cancelarLogin,
         logout,
+        cerrarSesionLocal,
       }}
     >
       {children}

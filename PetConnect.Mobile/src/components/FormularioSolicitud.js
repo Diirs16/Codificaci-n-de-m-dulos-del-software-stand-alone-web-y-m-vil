@@ -25,7 +25,7 @@ const ERROR_GENERICO = "No pudimos enviar. Revisa tu conexión e inténtalo de n
  * onCerrar (opcional: muestra el botón "Cerrar").
  */
 export default function FormularioSolicitud({ tipo, mascota, onCerrar }) {
-  const { user, logout } = useAuth();
+  const { user, cerrarSesionLocal } = useAuth();
   const navigation = useNavigation();
   const esAdopcion = tipo === "adopcion";
 
@@ -84,7 +84,9 @@ export default function FormularioSolicitud({ tipo, mascota, onCerrar }) {
   async function volverAIniciarSesion() {
     setError("");
     setVolverAEntrar(false);
-    await logout();
+    // Ítem 4.13: la API ya dijo que este token no vale (401) o pide la autorización
+    // (403): solo se borra la sesión del celular, sin pedirle a la API que la cierre.
+    await cerrarSesionLocal();
     iniciarSesion();
   }
 
