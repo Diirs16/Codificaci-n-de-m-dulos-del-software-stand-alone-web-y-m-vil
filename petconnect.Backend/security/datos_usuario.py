@@ -11,9 +11,14 @@ las contrasenas desde el 4.1).
   virgulilla) separadas por espacios; nada de numeros, URL ni HTML.
 - validar_formato_correo: formato y largo maximo. NO consulta el DNS: esa parte
   (registros MX) sigue en api.py, porque necesita red y solo la usa la API.
+- validar_telefono: item 4.19. Es la regla de las solicitudes de adopcion (3.6),
+  que antes vivia en api.py; ahora la usa tambien la consola al registrar y al
+  actualizar un usuario.
 
-Cada funcion devuelve el mensaje de error (sin tildes, como el resto de la API)
-o None si el dato sirve. Los mensajes nunca repiten el dato recibido (Ley 1581).
+Cada funcion devuelve el mensaje de error o None si el dato sirve. Los mensajes
+de nombre y correo van sin tildes, como el resto de la API; el del telefono las
+lleva porque la web y el movil lo muestran tal cual desde el 3.6. Los mensajes
+nunca repiten el dato recibido (Ley 1581).
 """
 import re
 
@@ -26,6 +31,10 @@ NOMBRE_MIN, NOMBRE_MAX = 2, 60
 
 _EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 CORREO_MAX = 120     # como usuarios.correo y otp_pendientes.correo (varchar(120))
+
+TELEFONO_MAX = 20                       # como usuarios.telefono y solicitudes.telefono
+TELEFONO_DIGITOS_MIN, TELEFONO_DIGITOS_MAX = 7, 15   # 15: maximo internacional (E.164)
+_TELEFONO_REGEX = re.compile(r"\+?[0-9 ]+")
 
 
 def validar_nombre(nombre: str, etiqueta: str = "El nombre") -> str | None:
@@ -50,4 +59,16 @@ def validar_formato_correo(correo: str) -> str | None:
     # Item 4.6: en modo estricto un correo mas largo daria error al guardar
     if len(correo) > CORREO_MAX:
         return f"El correo no puede tener mas de {CORREO_MAX} caracteres"
+    return None
+
+
+def validar_telefono(telefono: str) -> str | None:
+    """Vacio = no lo dio (es opcional). Solo numeros, espacios y un + al inicio."""
+    if telefono == "":
+        return None
+    digitos = sum(c.isdigit() for c in telefono)
+    if (len(telefono) > TELEFONO_MAX or not _TELEFONO_REGEX.fullmatch(telefono)
+            or not (TELEFONO_DIGITOS_MIN <= digitos <= TELEFONO_DIGITOS_MAX)):
+        return (f"El teléfono solo puede tener números, espacios y un + al inicio "
+                f"(entre {TELEFONO_DIGITOS_MIN} y {TELEFONO_DIGITOS_MAX} dígitos)")
     return None

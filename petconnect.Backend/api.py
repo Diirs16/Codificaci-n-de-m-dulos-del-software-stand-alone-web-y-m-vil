@@ -45,7 +45,7 @@ from security.passwords import hash_password, verificar_password, es_hash_hereda
 from security.politica import validar_contrasena
 # Item 4.11 (A-18): nombre y formato del correo se validan en un modulo comun que
 # tambien usa la consola (vista/menu_usuarios.py) sin importar este archivo
-from security.datos_usuario import validar_formato_correo, validar_nombre
+from security.datos_usuario import validar_formato_correo, validar_nombre, validar_telefono
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -917,9 +917,6 @@ def verify():
 # Nunca se registra en los logs el mensaje ni el telefono (Ley 1581).
 
 MENSAJE_MIN, MENSAJE_MAX = 10, 1000
-TELEFONO_MAX = 20                       # como usuarios.telefono y solicitudes.telefono
-TELEFONO_DIGITOS_MIN, TELEFONO_DIGITOS_MAX = 7, 15   # 15: maximo internacional (E.164)
-_TELEFONO_REGEX = re.compile(r"\+?[0-9 ]+")
 
 _MENSAJE_SOLICITUD_SIN_AUTORIZACION = (
     "Para enviar tu solicitud debes autorizar la versión vigente de la política de datos. "
@@ -933,16 +930,9 @@ def _validar_mensaje(mensaje: str) -> str | None:
     return None
 
 
-def _validar_telefono(telefono: str) -> str | None:
-    """Vacio = no lo dio (es opcional). Solo numeros, espacios y un + al inicio."""
-    if telefono == "":
-        return None
-    digitos = sum(c.isdigit() for c in telefono)
-    if (len(telefono) > TELEFONO_MAX or not _TELEFONO_REGEX.fullmatch(telefono)
-            or not (TELEFONO_DIGITOS_MIN <= digitos <= TELEFONO_DIGITOS_MAX)):
-        return (f"El teléfono solo puede tener números, espacios y un + al inicio "
-                f"(entre {TELEFONO_DIGITOS_MIN} y {TELEFONO_DIGITOS_MAX} dígitos)")
-    return None
+# Item 4.19: la regla del telefono vive en security/datos_usuario.py, comun con la
+# consola (registrar y actualizar usuario). Mismo mensaje y mismos limites que antes.
+_validar_telefono = validar_telefono
 
 
 def _cuenta_que_envia():

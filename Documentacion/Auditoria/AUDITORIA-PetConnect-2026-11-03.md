@@ -668,6 +668,20 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   ni del correo repetido) y pasan a propósito 13 (módulo común, valores que el código viejo ya guardaba bien); con el
   `api.py` anterior falla 1 (la API no usaba la función común). Queda: un `INSERT` simultáneo del mismo correo aún
   imprime el mensaje de MySQL desde el DAO (4.15). Hallazgo → 4.19 (“6. Actualizar usuario” no valida nombre ni correo).
+- **Complemento: resuelto el 09/11/2026 (ítem 4.19 de PRIORIDADES; solo backend, no toca el esquema; no cierra NC).**
+  “6. Actualizar usuario” (`_actualizar_usuario()`) guardaba nombres, apellidos, correo y teléfono sin revisarlos (una
+  URL como nombre, `x` como correo) e ignoraba en silencio un estado mal escrito; un correo de otra cuenta hacía
+  fallar el `UPDATE` y el `print` del DAO mostraba el mensaje de MySQL con ese correo (Ley 1581). Decisiones del
+  dueño (las recomendadas): cada dato se revisa al escribirlo con las funciones comunes (vacío = mantener) y ante el
+  primer error vuelve al menú sin guardar; el correo nuevo se busca **antes** del `UPDATE` y, si es de otra cuenta,
+  avisa “Ese correo ya tiene una cuenta” sin repetirlo (el de la misma cuenta se acepta); estado fuera de
+  activo/inactivo/bloqueado → aviso y no guarda; teléfono: la regla de las solicitudes de adopción (3.6) pasa de
+  `api.py` a `security/datos_usuario.py` (`validar_telefono`, mismo mensaje y límites; `api.py` conserva
+  `_validar_telefono` como alias) y la usan también el registro y la actualización de la consola. Regresión:
+  `tests/test_consola_actualizar.py` (22, sin BD, sin `.env`, sin DNS). Suite 456 (403 + 53 omitidas). Contraprueba
+  con `git stash`: con la consola anterior fallan 10 (17 casos con los subcasos) y pasan a propósito 12 (cambio
+  válido, vacío mantiene, correo propio o libre, regla común); con el `api.py` anterior falla 1. Queda para el 4.21:
+  si dos administradores guardan el mismo correo a la vez o la BD falla, el `print` del DAO aún muestra el mensaje.
 
 #### A-19 · ⚪ Baja · Búsqueda de proveedores devuelve inactivos — NC-011
 - `dao/proveedor_dao.py:49-54` (falta `AND activo = TRUE`, que sí tiene `:56-62`). Una línea.

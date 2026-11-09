@@ -7,7 +7,7 @@ from getpass import getpass
 
 from dao.usuario_dao import UsuarioDAO
 from modelo.usuario import Usuario
-from security.datos_usuario import validar_formato_correo, validar_nombre
+from security.datos_usuario import validar_formato_correo, validar_nombre, validar_telefono
 from security.passwords import hash_password
 from security.politica import validar_contrasena
 
@@ -18,6 +18,8 @@ AVISO_SIN_AUTORIZACION = (
     "  [i] La cuenta queda SIN autorizacion de tratamiento de datos. El titular\n"
     "      debe darla al iniciar sesion por la web o el movil (casilla + codigo)."
 )
+
+ESTADOS = ("activo", "inactivo", "bloqueado")    # como el ENUM de usuarios.estado
 
 
 class MenuUsuarios:
@@ -101,6 +103,11 @@ class MenuUsuarios:
             return
 
         telefono = input("  Telefono (opcional): ").strip()
+        # Item 4.19: la misma regla de las solicitudes de adopcion (vacio = no lo dio)
+        error = validar_telefono(telefono)
+        if error:
+            print(f"  [!] {error}")
+            return
 
         contrasena = getpass("  Contrasena (no se vera al escribir): ")
         if not contrasena:
@@ -182,7 +189,15 @@ class MenuUsuarios:
         print(f"\n  Encontrados: {len(usuarios)} usuario(s)")
 
     def _actualizar_usuario(self):
-        """Actualiza la información de un usuario existente."""
+        """Actualiza la informacion de un usuario existente con las reglas del registro.
+
+        Item 4.19 (A-18): cada dato que se escribe pasa por las mismas funciones
+        que el registro y la API (security/datos_usuario.py). Dejarlo vacio
+        mantiene el valor actual. Si el correo nuevo ya es de OTRA cuenta se avisa
+        antes del UPDATE, sin repetir el correo (Ley 1581): asi la base de datos no
+        lo rechaza ni su mensaje (que trae el correo) llega a la pantalla. Ante
+        cualquier error se vuelve al menu sin guardar nada.
+        """
         print("\n--- Actualizar usuario ---")
         try:
             id_usuario = int(input("  ID del usuario a actualizar: ").strip())
@@ -199,10 +214,43 @@ class MenuUsuarios:
         print("  (Deje vacio para mantener el valor actual)\n")
 
         nombres = input(f"  Nombres [{usuario.nombres}]: ").strip()
+        if nombres:
+            error = validar_nombre(nombres, "El nombre")
+            if error:
+                print(f"  [!] {error}")
+                return
+
         apellidos = input(f"  Apellidos [{usuario.apellidos}]: ").strip()
+        if apellidos:
+            error = validar_nombre(apellidos, "Los apellidos")
+            if error:
+                print(f"  [!] {error}")
+                return
+
         correo = input(f"  Correo [{usuario.correo}]: ").strip()
+        if correo:
+            error = validar_formato_correo(correo)
+            if error:
+                print(f"  [!] {error}")
+                return
+            # Si es el de esta misma cuenta (por ejemplo, con otras mayusculas) se acepta
+            dueno = self._usuario_dao.consultar_por_correo(correo)
+            if dueno is not None and dueno.id_usuario != usuario.id_usuario:
+                print("  [!] Ese correo ya tiene una cuenta. No se actualizo nada.")
+                return
+
         telefono = input(f"  Telefono [{usuario.telefono}]: ").strip()
+        error = validar_telefono(telefono)
+        if error:
+            print(f"  [!] {error}")
+            return
+
         estado = input(f"  Estado (activo/inactivo/bloqueado) [{usuario.estado}]: ").strip()
+        if estado and estado not in ESTADOS:
+            # Antes se ignoraba en silencio y la consola decia "[OK]"
+            print("  [!] Estado no valido: escriba activo, inactivo o bloqueado. "
+                  "No se actualizo nada.")
+            return
 
         if nombres:
             usuario.nombres = nombres
@@ -212,7 +260,7 @@ class MenuUsuarios:
             usuario.correo = correo
         if telefono:
             usuario.telefono = telefono
-        if estado in ("activo", "inactivo", "bloqueado"):
+        if estado:
             usuario.estado = estado
 
         if self._usuario_dao.actualizar(usuario):
