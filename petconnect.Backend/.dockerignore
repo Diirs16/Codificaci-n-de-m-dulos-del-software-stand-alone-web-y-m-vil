@@ -1,0 +1,41 @@
+# ================================================================
+# PETCONNECT Backend — .dockerignore (item 5.1 de la auditoria, A-30)
+# Lo que aqui aparece NO se manda a Docker al construir la imagen,
+# asi que un "COPY . ." en el Dockerfile nunca lo mete en ella.
+# Docker NO lee el .gitignore: por eso este archivo existe aparte.
+#
+# OJO con la sintaxis: "__pycache__" solo excluye la carpeta de la raiz;
+# "**/__pycache__" la excluye en cualquier subcarpeta (dao/, config/...).
+# La prueba tests/test_dockerignore.py revisa que esto siga asi.
+# ================================================================
+
+# Secretos: NUNCA dentro de la imagen. La configuracion entra por
+# variables de entorno (env_file en docker-compose), no por archivos.
+**/.env
+**/.env.*
+**/*.env
+**/*.pem
+**/*.key
+**/*.p12
+
+# Python: cache y entornos virtuales locales
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+
+# Colecciones de Postman (pueden traer tokens) y documentos pesados
+postman
+**/*.docx
+
+# Herramientas locales que no hacen falta para correr la API
+**/*.log
+.git
+.gitignore
+.dockerignore
+.claude
+CLAUDE.md
+Dockerfile*
+docker-compose*
+.vscode
+.idea

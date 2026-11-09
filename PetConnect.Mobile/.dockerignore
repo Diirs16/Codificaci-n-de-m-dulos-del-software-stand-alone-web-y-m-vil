@@ -1,0 +1,45 @@
+# ================================================================
+# PETCONNECT Movil — .dockerignore (item 5.1 de la auditoria, A-30)
+# Hoy el movil no tiene Dockerfile; este archivo protege cualquier
+# "docker build" futuro en esta carpeta. Docker NO lee el .gitignore.
+# La prueba petconnect.Backend/tests/test_dockerignore.py lo revisa.
+# ================================================================
+
+# Secretos: archivos .env y claves de firma de Android/iOS
+**/.env
+**/.env.*
+**/*.env
+**/*.jks
+**/*.keystore
+**/*.p8
+**/*.p12
+**/*.key
+**/*.pem
+**/*.mobileprovision
+
+# Dependencias y compilaciones locales (node_modules pesa unos 2 GB
+# y android/ casi 1 GB; se rehacen si algun dia hace falta)
+**/node_modules
+dist
+web-build
+.expo
+android
+ios
+.kotlin
+.metro-health-check*
+
+# Colecciones de Postman (pueden traer tokens)
+postman
+.postman
+
+# Herramientas locales
+**/*.log
+.git
+.gitignore
+.dockerignore
+.claude
+CLAUDE.md
+Dockerfile*
+docker-compose*
+.vscode
+.idea

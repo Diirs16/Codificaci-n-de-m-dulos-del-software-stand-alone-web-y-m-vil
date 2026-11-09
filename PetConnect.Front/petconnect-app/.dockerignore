@@ -1,0 +1,32 @@
+# ================================================================
+# PETCONNECT Web — .dockerignore (item 5.1 de la auditoria, A-30)
+# Lo que aqui aparece NO se manda a Docker al construir la imagen.
+# Docker NO lee el .gitignore: por eso este archivo existe aparte.
+# La imagen instala sus dependencias con "npm ci" y compila con
+# "npm run build" adentro, asi que node_modules y dist locales sobran.
+# La prueba petconnect.Backend/tests/test_dockerignore.py lo revisa.
+# ================================================================
+
+# Secretos y configuracion local. Lo que lleva VITE_ queda visible en el
+# navegador: nunca secretos; la URL de la API entra al construir (5.2).
+**/.env
+**/.env.*
+**/*.env
+**/*.local
+
+# Dependencias y compilaciones locales (se rehacen dentro de la imagen)
+**/node_modules
+dist
+dist-ssr
+
+# Herramientas locales que no hacen falta para compilar la web
+**/*.log
+.git
+.gitignore
+.dockerignore
+.claude
+CLAUDE.md
+Dockerfile*
+docker-compose*
+.vscode
+.idea
