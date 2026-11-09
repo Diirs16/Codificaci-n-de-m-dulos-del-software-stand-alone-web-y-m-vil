@@ -342,6 +342,23 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         self.assertEqual(len(mascotas), 6)
         self.assertTrue(all(m["estado"] == "en_adopcion" for m in mascotas))
 
+    def test_la_adopcion_se_pagina_sin_repetir_ni_saltar_mascotas(self):
+        """Item 4.17 (NC-003) con la base real: 6 mascotas de 4 en 4 son 4 + 2 + 0."""
+        import api   # ver la nota de test_api_de_adopcion_devuelve_las_6_mascotas
+
+        ids = []
+        for pagina, esperadas in ((1, 4), (2, 2), (3, 0)):
+            with self.subTest(pagina=pagina):
+                ruta = f"/api/mascotas/adopcion?pagina={pagina}&por_pagina=4"
+                with api.app.test_request_context(ruta):
+                    respuesta = api.get_mascotas_adopcion()
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertEqual(len(respuesta.get_json()), esperadas)
+                ids += [m["id"] for m in respuesta.get_json()]
+        self.assertEqual(len(ids), 6)
+        self.assertEqual(len(set(ids)), 6)          # ninguna sale en dos paginas
+        self.assertEqual(ids, sorted(ids))          # mismo orden que sin paginar
+
     def test_mascota_privada_solo_la_ve_su_dueno(self):
         """NC-002 (item 2.9) con el SQL real: la ruta publica no la encuentra."""
         from cryptography.fernet import Fernet
@@ -1258,8 +1275,9 @@ class PruebasMigracionIndicesEnBD(unittest.TestCase):
         for sentencia in _sentencias(_leer(RUTA_MIGRACION_INDICES)):
             cursor.execute(sentencia)
         consultas = (
-            ("idx_mascotas_estado", MascotaDAO._EN_ADOPCION, ()),
-            ("idx_productos_activo", ProductoDAO._CATALOGO, ()),
+            # Item 4.17: las dos consultas de la API llevan LIMIT %s OFFSET %s
+            ("idx_mascotas_estado", MascotaDAO._EN_ADOPCION, (20, 0)),
+            ("idx_productos_activo", ProductoDAO._CATALOGO, (20, 0)),
             ("idx_proveedores_ciudad", ProveedorDAO._CONSULTAR_POR_CIUDAD, ("Ciudad A",)),
         )
         for indice, sql, params in consultas:

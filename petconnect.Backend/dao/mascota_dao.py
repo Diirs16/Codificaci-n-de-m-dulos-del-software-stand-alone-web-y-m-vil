@@ -72,6 +72,7 @@ class MascotaDAO:
                sexo AS gender, edad_aprox AS age, foto AS image,
                observaciones AS description, estado
         FROM mascotas WHERE estado = 'en_adopcion' ORDER BY id_mascota
+        LIMIT %s OFFSET %s
     """
 
     # NC-002 (item 2.9): la ruta publica solo encuentra mascotas en adopcion. Las demas
@@ -94,10 +95,12 @@ class MascotaDAO:
     def __init__(self):
         self._conexion_bd = ConexionBD()
 
-    def consultar_en_adopcion(self):
-        """Mascotas en adopcion para la API, como diccionarios con los alias del JSON."""
+    def consultar_en_adopcion(self, limite, desplazamiento):
+        """Una pagina de mascotas en adopcion para la API, como diccionarios con los alias
+        del JSON: hasta `limite` filas, saltando las `desplazamiento` primeras (item 4.17,
+        NC-003). api.py valida los dos numeros."""
         with conexion_y_cursor(self._conexion_bd, dictionary=True) as (_, cursor):
-            cursor.execute(self._EN_ADOPCION)
+            cursor.execute(self._EN_ADOPCION, (limite, desplazamiento))
             return cursor.fetchall()
 
     def consultar_en_adopcion_por_id(self, id_mascota):

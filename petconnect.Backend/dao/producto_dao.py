@@ -68,6 +68,7 @@ class ProductoDAO:
         FROM productos p
         LEFT JOIN categorias_producto c ON p.id_categoria_producto = c.id_categoria_producto
         WHERE p.activo = TRUE ORDER BY p.id_producto
+        LIMIT %s OFFSET %s
     """
 
     _CATALOGO_POR_ID = """
@@ -84,10 +85,12 @@ class ProductoDAO:
     def __init__(self):
         self._conexion_bd = ConexionBD()
 
-    def consultar_catalogo(self):
-        """Productos activos para la API, como diccionarios con los alias del JSON."""
+    def consultar_catalogo(self, limite, desplazamiento):
+        """Una pagina de productos activos para la API, como diccionarios con los alias
+        del JSON: hasta `limite` filas, saltando las `desplazamiento` primeras (item 4.17,
+        NC-003). api.py valida los dos numeros."""
         with conexion_y_cursor(self._conexion_bd, dictionary=True) as (_, cursor):
-            cursor.execute(self._CATALOGO)
+            cursor.execute(self._CATALOGO, (limite, desplazamiento))
             return cursor.fetchall()
 
     def consultar_catalogo_por_id(self, id_producto):

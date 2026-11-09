@@ -235,6 +235,43 @@ def _texto(datos: dict, campo: str) -> str:
     return valor
 
 
+# Item 4.17 (NC-003): los listados publicos van por paginas. Antes devolvian todas
+# las filas en cada peticion. ?pagina= y ?por_pagina= son opcionales y la respuesta
+# sigue siendo una lista (sin total: si llega una pagina llena, el cliente ofrece
+# "Ver mas"). Mas de POR_PAGINA_MAXIMA se recorta; PAGINA_MAXIMA evita un OFFSET
+# enorme que haria fallar la consulta con un 500.
+POR_PAGINA_DEFECTO = 20
+POR_PAGINA_MAXIMA = 50
+PAGINA_MAXIMA = 10000
+
+
+def _entero_de_la_url(nombre: str, por_defecto: int) -> int:
+    """Numero entero mayor que 0 de ?nombre=; si falta, por_defecto; si no sirve, 400."""
+    texto = request.args.get(nombre)
+    if texto is None:
+        return por_defecto
+    texto = texto.strip()
+    # Solo digitos ASCII: isdigit() aceptaria tambien otros, como el "²"
+    if not re.fullmatch(r"[0-9]+", texto):
+        raise EntradaInvalida(f"El parametro '{nombre}' debe ser un numero entero mayor que 0")
+    # Con mas de 9 cifras ya supera cualquier limite. No se convierte entero: Python
+    # rechaza (con un 500) convertir textos de miles de cifras.
+    cifras = texto.lstrip("0") or "0"
+    numero = int(cifras) if len(cifras) <= 9 else 10 ** 9
+    if numero < 1:
+        raise EntradaInvalida(f"El parametro '{nombre}' debe ser un numero entero mayor que 0")
+    return numero
+
+
+def _leer_paginacion():
+    """(limite, desplazamiento) para el DAO a partir de ?pagina= y ?por_pagina=."""
+    pagina = _entero_de_la_url("pagina", 1)
+    if pagina > PAGINA_MAXIMA:
+        raise EntradaInvalida(f"El parametro 'pagina' no puede ser mayor que {PAGINA_MAXIMA}")
+    por_pagina = min(_entero_de_la_url("por_pagina", POR_PAGINA_DEFECTO), POR_PAGINA_MAXIMA)
+    return por_pagina, (pagina - 1) * por_pagina
+
+
 def _serialize(value):
     if isinstance(value, (datetime, date)):
         return value.isoformat()
@@ -389,7 +426,7 @@ def require_auth(f):
 
 @app.route("/api/productos", methods=["GET"])
 def get_productos():
-    rows = ProductoDAO().consultar_catalogo()
+    rows = ProductoDAO().consultar_catalogo(*_leer_paginacion())
     return jsonify([_row_to_dict(r) for r in rows])
 
 
@@ -426,7 +463,7 @@ def _mascota_to_dict(row):
 
 @app.route("/api/mascotas/adopcion", methods=["GET"])
 def get_mascotas_adopcion():
-    rows = MascotaDAO().consultar_en_adopcion()
+    rows = MascotaDAO().consultar_en_adopcion(*_leer_paginacion())
     return jsonify([_mascota_to_dict(r) for r in rows])
 
 

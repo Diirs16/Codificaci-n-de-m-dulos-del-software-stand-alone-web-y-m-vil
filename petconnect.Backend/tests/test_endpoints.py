@@ -254,7 +254,7 @@ class PruebasProductos(_BaseEndpoints):
         self.cliente.get("/api/productos")
         sql, params = self._sql_y_parametros()
         self.assertIn("WHERE p.activo = TRUE", sql)
-        self.assertIsNone(params)
+        self.assertEqual(params, (20, 0))       # item 4.17: primera pagina de 20
 
     def test_detalle_responde_200_y_va_parametrizado(self):
         self.cursor.fetchone.return_value = _producto()
@@ -302,7 +302,7 @@ class PruebasListaAdopcion(_BaseEndpoints):
         self.assertEqual(r.get_json(), [])          # lista vacia: 200, no error
         sql, params = self._sql_y_parametros()
         self.assertRegex(sql, r"WHERE estado = 'en_adopcion'")
-        self.assertIsNone(params)
+        self.assertEqual(params, (20, 0))       # item 4.17: primera pagina de 20
 
 
 # ---------------------------------------------------------------------------
