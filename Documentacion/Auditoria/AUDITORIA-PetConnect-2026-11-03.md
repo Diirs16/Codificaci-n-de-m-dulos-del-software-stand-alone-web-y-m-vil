@@ -435,7 +435,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   que las listas de métodos y rutas estén completas); con solo el `api.py` anterior fallan las 12 rutas que usan
   la BD en los 3 escenarios; con solo los DAO anteriores, los 32 métodos; con solo el `seed.py` o el `main.py`
   anterior, su prueba.
-- **Ítem 4.17 (paginación e índices, NC-003), en curso desde el 09/11/2026.** Decisiones del dueño: parámetros
+- **Ítem 4.17 (paginación e índices, NC-003): hecho el 09/11/2026 en 4 partes** (`ea95ed5`, `d5502a8`, `55fa8bf`, `a42a038`). Decisiones del dueño: parámetros
   opcionales `?pagina=&por_pagina=` (20 por defecto, máximo 50) que mantienen la respuesta como lista; catálogo web
   con “Ver más” y búsqueda sobre lo cargado; móvil con botón “Ver más”. **Parte 1 hecha (índices, commit
   `ea95ed5`):** `sql/schema.sql` y la migración `sql/migraciones/2026-11-09_indices_listados.sql` crean
@@ -462,7 +462,12 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `src/hooks/useListaPaginada.js`: un error al pedir más no borra lo cargado y un clic doble no pide dos veces.
   Regresión: `tests/paginacion.test.js` (10); contraprueba: con el código anterior fallan 3. Probado en el navegador
   a 375 px con la API real (tamaños bajados solo para la prueba): sin repetir, una petición por “Ver más” y el botón
-  desaparece al final. Falta la parte 4 (móvil).
+  desaparece al final. **Parte 4 hecha (móvil, commit `a42a038`):** el catálogo (`HomeScreen`) se pide de 20 en 20
+  y la adopción de 12 en 12, con “Ver más” al pie de la `FlatList` (`src/components/BotonVerMas.js`); misma lógica
+  que la web en `src/utils/paginacion.js` y `src/hooks/useListaPaginada.js`. Regresión: `tests/paginacion.test.mjs`
+  (8); contraprueba: con el código anterior fallan 2. Probado en el export web a 375 px con la API real (servido en
+  el puerto 8081: el 8090 no está en el CORS de la API). **NC-003 sigue abierta** hasta repetir la prueba de carga
+  (4.12).
 
 #### A-12 · 🟠 Alta · Pasar a Gunicorn romperá los OTP [N]
 - **Dónde:** `api.py:44-45` (`AlmacenOTP()` en memoria), `otp/servicio.py`.
