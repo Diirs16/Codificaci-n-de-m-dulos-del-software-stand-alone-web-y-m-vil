@@ -440,8 +440,8 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   con “Ver más” y búsqueda sobre lo cargado; móvil con botón “Ver más”. **Parte 1 hecha (índices, commit
   `ea95ed5`):** `sql/schema.sql` y la migración `sql/migraciones/2026-11-09_indices_listados.sql` crean
   `idx_mascotas_estado`, `idx_productos_activo` e `idx_proveedores_ciudad` (`ciudad`, `activo`, `nombre`). La
-  migración usa `CREATE INDEX IF NOT EXISTS` (MariaDB, no MySQL), no toca datos y se puede repetir; **falta que el
-  dueño la aplique con respaldo**. La búsqueda por nombre de proveedores (`LIKE '%texto%'`) no puede usar un índice
+  migración usa `CREATE INDEX IF NOT EXISTS` (MariaDB, no MySQL), no toca datos y se puede repetir; **el dueño la
+  aplicó con respaldo el 09/11/2026**. La búsqueda por nombre de proveedores (`LIKE '%texto%'`) no puede usar un índice
   normal y queda sin él. Regresión en `tests/test_esquema.py`: 3 pruebas sin BD (los índices están en el esquema; la
   migración solo crea esos índices y no apaga el modo estricto) y 2 con MariaDB en la base temporal
   `petconnect_prueba_indices` (sin índices, aplicar la migración dos veces los crea con las columnas en orden y sin
@@ -466,7 +466,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - **Arreglo:** guardar los OTP en una tabla de la BD (`otp_pendientes` con hash del código, intentos y expiración) o
   usar 1 worker con hilos mientras tanto; limpiar vencidos.
 - **Estado: resuelto en el código el 07/11/2026 (ítem 4.6 de PRIORIDADES, en dos partes; solo backend). NC-003 sigue
-  abierta** hasta el 4.17 (paginación e índices) y la medición del 4.12. **Falta que el dueño aplique la migración**
+  abierta** hasta el 4.17 (paginación e índices) y la medición del 4.12. **Migración aplicada (confirmado el 09/11/2026: la API pasa su revisión de la tabla al arrancar)**
   en su BD (`sql/migraciones/2026-11-07_otp_pendientes.sql`, con respaldo): sin ella la API nueva no arranca y lo
   avisa. Decisiones del dueño: opción A (tabla), el código **cifrado con Fernet** y no con hash (con un hash no se
   podría reenviar el mismo código, regla del A-09), borrar los datos del registro pendiente al terminar (Ley 1581) y
