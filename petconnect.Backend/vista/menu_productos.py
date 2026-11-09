@@ -3,8 +3,11 @@ Vista del módulo de Productos (Tienda/Marketplace).
 Interfaz de consola para gestionar las operaciones CRUD de productos.
 """
 
+from mysql.connector import Error
+
 from dao.producto_dao import ProductoDAO
 from modelo.producto import Producto
+from vista.aviso_bd import avisar_error_bd
 
 
 class MenuProductos:
@@ -31,24 +34,29 @@ class MenuProductos:
 
             opcion = input("  Seleccione una opcion: ").strip()
 
-            if opcion == "1":
-                self._registrar_producto()
-            elif opcion == "2":
-                self._consultar_todos()
-            elif opcion == "3":
-                self._buscar_por_id()
-            elif opcion == "4":
-                self._buscar_por_categoria()
-            elif opcion == "5":
-                self._buscar_por_nombre()
-            elif opcion == "6":
-                self._actualizar_producto()
-            elif opcion == "7":
-                self._eliminar_producto()
-            elif opcion == "0":
-                break
-            else:
-                print("  [!] Opcion no valida.")
+            # Item 4.15: los DAO dejan subir los errores de la BD. Se atrapan
+            # aqui para avisar (sin el mensaje de MySQL) y volver al menu.
+            try:
+                if opcion == "1":
+                    self._registrar_producto()
+                elif opcion == "2":
+                    self._consultar_todos()
+                elif opcion == "3":
+                    self._buscar_por_id()
+                elif opcion == "4":
+                    self._buscar_por_categoria()
+                elif opcion == "5":
+                    self._buscar_por_nombre()
+                elif opcion == "6":
+                    self._actualizar_producto()
+                elif opcion == "7":
+                    self._eliminar_producto()
+                elif opcion == "0":
+                    break
+                else:
+                    print("  [!] Opcion no valida.")
+            except Error as e:
+                avisar_error_bd(e)
 
     def _registrar_producto(self):
         """Solicita datos y registra un nuevo producto."""

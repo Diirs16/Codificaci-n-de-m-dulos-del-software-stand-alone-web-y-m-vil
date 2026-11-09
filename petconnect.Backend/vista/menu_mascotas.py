@@ -3,9 +3,12 @@ Vista del módulo de Mascotas.
 Interfaz de consola para gestionar las operaciones CRUD de mascotas.
 """
 
+from mysql.connector import Error
+
 from dao.mascota_dao import MascotaDAO
 from dao.usuario_dao import UsuarioDAO
 from modelo.mascota import Mascota
+from vista.aviso_bd import avisar_error_bd
 
 
 class MenuMascotas:
@@ -33,24 +36,29 @@ class MenuMascotas:
 
             opcion = input("  Seleccione una opcion: ").strip()
 
-            if opcion == "1":
-                self._registrar_mascota()
-            elif opcion == "2":
-                self._consultar_todas()
-            elif opcion == "3":
-                self._buscar_por_id()
-            elif opcion == "4":
-                self._buscar_por_usuario()
-            elif opcion == "5":
-                self._buscar_por_nombre()
-            elif opcion == "6":
-                self._actualizar_mascota()
-            elif opcion == "7":
-                self._eliminar_mascota()
-            elif opcion == "0":
-                break
-            else:
-                print("  [!] Opcion no valida.")
+            # Item 4.15: los DAO dejan subir los errores de la BD. Se atrapan
+            # aqui para avisar (sin el mensaje de MySQL) y volver al menu.
+            try:
+                if opcion == "1":
+                    self._registrar_mascota()
+                elif opcion == "2":
+                    self._consultar_todas()
+                elif opcion == "3":
+                    self._buscar_por_id()
+                elif opcion == "4":
+                    self._buscar_por_usuario()
+                elif opcion == "5":
+                    self._buscar_por_nombre()
+                elif opcion == "6":
+                    self._actualizar_mascota()
+                elif opcion == "7":
+                    self._eliminar_mascota()
+                elif opcion == "0":
+                    break
+                else:
+                    print("  [!] Opcion no valida.")
+            except Error as e:
+                avisar_error_bd(e)
 
     def _registrar_mascota(self):
         """Solicita datos y registra una nueva mascota."""

@@ -80,6 +80,10 @@ class PruebasSinEnvReal(unittest.TestCase):
     def test_esquema_sin_bd_no_carga_el_env(self):
         self._revisar("test_esquema")
 
+    def test_dao_errores_no_carga_el_env(self):
+        # Item 4.15: importa dao/ y vista/ (que cargan config/) despues de _importar_api()
+        self._revisar("test_dao_errores")
+
 
 if __name__ == "__main__":
     unittest.main()
