@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { errorDeApi, cuerpoLogin, cuerpoSolicitudAdopcion, cuerpoMensajeContacto } from "../utils/peticiones";
 import { conLimiteDeTiempo } from "../utils/sesion";
+import { rutaPaginada } from "../utils/paginacion";
 
 /**
  * URL base de la API PetConnect (mismo backend Flask que usan el módulo
@@ -46,16 +47,19 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
-export function getProductos() {
-  return apiFetch("/productos");
+// Ítem 4.17 (NC-003): los listados van por páginas. Opcional:
+// { pagina, porPagina } → ?pagina=&por_pagina= (sin opciones, la API manda la
+// primera página de 20; nunca más de 50). La respuesta sigue siendo una lista.
+export function getProductos(opciones) {
+  return apiFetch(rutaPaginada("/productos", opciones));
 }
 
 export function getProducto(id) {
   return apiFetch(`/productos/${id}`);
 }
 
-export function getMascotasAdopcion() {
-  return apiFetch("/mascotas/adopcion");
+export function getMascotasAdopcion(opciones) {
+  return apiFetch(rutaPaginada("/mascotas/adopcion", opciones));
 }
 
 export function getMascota(id) {

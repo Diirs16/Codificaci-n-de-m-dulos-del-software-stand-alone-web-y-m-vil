@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,19 +8,22 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { getMascotasAdopcion } from "../services/api";
+import BotonVerMas from "../components/BotonVerMas";
+import { useListaPaginada } from "../hooks/useListaPaginada";
 import { datosMascota } from "../utils/mascota";
+import { POR_PAGINA_ADOPCION } from "../utils/paginacion";
 
 export default function AdoptionScreen({ navigation }) {
-  const [mascotas, setMascotas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    getMascotasAdopcion()
-      .then(setMascotas)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+  // Ítem 4.17 (NC-003): se pide de 12 en 12; "Ver más" trae las siguientes.
+  const {
+    items: mascotas,
+    loading,
+    error,
+    hayMas,
+    verMas,
+    cargandoMas,
+    errorMas,
+  } = useListaPaginada(getMascotasAdopcion, POR_PAGINA_ADOPCION);
 
   if (loading) {
     return (
@@ -51,6 +53,15 @@ export default function AdoptionScreen({ navigation }) {
         <Text style={styles.empty}>
           No hay mascotas en adopción registradas en este momento.
         </Text>
+      }
+      ListFooterComponent={
+        <BotonVerMas
+          hayMas={hayMas}
+          cargando={cargandoMas}
+          error={errorMas}
+          onVerMas={verMas}
+          texto="Ver más mascotas"
+        />
       }
       renderItem={({ item }) => (
         <TouchableOpacity

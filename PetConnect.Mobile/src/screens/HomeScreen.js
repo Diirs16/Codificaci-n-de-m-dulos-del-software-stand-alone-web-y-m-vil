@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,18 +8,21 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { getProductos } from "../services/api";
+import BotonVerMas from "../components/BotonVerMas";
+import { useListaPaginada } from "../hooks/useListaPaginada";
+import { POR_PAGINA_CATALOGO } from "../utils/paginacion";
 
 export default function HomeScreen({ navigation }) {
-  const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    getProductos()
-      .then(setProductos)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+  // Ítem 4.17 (NC-003): el catálogo se pide de 20 en 20; "Ver más" trae los siguientes.
+  const {
+    items: productos,
+    loading,
+    error,
+    hayMas,
+    verMas,
+    cargandoMas,
+    errorMas,
+  } = useListaPaginada(getProductos, POR_PAGINA_CATALOGO);
 
   if (loading) {
     return (
@@ -47,6 +49,15 @@ export default function HomeScreen({ navigation }) {
       columnWrapperStyle={styles.row}
       ListHeaderComponent={
         <Text style={styles.title}>Catálogo de productos</Text>
+      }
+      ListFooterComponent={
+        <BotonVerMas
+          hayMas={hayMas}
+          cargando={cargandoMas}
+          error={errorMas}
+          onVerMas={verMas}
+          texto="Ver más productos"
+        />
       }
       renderItem={({ item }) => (
         <TouchableOpacity
