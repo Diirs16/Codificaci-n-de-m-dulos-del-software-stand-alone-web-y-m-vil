@@ -455,7 +455,14 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `000` daba 500 antes de publicar el cambio; corregido. Regresión: `tests/test_paginacion.py` (8 pruebas) y, con
   MariaDB, 6 mascotas de 4 en 4 dan 4 + 2 + 0 sin repetir ni saltar. Contraprueba: con el código anterior fallan 7 de
   8 (pasa a propósito la que revisa que sigue siendo una lista); solo con el `api.py` anterior, 7; solo con los DAO
-  anteriores, 6. Suite: 423 (370 correctas y 53 omitidas). Faltan las partes 3 (web) y 4 (móvil).
+  anteriores, 6. Suite: 423 (370 correctas y 53 omitidas). **Parte 3 hecha (web, commit `55fa8bf`):** Home pide
+  solo los 4 destacados (antes todo el catálogo y recortaba), Adopción carga de 12 en 12 y Catálogo de 50 en 50 con
+  un botón “Ver más” (`src/components/BotonVerMas.jsx`); el buscador y las categorías del catálogo filtran lo ya
+  cargado y un aviso lo dice si quedan más. La lógica está en `src/utils/paginacion.js` y el hook
+  `src/hooks/useListaPaginada.js`: un error al pedir más no borra lo cargado y un clic doble no pide dos veces.
+  Regresión: `tests/paginacion.test.js` (10); contraprueba: con el código anterior fallan 3. Probado en el navegador
+  a 375 px con la API real (tamaños bajados solo para la prueba): sin repetir, una petición por “Ver más” y el botón
+  desaparece al final. Falta la parte 4 (móvil).
 
 #### A-12 · 🟠 Alta · Pasar a Gunicorn romperá los OTP [N]
 - **Dónde:** `api.py:44-45` (`AlmacenOTP()` en memoria), `otp/servicio.py`.
