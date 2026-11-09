@@ -105,8 +105,8 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   (`test_sin_jwt_secret_no_arranca`, `test_secreto_publico_de_ejemplo_no_arranca`, `test_secreto_de_31_bytes_no_arranca`:
   el código viejo arrancaba igual) y `test_secreto_de_64_caracteres_importa_bien` pasa con ambos (una clave válida
   nunca fue el problema). NC-007 sigue en corrección (2.3 y 4.8).
-- **Estado del ítem 4.13 (revocar sesiones): partes 1 (API y BD, commit `3c039ec`) y 2 (web, commit `aeb6e99`) de 3
-  hechas el 08/11/2026; falta el móvil.**
+- **Estado del ítem 4.13 (revocar sesiones): resuelto el 08/11/2026 en tres partes: API y BD (commit `3c039ec`), web
+  (commit `aeb6e99`) y móvil (commit `383beb0`).**
   Decisiones del dueño (las recomendadas): (1) ruta `POST /api/auth/logout` y botones por partes (API → web → móvil);
   como hay un solo contador por cuenta, cerrar sesión cierra **en todos los aparatos**; descartada la tabla de sesiones
   por aparato (más tabla, limpieza y pruebas); (2) `require_auth` también rechaza cuentas con estado distinto de
@@ -155,7 +155,31 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   desactiva; con 503 aparece el aviso y con 401 no; en ambos casos se borran el token y los datos; sin scroll
   horizontal. `/impeccable audit`: detector sin hallazgos; pendientes menores fuera del ítem: al cerrar sesión el
   foco del teclado vuelve al inicio de la página (el botón desaparece) y la web no tiene alternativa
-  `prefers-reduced-motion` para sus animaciones (también la del aviso). Falta la parte 3 (móvil).
+  `prefers-reduced-motion` para sus animaciones (también la del aviso).
+  **Parte 3 (móvil, 08/11/2026, commit `383beb0`).** Antes, “Cerrar sesión” en Perfil solo borraba el token de
+  `AsyncStorage`. Ahora sigue las mismas reglas que la web (A1, B1, la sesión local se borra siempre y tras un 401 solo
+  se cierra en local). Decisión del dueño para el aviso: **opción A, `Alert.alert`** (ventana nativa que TalkBack lee
+  sola). Se descartó un texto con `accessibilityLiveRegion` porque, al borrarse la sesión, `AppNavigator.js` cambia
+  `ProfileScreen` por la pantalla de inicio de sesión y el aviso tendría que vivir en `AuthContext` y mostrarse en
+  `LoginScreen` (más estado y un archivo más). Contra: en `react-native-web` `Alert.alert` no hace nada, así que el
+  aviso solo se ve en Android. Cambios en `PetConnect.Mobile`: `src/utils/sesion.js` (nuevo, JS puro):
+  `cerrarSesion({ leerToken, cerrarEnServidor, borrarLocal })`, como la de la web pero con `await` (AsyncStorage);
+  un error sin `status` (sin red: `apiFetch` no atrapa el fallo de `fetch`, o tiempo agotado) cuenta como
+  `"sin-confirmar"`; y `conLimiteDeTiempo(hacerPeticion, ms)` con `AbortController` + `setTimeout`
+  (`TIEMPO_CIERRE_MS = 8000`; no se usó `AbortSignal.timeout` porque puede no existir en React Native).
+  `src/services/api.js`: `cerrarSesionEnServidor()` (`POST /auth/logout`; `apiFetch` no cambió y ya pasaba el
+  `signal`). `src/context/AuthContext.js`: `cerrarSesionLocal()` nuevo; `logout()` devuelve el resultado.
+  `src/screens/ProfileScreen.js`: `salir()`, botón desactivado con “Cerrando sesión…”,
+  `accessibilityState={{ disabled, busy }}`, alto mínimo 48 y rojo más oscuro mientras espera (no transparencia, que
+  bajaría el contraste del texto blanco); con `"sin-confirmar"`, `Alert.alert` con el mismo texto de la web
+  (“celular” en vez de “navegador”). `src/components/FormularioSolicitud.js`: tras un 401 usa `cerrarSesionLocal()`.
+  Regresión: `tests/cerrar-sesion.test.mjs` (12: 8 ejecutan la lógica, incluidos el corte a los 30 ms y la limpieza
+  del temporizador, y 4 revisan el texto de los archivos con React Native). `npm test` 47 (35 + 12) y
+  `npx expo export --platform web` sin errores. Contraprueba (`git stash` de los 4 archivos y `sesion.js` vacío):
+  fallan las 12 nuevas y pasan las 35 anteriores; ninguna nueva pasa a propósito. Sin revisión en el emulador
+  (opcional del dueño, con la migración `2026-11-08_version_sesion.sql` aplicada). Hallazgo fuera del ítem: al abrir
+  la app, `AuthContext.js` del móvil borra el token ante cualquier error de `/auth/me` (también sin red); la web lo
+  corrigió en el 4.7, el móvil no.
 - **Pendiente relacionado (ítem 4.13, texto original del 03/11/2026):** hoy `require_auth` acepta el token solo por su firma, sin
   consultar la BD, así que una sesión no se puede cerrar antes de 24 h (ni al cambiar la contraseña). Además el token
   lleva el **correo**, y el contenido de un JWT se puede leer (base64, no cifrado). Propuesta: columna

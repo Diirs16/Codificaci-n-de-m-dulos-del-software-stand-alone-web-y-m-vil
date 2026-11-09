@@ -90,7 +90,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.10 | A-14 | — | Registro con respuesta neutra (sin 409 que revele cuentas) — *Hecho el 08/11/2026 en una parte (`8668680`, solo backend; no toca el esquema). Decisión del dueño: opción A, respuesta neutra + correo de aviso al titular. Un correo con cuenta recibe lo mismo que uno nuevo (200 “Codigo enviado”) por el mismo camino: bcrypt + un correo la primera vez, nada si se repite antes de 10 min, el mismo 503 si el correo falla. Nunca crea OTP. El aviso (`enviar_aviso_cuenta_existente`, plantilla `HTML_AVISO_REGISTRO`) lleva el nombre de la cuenta y no lleva código; la memoria de avisos guarda el SHA-256 del correo. Hueco tapado: `/verify` respondía distinto sin pendiente (“No hay verificación pendiente”) que con código incorrecto; ahora un solo mensaje para sin pendiente, vencido e incorrecto. Web y móvil sin cambios. Regresión: `tests/test_registro_neutro.py` (18) + 7 pruebas viejas ajustadas. Suite 339 (294 + 45 omitidas). Contraprueba: con el `api.py` viejo dan error 52; 9 sabotajes sobre el código nuevo, todos detectados (volver al 409: fallan 11). CP-002 de la GA9 aprobado en la API. Hallazgo → 4.18 (tiempo de `/login`). Opcional del dueño: probarlo con la API real* | 🟢 |
 | [x] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos — *Hecho el 08/11/2026 en una parte (`3e814e3`, solo backend; no toca el esquema). Decisiones del dueño (las recomendadas): la consola no da la autorización por el titular (Ley 1581, art. 9; política C.6): guarda `acepta_datos = False` explícito y avisa que el titular la dará al iniciar sesión (3.5); nombre, apellidos y formato del correo como la API (sin DNS); correo repetido → “Ese correo ya tiene una cuenta”, sin repetirlo ni calcular bcrypt; contraseña dos veces con `getpass` y sin `.strip()`, por `validar_contrasena`. Módulo común nuevo `security/datos_usuario.py` (sacado de `api.py`; la consola no importa `api.py`, A-41). Regresión: `tests/test_consola_registro.py` (26). Suite 365 (320 + 45 omitidas). Contraprueba: con la consola vieja fallan 13 (registraba `PETCONNECT1!`) y pasan a propósito 13; con el `api.py` viejo falla 1. No cierra NC. Hallazgo → 4.19. Opcional del dueño: probarlo con `python main.py`* | 🟢 |
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
-| [ ] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 — *Parte 1 de 3 (API y BD) hecha el 08/11/2026 (`3c039ec`). Decisiones del dueño (las recomendadas): ruta `POST /api/auth/logout` y botones por partes (cierra la sesión en todos los aparatos: un contador por cuenta); `require_auth` rechaza con 401 las cuentas con estado distinto de `activo`; los tokens viejos sin versión no valen. Columna `usuarios.version_sesion` (migración `2026-11-08_version_sesion.sql`), token con `sub`, `ver`, `iat` y `exp` (sin correo), `require_auth` consulta la sesión en cada petición (BD caída → 503), la API no arranca sin la columna. `tests/test_sesiones.py` (26; 5 con MariaDB). Suite 395 (345 + 50 omitidas). Contraprueba: fallan las 21 nuevas sin BD. **Falta del dueño: aplicar la migración (con respaldo).** Parte 2 de 3 (web) hecha el 08/11/2026 (`aeb6e99`): el botón “Cerrar sesión” llama a `POST /api/auth/logout` y siempre borra la sesión local (401, 503, sin red o 8 s sin respuesta); decisiones del dueño A1 (aviso `role="status"` si el servidor no confirmó) y B1 (botón desactivado, “Cerrando sesión…”); `FormularioSolicitud` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.js` (10); `npm test` 61. Contraprueba: fallan las 10 nuevas. Falta la parte 3 (móvil)* | 🟡 |
+| [x] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 — *Parte 1 de 3 (API y BD) hecha el 08/11/2026 (`3c039ec`). Decisiones del dueño (las recomendadas): ruta `POST /api/auth/logout` y botones por partes (cierra la sesión en todos los aparatos: un contador por cuenta); `require_auth` rechaza con 401 las cuentas con estado distinto de `activo`; los tokens viejos sin versión no valen. Columna `usuarios.version_sesion` (migración `2026-11-08_version_sesion.sql`), token con `sub`, `ver`, `iat` y `exp` (sin correo), `require_auth` consulta la sesión en cada petición (BD caída → 503), la API no arranca sin la columna. `tests/test_sesiones.py` (26; 5 con MariaDB). Suite 395 (345 + 50 omitidas). Contraprueba: fallan las 21 nuevas sin BD. **Falta del dueño: aplicar la migración (con respaldo).** Parte 2 de 3 (web) hecha el 08/11/2026 (`aeb6e99`): el botón “Cerrar sesión” llama a `POST /api/auth/logout` y siempre borra la sesión local (401, 503, sin red o 8 s sin respuesta); decisiones del dueño A1 (aviso `role="status"` si el servidor no confirmó) y B1 (botón desactivado, “Cerrando sesión…”); `FormularioSolicitud` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.js` (10); `npm test` 61. Contraprueba: fallan las 10 nuevas. Parte 3 de 3 (móvil) hecha el 08/11/2026 (`383beb0`): el botón “Cerrar sesión” de `ProfileScreen` llama a `POST /api/auth/logout` con límite de 8 s (`AbortController`) y siempre borra la sesión del celular; mismas reglas que la web (A1, B1); decisión del dueño para el aviso: opción A, `Alert.alert` (la pantalla Perfil desaparece al cerrar sesión: un texto no alcanzaría a verse). `FormularioSolicitud.js` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.mjs` (12); `npm test` 47; `expo export` web OK. Contraprueba: fallan las 12 nuevas y pasan las 35 de antes. **Ítem cerrado.** Opcional del dueño: probarlo con la API real (necesita la migración)* | 🟡 |
 | [ ] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` | 🟢 |
 | [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`* | 🟡 |
 | [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
@@ -149,9 +149,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 08/11/2026, actualizada al terminar la parte 2 del 4.13 (A-03, web: el botón “Cerrar sesión” llama a
-`POST /api/auth/logout` y siempre borra la sesión local; solo Front; no cierra NC). Lo próximo es la parte 3 del 4.13
-(móvil: el botón “Cerrar sesión” de ProfileScreen llama a la ruta). El 4.12 se salta hasta tener el 4.17.
+*Versión del 08/11/2026, actualizada al terminar el 4.13 (parte 3 de 3, A-03, móvil: el botón “Cerrar sesión” de
+ProfileScreen llama a `POST /api/auth/logout` y siempre borra la sesión del celular; solo Móvil; no cierra NC). Lo
+próximo es el 4.14 (A-41: `tests/test_seguridad.py` no debe cargar el `.env` real). El 4.12 se salta hasta tener el 4.17.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -178,6 +178,37 @@ Lee primero:
   todavía: desde 240116e (4.1) en adelante.
 
 Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.13 CERRADO: PARTE 3 de 3 HECHA el 08/11/2026 (A-03; commit 383beb0,
+  solo móvil; no toca la BD; no cierra NC). Mismas reglas que la web (A1,
+  B1, siempre se borra lo local, tras un 401 solo cierre local).
+  Decisión del dueño para el aviso: opción A, Alert.alert (al borrarse la
+  sesión AppNavigator cambia ProfileScreen por LoginStack y un texto en
+  Perfil no alcanzaría a verse; en react-native-web Alert.alert no hace
+  nada: el aviso solo se ve en Android). src/utils/sesion.js (nuevo, JS
+  puro): cerrarSesion({ leerToken, cerrarEnServidor, borrarLocal }) con
+  await (AsyncStorage), mismos resultados que la web ("cerrada",
+  "ya-cerrada", "sin-confirmar"; un error sin status = sin red o tiempo
+  agotado = "sin-confirmar"), y conLimiteDeTiempo(hacerPeticion, ms) con
+  AbortController + setTimeout (no AbortSignal.timeout, que puede no
+  existir en React Native), TIEMPO_CIERRE_MS = 8000. api.js:
+  cerrarSesionEnServidor() (POST /auth/logout; apiFetch pasa el signal a
+  fetch; apiFetch no se tocó). AuthContext.js: cerrarSesionLocal() nuevo
+  y logout() devuelve el resultado de cerrarSesion. ProfileScreen.js:
+  salir() con disabled + "Cerrando sesión…" + accessibilityState
+  { disabled, busy }, minHeight 48 y rojo más oscuro (#7f1d1d) mientras
+  espera (no opacidad: bajaría el contraste); con "sin-confirmar"
+  Alert.alert(AVISO_CIERRE_TITULO, AVISO_CIERRE_TEXTO, "Entendido").
+  FormularioSolicitud.js: volverAIniciarSesion usa cerrarSesionLocal().
+  tests/cerrar-sesion.test.mjs (12: 8 ejecutan la lógica, 4 revisan el
+  texto). npm test 47 (35 + 12); npx expo export --platform web OK.
+  Contraprueba (git stash de los 4 archivos y sesion.js vacío): fallan las
+  12 nuevas, pasan las 35 de antes, ninguna nueva pasa a propósito. Sin
+  emulador (opcional del dueño, con la migración aplicada).
+- Hallazgo sin ítem (visto en el 4.13 parte 3, preguntar al dueño si se
+  anota como 4.20): al abrir la app, AuthContext.js del MÓVIL borra el
+  token ante CUALQUIER error de /auth/me (sin red o API apagada también).
+  La web lo corrigió en el 4.7 (solo el 401 cierra; src/utils/sesion.js
+  revalidarSesion), pero ese ítem fue solo web.
 - 4.13 PARTE 2 de 3 HECHA el 08/11/2026 (A-03; commit aeb6e99, solo
   web; no toca la BD; no cierra NC). Decisiones del dueño: A1 (avisar si
   el servidor no pudo confirmar el cierre) y B1 (botón desactivado
@@ -1121,37 +1152,33 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.13 parte 3 de 3, A-03: móvil; no toca la BD):
-- La API ya tiene POST /api/auth/logout (con @require_auth): suma 1 a
-  usuarios.version_sesion y responde 200 {"message": "Sesion cerrada"};
-  con un token que ya no vale responde 401. Cierra la sesión en TODOS
-  los aparatos de la cuenta.
-- La web ya lo hace (aeb6e99): copiar las MISMAS reglas y decisiones
-  (A1 aviso si "sin-confirmar", B1 botón desactivado; siempre se borra
-  lo local; tras un 401 solo cierre local). Ver src/utils/sesion.js
-  (cerrarSesion) y tests/cerrar-sesion.test.js de la web como modelo.
-- Móvil hoy: src/context/AuthContext.js tiene logout() async que solo
-  hace clearToken() (AsyncStorage) y setUser(null). Lo usan
-  src/screens/ProfileScreen.js (~15, TouchableOpacity "Cerrar sesión")
-  y src/components/FormularioSolicitud.js (~87, volverAIniciarSesion
-  tras un 401: NO debe llamar a la API; conviene cerrarSesionLocal()).
-- OJO móvil: apiFetch de src/services/api.js NO atrapa el fallo de
-  fetch (sin red → TypeError sin status) ni tiene límite de tiempo; la
-  lógica pura debe tratar "sin status" como "sin-confirmar". Las pruebas
-  van en tests/*.test.mjs (npm test con node --test; la lógica pura en
-  src/utils/, como peticiones.js, para poder importarla sin React
-  Native). El aviso puede ser un texto con accessibilityLiveRegion
-  "polite" (Android) y accessibilityRole "alert", o Alert.alert;
-  decidir con el dueño.
-- Verificación móvil: npm test y npx expo export --platform web (o
-  npm start) sin errores; revisión en el emulador Pixel_7 (memoria
-  emulador-android-petconnect) solo si el dueño quiere. El dueño
-  arranca Metro y la API (no lanzarlos en el panel Terminal).
-- Para verlo con la API real, el dueño debe haber aplicado la migración
-  2026-11-08_version_sesion.sql (sin ella python api.py no arranca).
-- Al terminar la parte 3, marcar [x] el 4.13. Luego sigue el 4.14 (el
-  4.12 se salta hasta tener el 4.17). El 4.18 y el 4.19 se pueden
-  adelantar si el dueño quiere.
+Contexto del próximo paso (4.14, A-41: pruebas que importan api.py; solo
+backend, no toca la BD):
+- A-41: un script que importa api.py carga el .env real con
+  load_dotenv() (no imprime nada, pero choca con la regla 4 de
+  CLAUDE.md y la memoria no-importar-api-con-env-real).
+- Ya resuelto en otras pruebas: tests/test_correo.py (~20-27) y
+  tests/test_errores.py (_importar_api(), ~33-55) reemplazan
+  dotenv.load_dotenv por una función que no hace nada y la restauran
+  después. test_endpoints, test_sesiones y casi todas las demás usan
+  _importar_api() de test_errores.
+- Falta: tests/test_seguridad.py hace "import api" directo (~31, tras
+  fijar FERNET_KEY/JWT_SECRET de prueba con os.environ.setdefault).
+  Revisar también tests/test_esquema.py (~297 y ~314, "import api"
+  dentro de pruebas con BD). En la suite completa api ya puede estar en
+  sys.modules (lo cargó _importar_api), pero al correr el archivo solo
+  sí se carga el .env.
+- OJO: FERNET_KEY y JWT_SECRET de prueba se fijan ANTES del import y
+  load_dotenv() no pisa lo que ya existe (override=False), así que esas
+  dos ganan; el problema es que el RESTO del .env (BD, correo) sí entra
+  a os.environ. Preguntar si conviene usar _importar_api() en esos dos
+  archivos (lo más simple) o repetir el bloque de test_correo.
+- Prueba de regresión sugerida: correr test_seguridad en un proceso
+  aparte con load_dotenv vigilado (o revisar el texto) y comprobar que
+  no se llama. Contraprueba con el test_seguridad.py viejo. NUNCA
+  imprimir valores de configuración.
+- Luego sigue el 4.15 (el 4.12 se salta hasta tener el 4.17). El 4.18 y
+  el 4.19 se pueden adelantar si el dueño quiere.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -1190,4 +1217,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.13, parte 3 de 3 (móvil)** (A-03): el botón “Cerrar sesión” de `ProfileScreen` llama a `POST /api/auth/logout` y siempre borra la sesión local, con las mismas reglas que la web. La parte 1 (API y BD, `3c039ec`) y la parte 2 (web, `aeb6e99`: aviso si el servidor no confirmó, botón desactivado mientras espera, cierre solo local tras un 401) quedaron hechas el 08/11/2026. Al terminar la parte 3 se marca [x] el 4.13. El 4.12 se salta hasta tener el 4.17. Hallazgos abiertos: 4.18 (`/login` revela cuentas por tiempo) y 4.19 (consola: “Actualizar usuario” sin validar). **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar) y `2026-11-08_version_sesion.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.14** (A-41): `tests/test_seguridad.py` hace `import api` directo y así carga el `.env` real con `load_dotenv()`; desactivarlo como en `tests/test_correo.py` o usar `_importar_api()` de `tests/test_errores.py` (revisar también los `import api` de `tests/test_esquema.py`). Solo backend, no toca la BD. El 4.13 quedó cerrado el 08/11/2026 en tres partes: API y BD (`3c039ec`), web (`aeb6e99`) y móvil (`383beb0`, aviso con `Alert.alert`). El 4.12 se salta hasta tener el 4.17. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me` (la web lo corrigió en el 4.7); preguntar si se anota como 4.20. Hallazgos abiertos: 4.18 (`/login` revela cuentas por tiempo) y 4.19 (consola: “Actualizar usuario” sin validar). **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar) y `2026-11-08_version_sesion.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
