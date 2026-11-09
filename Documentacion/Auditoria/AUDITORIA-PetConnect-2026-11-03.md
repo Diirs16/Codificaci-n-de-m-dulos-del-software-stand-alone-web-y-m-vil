@@ -275,6 +275,18 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   11 omitidas que requieren MariaDB. Con MariaDB temporal (`PETCONNECT_PRUEBA_BD=1`, ejecutada por el dueño del proyecto
   con respaldo previo): `test_esquema.PruebasEsquemaEnBD` 6 de 6 OK, incluida `test_mascota_privada_solo_la_ve_su_dueno`
   (una mascota `activa` → 404 en la ruta pública y con el token de otro usuario, 200 con el del dueño, con el SQL real).
+- **Actualización 09/11/2026 (ítem 4.15, commits `d03871b` y `400061f`, solo backend; no toca el esquema).** El SQL
+  de productos y mascotas salió de `api.py` a `dao/`. Parte 1: `MascotaDAO` y `ProductoDAO` ya no atrapan los errores
+  de la BD ni imprimen el mensaje de MySQL (Ley 1581): los dejan subir, como `SolicitudDAO` y `OtpDAO`, y la consola
+  los atrapa en el ciclo de cada menú con un aviso que solo trae el número del error (`vista/aviso_bd.py`). Parte 2:
+  las 5 consultas pasan, copiadas tal cual, a `ProductoDAO.consultar_catalogo` / `consultar_catalogo_por_id` y
+  `MascotaDAO.consultar_en_adopcion` / `consultar_en_adopcion_por_id` / `consultar_del_dueno`, que devuelven
+  diccionarios con los mismos alias (el JSON no cambia); la doble barrera sigue en `api.py`. `_verificar_bd()` se
+  queda solo para `UsuarioDAO`, que todavía se traga los errores (igual que `ProveedorDAO`). Regresión:
+  `tests/test_dao_errores.py` (9: los métodos de 4 DAO dejan subir el error sin imprimir, la consola avisa sin el
+  mensaje y `api.py` no tiene SQL) + su caso en `test_sin_env_real.py`; `test_mascotas.py`, `test_endpoints.py` y
+  `test_errores.py` (503 con BD caída) pasan sin cambios. Contraprueba: con los DAO viejos fallan 2 (28 casos), con
+  los menús viejos 4 y con el `api.py` viejo 2 (3 casos).
 
 #### A-08 · 🟠 Alta · Configuración insegura y errores internos expuestos — NC-007 [A + N]
 - `api.py:458` → `app.run(debug=True)`: el depurador de Werkzeug permite ejecutar código si se expone. [A]
@@ -1029,6 +1041,10 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   cada una de las 31 pruebas falla con al menos una. Hallazgo nuevo: `GET /api/productos/<id>` no filtra
   `activo = TRUE` (un producto descontinuado se ve por su URL); por decisión del dueño no se tocó `api.py` y quedó
   como ítem 4.16.
+  **Resuelto el 09/11/2026 (ítem 4.16, commit `4b5d18e`):** `ProductoDAO.consultar_catalogo_por_id` filtra
+  `activo = TRUE` y `api.py` lo vuelve a revisar (doble barrera); un producto descontinuado responde el 404
+  “Producto no encontrado” de siempre (web y móvil ya lo muestran). Regresión: 2 pruebas en
+  `PruebasProductos`; contraprueba: sin el filtro del DAO falla 1, sin la revisión de `api.py` fallan 2 casos.
 - **Integración continua (ítem 4.3, commit `8802815`):** `.github/workflows/ci.yml` corre en GitHub Actions
   (`ubuntu-latest`) en cada push y con el botón “Run workflow”, con un job por módulo: backend (Python 3.14,
   `pip install -r requirements.txt` y `unittest`), web (Node 24: `npm ci`, `npm run lint`, `npm test` y

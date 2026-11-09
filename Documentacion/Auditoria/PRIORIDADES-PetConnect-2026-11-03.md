@@ -92,8 +92,8 @@ se borra de aquí y se marca `[x]` en su fase.
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
 | [x] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 — *Parte 1 de 3 (API y BD) hecha el 08/11/2026 (`3c039ec`). Decisiones del dueño (las recomendadas): ruta `POST /api/auth/logout` y botones por partes (cierra la sesión en todos los aparatos: un contador por cuenta); `require_auth` rechaza con 401 las cuentas con estado distinto de `activo`; los tokens viejos sin versión no valen. Columna `usuarios.version_sesion` (migración `2026-11-08_version_sesion.sql`), token con `sub`, `ver`, `iat` y `exp` (sin correo), `require_auth` consulta la sesión en cada petición (BD caída → 503), la API no arranca sin la columna. `tests/test_sesiones.py` (26; 5 con MariaDB). Suite 395 (345 + 50 omitidas). Contraprueba: fallan las 21 nuevas sin BD. **Falta del dueño: aplicar la migración (con respaldo).** Parte 2 de 3 (web) hecha el 08/11/2026 (`aeb6e99`): el botón “Cerrar sesión” llama a `POST /api/auth/logout` y siempre borra la sesión local (401, 503, sin red o 8 s sin respuesta); decisiones del dueño A1 (aviso `role="status"` si el servidor no confirmó) y B1 (botón desactivado, “Cerrando sesión…”); `FormularioSolicitud` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.js` (10); `npm test` 61. Contraprueba: fallan las 10 nuevas. Parte 3 de 3 (móvil) hecha el 08/11/2026 (`383beb0`): el botón “Cerrar sesión” de `ProfileScreen` llama a `POST /api/auth/logout` con límite de 8 s (`AbortController`) y siempre borra la sesión del celular; mismas reglas que la web (A1, B1); decisión del dueño para el aviso: opción A, `Alert.alert` (la pantalla Perfil desaparece al cerrar sesión: un texto no alcanzaría a verse). `FormularioSolicitud.js` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.mjs` (12); `npm test` 47; `expo export` web OK. Contraprueba: fallan las 12 nuevas y pasan las 35 de antes. **Ítem cerrado.** Opcional del dueño: probarlo con la API real (necesita la migración)* | 🟡 |
 | [x] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` — *Hecho el 09/11/2026 en una parte (`08e61ec`, solo pruebas del backend; no toca la BD ni `api.py`). Revisión con un “espía” (cambia `load_dotenv` por una función que no carga nada y cuenta las llamadas): `test_seguridad.py` lo cargaba también en la suite completa (unittest importa todos los archivos antes de correr la primera prueba y era el primero en importar `api.py`), y `test_esquema.py` corrido solo lo cargaba en `PruebasEsquemaSinBD` (`config.db_config` y `seed.py`, que pedía la `FERNET_KEY` real). Decisión del dueño: opción A, `_importar_api()` de `tests/test_errores.py`, y opción 2, arreglar también `test_esquema.py`. `test_seguridad.py`: `api = _importar_api()` al importarse (la ruta de prueba se registra ahí). `test_esquema.py`: `_importar_api()` en el `setUpClass` de `PruebasEsquemaSinBD`; los `import api` de las pruebas con BD (~297 y ~314) se dejan a propósito, con un comentario (solo corren con `PETCONNECT_PRUEBA_BD=1`, cuando el `.env` ya se leyó para conectarse a MariaDB). Regresión: `tests/test_sin_env_real.py` (2): corre cada archivo en un Python aparte con el espía y un entorno mínimo; exige 0 llamadas y 0 fallos. Suite 397 (347 + 50 omitidas); el espía sobre la suite completa: 0 llamadas (antes 1). Contraprueba con `git stash` de los dos archivos: fallan 2 de 2 (`test_seguridad`: 3 llamadas; `test_esquema`: 1 prueba se rompe sin el `.env`). No cierra NC* | 🟢 |
-| [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`* | 🟡 |
-| [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
+| [x] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`. **Hecho el 09/11/2026 en 2 partes (solo backend; no toca el esquema).** Parte 1 (`d03871b`): `MascotaDAO` y `ProductoDAO` sin `try/except` + `print` en sus 14 métodos (dejan subir el error; los `rollback()` se quedan); hallazgo del plan: la consola también los usa y se habría cerrado con una traza, así que `vista/menu_mascotas.py` y `vista/menu_productos.py` atrapan el error en su ciclo con `vista/aviso_bd.py` (solo el número del error de MySQL, nunca el mensaje). Parte 2 (`400061f`): las 5 consultas pasan tal cual a `ProductoDAO.consultar_catalogo`/`consultar_catalogo_por_id` y `MascotaDAO.consultar_en_adopcion`/`consultar_en_adopcion_por_id`/`consultar_del_dueno` (diccionarios con los mismos alias: el JSON no cambia); `api.py` sin cursores; `_verificar_bd()` sigue para `UsuarioDAO`. Regresión: `tests/test_dao_errores.py` (9) + 1 caso en `test_sin_env_real.py`; `test_pool.py` cuenta 46 métodos (22 escrituras, 24 lecturas); `test_mascotas`, `test_endpoints` y `test_errores` sin cambios. Suite 407 (357 + 50 omitidas). Contraprueba: DAO viejos → fallan 2 (28 casos); menús viejos → 4; `api.py` viejo → 2 (3 casos). No cierra NC. Opcional del dueño: `PETCONNECT_PRUEBA_BD=1` y la consola. Hallazgo: `UsuarioDAO` y `ProveedorDAO` todavía se tragan los errores y hacen `print` (preguntar si se anota)* | 🟡 |
+| [x] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 — *Hecho el 09/11/2026 en una parte, justo después del 4.15 (`4b5d18e`, solo backend). El SQL de `ProductoDAO.consultar_catalogo_por_id` filtra `activo = TRUE` y `api.py` lo revisa otra vez (doble barrera, como las mascotas); web y móvil sin cambios (ya muestran el 404). Regresión: 2 pruebas en `PruebasProductos` (la nota de pendiente se quitó). Suite 409 (359 + 50 omitidas). Contraprueba: sin el filtro del DAO falla 1; sin la revisión de `api.py` fallan 2 casos. Sin datos personales; no cierra NC* | 🟢 |
 | [ ] | 4.17 | A-11 | NC-003 | Paginación e índices (la otra mitad de la acción correctiva de NC-003). **Paginación:** `GET /api/productos` y `GET /api/mascotas/adopcion` devuelven todas las filas sin `LIMIT`; la web y el móvil las consumen (`src/services/api.js` en ambos), así que cambiar la forma de la respuesta toca los 3 módulos: decidir antes si se usan parámetros opcionales (`?pagina=&por_pagina=` con un máximo fijo, parametrizados) que mantengan la lista de hoy o un objeto con `total`, y hacerlo por partes (API, web, móvil). **Índices:** `mascotas` solo tiene la clave primaria y `id_usuario` (falta `estado`), `productos` no tiene índice en `activo` y `proveedores_servicio` solo la clave primaria (`ciudad`, `activo`, `nombre`); el `LIKE '%texto%'` no usa índice. Va en `sql/schema.sql` y en una migración de `sql/migraciones/` con su prueba en `tests/test_esquema.py` (toca la BD: plan primero, respaldo y que el dueño la aplique). Agregado el 07/11/2026 con el sí del dueño, al cerrar el 4.5. Hacerlo antes del 4.12 | 🟡 |
 | [ ] | 4.18 | A-14 | — | `/api/auth/login` revela cuentas por **tiempo**: si el correo no existe responde enseguida (`usuario is None` corta antes de bcrypt) y si existe calcula bcrypt (~0,3 s) aunque la contraseña sea mala. Arreglo: comparar contra un hash bcrypt fijo de relleno cuando no hay usuario (mismo costo 12), responder el mismo 401 y una prueba que cuente las llamadas a `verificar_password`/bcrypt en los dos casos. Solo backend. Surgió en el 4.10 (08/11/2026) | 🟢 |
 | [ ] | 4.19 | A-18 | — | Consola, “6. Actualizar usuario” (`vista/menu_usuarios.py`, `_actualizar_usuario`): cambia nombres, apellidos y correo **sin validar** (acepta una URL como nombre o `x` como correo) y un correo que ya tiene otra cuenta hace fallar el `UPDATE`, cuyo `print` muestra el mensaje de MySQL con el correo (Ley 1581). Arreglo: usar `validar_nombre` y `validar_formato_correo` de `security/datos_usuario.py` (ya comunes desde el 4.11) y avisar “ese correo ya tiene una cuenta” como el registro; prueba en `tests/test_consola_registro.py` o una nueva. Solo backend. Surgió en el 4.11 (08/11/2026) | 🟢 |
@@ -149,10 +149,10 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 09/11/2026, actualizada al terminar el 4.14 (A-41: las pruebas ya no cargan el `.env` real;
-`test_seguridad.py` y `test_esquema.py` usan `_importar_api()` y `tests/test_sin_env_real.py` lo vigila; solo pruebas del
-backend; no cierra NC). Lo próximo es el 4.15 (mover el SQL de productos y mascotas de `api.py` a `dao/`). El 4.12 se
-salta hasta tener el 4.17.
+*Versión del 09/11/2026, actualizada al terminar el 4.15 y el 4.16 (el SQL de productos y mascotas salió de
+`api.py` a `dao/`, los DAO dejan subir los errores y el detalle de producto oculta los descontinuados; solo backend;
+no cierran NC). Lo próximo es el 4.17 (paginación e índices; toca la BD y los 3 módulos). El 4.12 se salta hasta
+tener el 4.17; el 4.18 y el 4.19 se pueden adelantar.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -179,6 +179,40 @@ Lee primero:
   todavía: desde 240116e (4.1) en adelante.
 
 Estado conocido (9/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.16 HECHO el 09/11/2026 (commit 4b5d18e, solo backend; no toca la BD; no
+  cierra NC). ProductoDAO.consultar_catalogo_por_id filtra activo = TRUE y
+  api.py lo revisa otra vez (doble barrera): un producto descontinuado
+  responde el 404 "Producto no encontrado". Web y móvil sin cambios.
+  2 pruebas en test_endpoints.PruebasProductos. Suite 409 (359 + 50
+  omitidas). Contraprueba: sin el filtro del DAO falla 1; sin la revisión
+  de api.py fallan 2 casos.
+- 4.15 HECHO el 09/11/2026 en 2 partes (solo backend; no toca la BD; no
+  cierra NC). Parte 1 (d03871b): MascotaDAO y ProductoDAO ya no tienen
+  try/except + print (dejan subir el error, como SolicitudDAO y OtpDAO;
+  los rollback() se quedan). La consola los usaba: vista/menu_mascotas.py
+  y vista/menu_productos.py atrapan mysql.connector.Error en su ciclo y
+  llaman a vista/aviso_bd.py (avisar_error_bd: solo el número del error de
+  MySQL, nunca el mensaje; sin número = "La base de datos no respondio").
+  Parte 2 (400061f): las 5 consultas de api.py pasaron tal cual a
+  ProductoDAO.consultar_catalogo / consultar_catalogo_por_id y
+  MascotaDAO.consultar_en_adopcion / consultar_en_adopcion_por_id /
+  consultar_del_dueno (dictionary=True, mismos alias: el JSON no cambia).
+  api.py ya no importa conexion_y_cursor; _verificar_bd() sigue solo para
+  UsuarioDAO. tests/test_dao_errores.py (9): los métodos de 4 DAO dejan
+  subir el error sin imprimir (con un correo inventado en el mensaje), la
+  consola avisa sin el mensaje y vuelve al menú, y api.py no tiene SQL
+  (ast + regex; ni cursor.execute ni conexion_y_cursor). Está en
+  test_sin_env_real.py. test_pool.py: 46 métodos, 22 escrituras y 24
+  lecturas. Contraprueba: DAO viejos → fallan 2 (28 casos); menús viejos
+  → 4; api.py viejo → 2 (3 casos). Opcional del dueño: las pruebas con
+  PETCONNECT_PRUEBA_BD=1 (test_esquema llama a get_mascotas_adopcion y a
+  la mascota privada) y abrir la consola.
+- Hallazgo sin ítem (visto en el 4.15, preguntar al dueño si se anota):
+  UsuarioDAO y ProveedorDAO todavía se tragan los errores de la BD, hacen
+  print del mensaje de MySQL (Ley 1581) y devuelven None/[]/False; por eso
+  api.py sigue llamando a _verificar_bd() antes de UsuarioDAO. Mismo
+  arreglo que el 4.15 (y la consola de usuarios y proveedores con
+  avisar_error_bd). Se cruza con el 4.19.
 - 4.14 HECHO el 09/11/2026 (A-41; commit 08e61ec, solo pruebas; no toca la BD
   ni api.py; no cierra NC). Un "espía" (load_dotenv cambiado por una
   función que no carga nada y cuenta llamadas) mostró que test_seguridad.py
@@ -1172,33 +1206,26 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.15: mover el SQL de productos y mascotas de
-api.py a dao/; solo backend, no toca el esquema):
-- Regla de petconnect.Backend/CLAUDE.md: el SQL solo vive en dao/. Hoy
-  api.py tiene 5 consultas propias (~382-475): _SQL_PRODUCTOS,
-  _SQL_PRODUCTO_BY_ID, _SQL_MASCOTAS_ADOPCION, _SQL_MASCOTA_ADOPCION_BY_ID y
-  _SQL_MASCOTA_DEL_USUARIO (las dos últimas por _consultar_mascota), ya
-  con conexion_y_cursor() (4.5).
-- Por qué no se usaron los DAO: mascota_dao.py y producto_dao.py (y
-  proveedor_dao, usuario_dao) atrapan los errores con try/except Error,
-  hacen print del mensaje de MySQL (puede traer un correo: Ley 1581) y
-  devuelven None/[]; así el 503 del 2.3 se volvería 404 o lista vacía.
-  Antes de mover el SQL, esos métodos deben PROPAGAR el error. Modelo:
-  dao/solicitud_dao.py y dao/otp_dao.py (sin print).
-- _verificar_bd() se llama en varias rutas de auth (~553-1094); revisar si
-  sigue haciendo falta en productos/mascotas al usar el DAO.
-- Ojo con el 4.16 (GET /api/productos/<id> sin filtro activo = TRUE): se
-  puede hacer junto con el 4.15 si el dueño quiere (dímelo).
-- Pruebas de modelo: tests/test_mascotas.py, tests/test_endpoints.py,
-  tests/test_errores.py (503 con BD caída) y tests/test_pool.py (inventario
-  de escrituras/lecturas por su SQL: hay que mantenerlo al día). Las
-  pruebas con BD real (test_esquema.PruebasEsquemaEnBD, ~298 y ~314,
-  llaman a api.get_mascotas_adopcion y la ruta de la mascota privada):
-  pedirle al dueño que las corra con PETCONNECT_PRUEBA_BD=1.
-- Plan primero: toca más de 3 archivos (DAO, api.py, pruebas). Proponer
-  si va por partes (primero propagar errores, luego mover el SQL).
-- Luego sigue el 4.16 (el 4.12 se salta hasta tener el 4.17). El 4.18 y
-  el 4.19 se pueden adelantar si el dueño quiere.
+Contexto del próximo paso (4.17: paginación e índices, A-11, NC-003; toca
+la BD y los 3 módulos):
+- Leer la fila del 4.17 en PRIORIDADES y el A-11 en la AUDITORÍA.
+- Paginación: GET /api/productos y GET /api/mascotas/adopcion devuelven
+  todas las filas. Desde el 4.15 el SQL está en dao/: el LIMIT/OFFSET va
+  en ProductoDAO.consultar_catalogo y MascotaDAO.consultar_en_adopcion
+  (parametrizado), no en api.py (tests/test_dao_errores.py vigila que
+  api.py no tenga SQL). La web y el móvil las leen en src/services/api.js:
+  decidir antes si se usan parámetros opcionales (?pagina=&por_pagina=
+  con un máximo fijo) que mantengan la lista de hoy, o un objeto con
+  total; hacerlo por partes (API, web, móvil).
+- Índices: mascotas(estado), productos(activo) y proveedores_servicio
+  (ciudad, activo, nombre). Van en sql/schema.sql y en una migración de
+  sql/migraciones/ con su prueba en tests/test_esquema.py. Toca la BD:
+  plan primero, respaldo y la migración la aplica el dueño (MariaDB: avisar
+  si algo es SQL propio de MySQL).
+- Pendientes del dueño que se cruzan: migraciones 2026-11-07_otp_pendientes.sql
+  (sin confirmar) y 2026-11-08_version_sesion.sql sin aplicar.
+- Luego el 4.12 (repetir la prueba de carga). El 4.18 y el 4.19 son solo
+  backend y se pueden adelantar si el dueño quiere.
 
 Luego:
 1. Toma el PRIMER ítem sin marcar ([ ]) en orden de fases, saltando los que
@@ -1237,4 +1264,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.15**: mover el SQL de productos y mascotas de `api.py` a `dao/`; antes, que los DAO propaguen los errores de la BD (hoy hacen `print` y devuelven `None`/`[]`, y el 503 del 2.3 se volvería 404 o lista vacía). Solo backend, no toca el esquema; plan primero (más de 3 archivos). El 4.16 se puede hacer junto. El 4.14 (A-41) quedó hecho el 09/11/2026: las pruebas importan `api.py` con `_importar_api()` y `tests/test_sin_env_real.py` vigila que nadie llame a `load_dotenv`. El 4.12 se salta hasta tener el 4.17. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me` (la web lo corrigió en el 4.7); preguntar si se anota como 4.20. Hallazgos abiertos: 4.18 (`/login` revela cuentas por tiempo) y 4.19 (consola: “Actualizar usuario” sin validar). **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar) y `2026-11-08_version_sesion.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.17**: paginación e índices (la otra mitad de la acción correctiva de NC-003); toca la BD (migración con respaldo, la aplica el dueño) y los 3 módulos: plan primero y por partes. El SQL de productos y mascotas ya está en `dao/` (4.15), así que el `LIMIT` va en `ProductoDAO.consultar_catalogo` y `MascotaDAO.consultar_en_adopcion`. El 4.15 y el 4.16 quedaron hechos el 09/11/2026 (`d03871b`, `400061f`, `4b5d18e`). El 4.12 va después del 4.17. El 4.18 (`/login` revela cuentas por tiempo) y el 4.19 (consola: “Actualizar usuario” sin validar) son solo backend y se pueden adelantar. Hallazgos sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me` (¿4.20?) y `UsuarioDAO`/`ProveedorDAO` todavía se tragan los errores de la BD (¿4.21?); preguntar si se anotan. **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar) y `2026-11-08_version_sesion.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
