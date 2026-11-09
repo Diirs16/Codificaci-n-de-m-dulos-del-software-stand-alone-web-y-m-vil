@@ -91,7 +91,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.11 | A-18 | — | Consola: `getpass`, sin `.strip()`, misma política que la API, autorización de datos — *Hecho el 08/11/2026 en una parte (`3e814e3`, solo backend; no toca el esquema). Decisiones del dueño (las recomendadas): la consola no da la autorización por el titular (Ley 1581, art. 9; política C.6): guarda `acepta_datos = False` explícito y avisa que el titular la dará al iniciar sesión (3.5); nombre, apellidos y formato del correo como la API (sin DNS); correo repetido → “Ese correo ya tiene una cuenta”, sin repetirlo ni calcular bcrypt; contraseña dos veces con `getpass` y sin `.strip()`, por `validar_contrasena`. Módulo común nuevo `security/datos_usuario.py` (sacado de `api.py`; la consola no importa `api.py`, A-41). Regresión: `tests/test_consola_registro.py` (26). Suite 365 (320 + 45 omitidas). Contraprueba: con la consola vieja fallan 13 (registraba `PETCONNECT1!`) y pasan a propósito 13; con el `api.py` viejo falla 1. No cierra NC. Hallazgo → 4.19. Opcional del dueño: probarlo con `python main.py`* | 🟢 |
 | [ ] | 4.12 | — | NC-003 | Repetir la prueba de carga (CP-008/CP-017) tras 4.5, 4.6 y 4.17 (saltarlo hasta que esos estén hechos) | 🟡 |
 | [x] | 4.13 | A-03 | — | Revocar sesiones: columna `usuarios.version_sesion` dentro del token y comparada en `require_auth` (sumar 1 al cerrar sesión o cambiar la contraseña); quitar el correo del token (se puede leer); si se guardan ids de sesión, solo su hash SHA-256. **Requiere 4.5** (hecho el 07/11/2026). No reemplaza 2.2 — *Parte 1 de 3 (API y BD) hecha el 08/11/2026 (`3c039ec`). Decisiones del dueño (las recomendadas): ruta `POST /api/auth/logout` y botones por partes (cierra la sesión en todos los aparatos: un contador por cuenta); `require_auth` rechaza con 401 las cuentas con estado distinto de `activo`; los tokens viejos sin versión no valen. Columna `usuarios.version_sesion` (migración `2026-11-08_version_sesion.sql`), token con `sub`, `ver`, `iat` y `exp` (sin correo), `require_auth` consulta la sesión en cada petición (BD caída → 503), la API no arranca sin la columna. `tests/test_sesiones.py` (26; 5 con MariaDB). Suite 395 (345 + 50 omitidas). Contraprueba: fallan las 21 nuevas sin BD. **Falta del dueño: aplicar la migración (con respaldo).** Parte 2 de 3 (web) hecha el 08/11/2026 (`aeb6e99`): el botón “Cerrar sesión” llama a `POST /api/auth/logout` y siempre borra la sesión local (401, 503, sin red o 8 s sin respuesta); decisiones del dueño A1 (aviso `role="status"` si el servidor no confirmó) y B1 (botón desactivado, “Cerrando sesión…”); `FormularioSolicitud` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.js` (10); `npm test` 61. Contraprueba: fallan las 10 nuevas. Parte 3 de 3 (móvil) hecha el 08/11/2026 (`383beb0`): el botón “Cerrar sesión” de `ProfileScreen` llama a `POST /api/auth/logout` con límite de 8 s (`AbortController`) y siempre borra la sesión del celular; mismas reglas que la web (A1, B1); decisión del dueño para el aviso: opción A, `Alert.alert` (la pantalla Perfil desaparece al cerrar sesión: un texto no alcanzaría a verse). `FormularioSolicitud.js` tras un 401 solo cierra en local. `tests/cerrar-sesion.test.mjs` (12); `npm test` 47; `expo export` web OK. Contraprueba: fallan las 12 nuevas y pasan las 35 de antes. **Ítem cerrado.** Opcional del dueño: probarlo con la API real (necesita la migración)* | 🟡 |
-| [ ] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` | 🟢 |
+| [x] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` — *Hecho el 09/11/2026 en una parte (`08e61ec`, solo pruebas del backend; no toca la BD ni `api.py`). Revisión con un “espía” (cambia `load_dotenv` por una función que no carga nada y cuenta las llamadas): `test_seguridad.py` lo cargaba también en la suite completa (unittest importa todos los archivos antes de correr la primera prueba y era el primero en importar `api.py`), y `test_esquema.py` corrido solo lo cargaba en `PruebasEsquemaSinBD` (`config.db_config` y `seed.py`, que pedía la `FERNET_KEY` real). Decisión del dueño: opción A, `_importar_api()` de `tests/test_errores.py`, y opción 2, arreglar también `test_esquema.py`. `test_seguridad.py`: `api = _importar_api()` al importarse (la ruta de prueba se registra ahí). `test_esquema.py`: `_importar_api()` en el `setUpClass` de `PruebasEsquemaSinBD`; los `import api` de las pruebas con BD (~297 y ~314) se dejan a propósito, con un comentario (solo corren con `PETCONNECT_PRUEBA_BD=1`, cuando el `.env` ya se leyó para conectarse a MariaDB). Regresión: `tests/test_sin_env_real.py` (2): corre cada archivo en un Python aparte con el espía y un entorno mínimo; exige 0 llamadas y 0 fallos. Suite 397 (347 + 50 omitidas); el espía sobre la suite completa: 0 llamadas (antes 1). Contraprueba con `git stash` de los dos archivos: fallan 2 de 2 (`test_seguridad`: 3 llamadas; `test_esquema`: 1 prueba se rompe sin el `.env`). No cierra NC* | 🟢 |
 | [ ] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`* | 🟡 |
 | [ ] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 | 🟢 |
 | [ ] | 4.17 | A-11 | NC-003 | Paginación e índices (la otra mitad de la acción correctiva de NC-003). **Paginación:** `GET /api/productos` y `GET /api/mascotas/adopcion` devuelven todas las filas sin `LIMIT`; la web y el móvil las consumen (`src/services/api.js` en ambos), así que cambiar la forma de la respuesta toca los 3 módulos: decidir antes si se usan parámetros opcionales (`?pagina=&por_pagina=` con un máximo fijo, parametrizados) que mantengan la lista de hoy o un objeto con `total`, y hacerlo por partes (API, web, móvil). **Índices:** `mascotas` solo tiene la clave primaria y `id_usuario` (falta `estado`), `productos` no tiene índice en `activo` y `proveedores_servicio` solo la clave primaria (`ciudad`, `activo`, `nombre`); el `LIKE '%texto%'` no usa índice. Va en `sql/schema.sql` y en una migración de `sql/migraciones/` con su prueba en `tests/test_esquema.py` (toca la BD: plan primero, respaldo y que el dueño la aplique). Agregado el 07/11/2026 con el sí del dueño, al cerrar el 4.5. Hacerlo antes del 4.12 | 🟡 |
@@ -149,9 +149,10 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 08/11/2026, actualizada al terminar el 4.13 (parte 3 de 3, A-03, móvil: el botón “Cerrar sesión” de
-ProfileScreen llama a `POST /api/auth/logout` y siempre borra la sesión del celular; solo Móvil; no cierra NC). Lo
-próximo es el 4.14 (A-41: `tests/test_seguridad.py` no debe cargar el `.env` real). El 4.12 se salta hasta tener el 4.17.
+*Versión del 09/11/2026, actualizada al terminar el 4.14 (A-41: las pruebas ya no cargan el `.env` real;
+`test_seguridad.py` y `test_esquema.py` usan `_importar_api()` y `tests/test_sin_env_real.py` lo vigila; solo pruebas del
+backend; no cierra NC). Lo próximo es el 4.15 (mover el SQL de productos y mascotas de `api.py` a `dao/`). El 4.12 se
+salta hasta tener el 4.17.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -177,7 +178,24 @@ Lee primero:
   commits pendientes y pregunta (push normal, nunca --force). Sin subir
   todavía: desde 240116e (4.1) en adelante.
 
-Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el git log):
+Estado conocido (9/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.14 HECHO el 09/11/2026 (A-41; commit 08e61ec, solo pruebas; no toca la BD
+  ni api.py; no cierra NC). Un "espía" (load_dotenv cambiado por una
+  función que no carga nada y cuenta llamadas) mostró que test_seguridad.py
+  cargaba el .env también en la suite completa (unittest importa todos los
+  archivos antes de correr y era el primero en importar api.py) y que
+  test_esquema.py corrido solo lo cargaba en PruebasEsquemaSinBD
+  (config.db_config y seed.py, que pedía la FERNET_KEY real). Decisión del
+  dueño: _importar_api() (opción A) y arreglar también test_esquema
+  (opción 2). test_seguridad.py: api = _importar_api() al importarse (la
+  ruta /_prueba/protegida se registra ahí). test_esquema.py:
+  _importar_api() en el setUpClass de PruebasEsquemaSinBD; los import api
+  de las pruebas con BD se dejan a propósito con comentario. Nuevo
+  tests/test_sin_env_real.py (2): corre test_seguridad y test_esquema en un
+  Python aparte con el espía y un entorno mínimo (sin
+  PETCONNECT_PRUEBA_BD); exige 0 llamadas y 0 fallos. Archivo de prueba
+  nuevo que importe api.py o config/: usar _importar_api() y agregarlo a
+  test_sin_env_real.py. Suite 397 (347 + 50 omitidas).
 - 4.13 CERRADO: PARTE 3 de 3 HECHA el 08/11/2026 (A-03; commit 383beb0,
   solo móvil; no toca la BD; no cierra NC). Mismas reglas que la web (A1,
   B1, siempre se borra lo local, tras un 401 solo cierre local).
@@ -736,7 +754,9 @@ Estado conocido (8/11/2026; si el git log muestra más ítems hechos, manda el g
   discover -s tests, no como tests.test_x). tests/test_logs.py es el modelo para
   simular una BD "encendida" (obtener_conexion -> MagicMock) con UsuarioDAO falso.
   tests/test_esquema.py tiene las pruebas con MariaDB real (PETCONNECT_PRUEBA_BD=1,
-  solo bases temporales). Pendiente 4.14 para test_seguridad.py.
+  solo bases temporales). Desde el 4.14 todas las pruebas importan api.py
+  con _importar_api() (salvo las de BD de test_esquema, a propósito) y
+  tests/test_sin_env_real.py lo vigila con un espía de load_dotenv.
 - Las rutas de prueba se registran al importar el archivo, no en setUpClass
   (Flask prohíbe registrar rutas después de la primera petición).
 - La web (src/services/api.js:20) y el móvil (src/services/api.js:34) muestran
@@ -1152,32 +1172,32 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.14, A-41: pruebas que importan api.py; solo
-backend, no toca la BD):
-- A-41: un script que importa api.py carga el .env real con
-  load_dotenv() (no imprime nada, pero choca con la regla 4 de
-  CLAUDE.md y la memoria no-importar-api-con-env-real).
-- Ya resuelto en otras pruebas: tests/test_correo.py (~20-27) y
-  tests/test_errores.py (_importar_api(), ~33-55) reemplazan
-  dotenv.load_dotenv por una función que no hace nada y la restauran
-  después. test_endpoints, test_sesiones y casi todas las demás usan
-  _importar_api() de test_errores.
-- Falta: tests/test_seguridad.py hace "import api" directo (~31, tras
-  fijar FERNET_KEY/JWT_SECRET de prueba con os.environ.setdefault).
-  Revisar también tests/test_esquema.py (~297 y ~314, "import api"
-  dentro de pruebas con BD). En la suite completa api ya puede estar en
-  sys.modules (lo cargó _importar_api), pero al correr el archivo solo
-  sí se carga el .env.
-- OJO: FERNET_KEY y JWT_SECRET de prueba se fijan ANTES del import y
-  load_dotenv() no pisa lo que ya existe (override=False), así que esas
-  dos ganan; el problema es que el RESTO del .env (BD, correo) sí entra
-  a os.environ. Preguntar si conviene usar _importar_api() en esos dos
-  archivos (lo más simple) o repetir el bloque de test_correo.
-- Prueba de regresión sugerida: correr test_seguridad en un proceso
-  aparte con load_dotenv vigilado (o revisar el texto) y comprobar que
-  no se llama. Contraprueba con el test_seguridad.py viejo. NUNCA
-  imprimir valores de configuración.
-- Luego sigue el 4.15 (el 4.12 se salta hasta tener el 4.17). El 4.18 y
+Contexto del próximo paso (4.15: mover el SQL de productos y mascotas de
+api.py a dao/; solo backend, no toca el esquema):
+- Regla de petconnect.Backend/CLAUDE.md: el SQL solo vive en dao/. Hoy
+  api.py tiene 5 consultas propias (~382-475): _SQL_PRODUCTOS,
+  _SQL_PRODUCTO_BY_ID, _SQL_MASCOTAS_ADOPCION, _SQL_MASCOTA_ADOPCION_BY_ID y
+  _SQL_MASCOTA_DEL_USUARIO (las dos últimas por _consultar_mascota), ya
+  con conexion_y_cursor() (4.5).
+- Por qué no se usaron los DAO: mascota_dao.py y producto_dao.py (y
+  proveedor_dao, usuario_dao) atrapan los errores con try/except Error,
+  hacen print del mensaje de MySQL (puede traer un correo: Ley 1581) y
+  devuelven None/[]; así el 503 del 2.3 se volvería 404 o lista vacía.
+  Antes de mover el SQL, esos métodos deben PROPAGAR el error. Modelo:
+  dao/solicitud_dao.py y dao/otp_dao.py (sin print).
+- _verificar_bd() se llama en varias rutas de auth (~553-1094); revisar si
+  sigue haciendo falta en productos/mascotas al usar el DAO.
+- Ojo con el 4.16 (GET /api/productos/<id> sin filtro activo = TRUE): se
+  puede hacer junto con el 4.15 si el dueño quiere (dímelo).
+- Pruebas de modelo: tests/test_mascotas.py, tests/test_endpoints.py,
+  tests/test_errores.py (503 con BD caída) y tests/test_pool.py (inventario
+  de escrituras/lecturas por su SQL: hay que mantenerlo al día). Las
+  pruebas con BD real (test_esquema.PruebasEsquemaEnBD, ~298 y ~314,
+  llaman a api.get_mascotas_adopcion y la ruta de la mascota privada):
+  pedirle al dueño que las corra con PETCONNECT_PRUEBA_BD=1.
+- Plan primero: toca más de 3 archivos (DAO, api.py, pruebas). Proponer
+  si va por partes (primero propagar errores, luego mover el SQL).
+- Luego sigue el 4.16 (el 4.12 se salta hasta tener el 4.17). El 4.18 y
   el 4.19 se pueden adelantar si el dueño quiere.
 
 Luego:
@@ -1217,4 +1237,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.14** (A-41): `tests/test_seguridad.py` hace `import api` directo y así carga el `.env` real con `load_dotenv()`; desactivarlo como en `tests/test_correo.py` o usar `_importar_api()` de `tests/test_errores.py` (revisar también los `import api` de `tests/test_esquema.py`). Solo backend, no toca la BD. El 4.13 quedó cerrado el 08/11/2026 en tres partes: API y BD (`3c039ec`), web (`aeb6e99`) y móvil (`383beb0`, aviso con `Alert.alert`). El 4.12 se salta hasta tener el 4.17. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me` (la web lo corrigió en el 4.7); preguntar si se anota como 4.20. Hallazgos abiertos: 4.18 (`/login` revela cuentas por tiempo) y 4.19 (consola: “Actualizar usuario” sin validar). **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar) y `2026-11-08_version_sesion.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.15**: mover el SQL de productos y mascotas de `api.py` a `dao/`; antes, que los DAO propaguen los errores de la BD (hoy hacen `print` y devuelven `None`/`[]`, y el 503 del 2.3 se volvería 404 o lista vacía). Solo backend, no toca el esquema; plan primero (más de 3 archivos). El 4.16 se puede hacer junto. El 4.14 (A-41) quedó hecho el 09/11/2026: las pruebas importan `api.py` con `_importar_api()` y `tests/test_sin_env_real.py` vigila que nadie llame a `load_dotenv`. El 4.12 se salta hasta tener el 4.17. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me` (la web lo corrigió en el 4.7); preguntar si se anota como 4.20. Hallazgos abiertos: 4.18 (`/login` revela cuentas por tiempo) y 4.19 (consola: “Actualizar usuario” sin validar). **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar) y `2026-11-08_version_sesion.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.

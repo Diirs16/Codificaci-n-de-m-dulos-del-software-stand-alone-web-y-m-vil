@@ -1064,6 +1064,15 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
 - Un script que **importa `api.py`** carga el `.env` real mediante `load_dotenv()`; ningún hook lo puede ver.
 - **Arreglo:** regla nueva en `CLAUDE.md`: los scripts de prueba que importen la API deben desactivar `load_dotenv`
   o usar variables de prueba explícitas, y **nunca imprimir** valores de configuración.
+- **Estado: resuelto el 09/11/2026 (ítem 4.14 de PRIORIDADES, commit `08e61ec`; la regla de `CLAUDE.md` ya existía).** Con un “espía”
+  (`load_dotenv` cambiado por una función que no carga nada y solo cuenta llamadas) se vio que `tests/test_seguridad.py`
+  cargaba el `.env` real también en la suite completa (era el primer archivo en importar `api.py`) y que
+  `tests/test_esquema.py`, corrido solo, lo cargaba en `PruebasEsquemaSinBD` (`config.db_config` y `seed.py`). Los dos
+  usan ahora `_importar_api()` de `tests/test_errores.py`; las pruebas con BD de `test_esquema.py` lo leen a propósito
+  (solo con `PETCONNECT_PRUEBA_BD=1`, para conectarse a MariaDB). Regresión: `tests/test_sin_env_real.py` (2) corre cada
+  archivo en un Python aparte con el espía y exige 0 llamadas. Suite 397 (347 + 50 omitidas); el espía sobre la suite
+  completa: 0 llamadas (antes 1). Contraprueba con los archivos viejos: fallan 2 de 2. Ningún valor de configuración se
+  leyó ni se imprimió. Los hooks siguen sin ver lecturas indirectas: la protección es la regla y esta prueba.
 
 ---
 
