@@ -105,7 +105,8 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   (`test_sin_jwt_secret_no_arranca`, `test_secreto_publico_de_ejemplo_no_arranca`, `test_secreto_de_31_bytes_no_arranca`:
   el código viejo arrancaba igual) y `test_secreto_de_64_caracteres_importa_bien` pasa con ambos (una clave válida
   nunca fue el problema). NC-007 sigue en corrección (2.3 y 4.8).
-- **Estado del ítem 4.13 (revocar sesiones): parte 1 de 3 (API y BD) hecha el 08/11/2026 (commit `3c039ec`); faltan la web y el móvil.**
+- **Estado del ítem 4.13 (revocar sesiones): partes 1 (API y BD, commit `3c039ec`) y 2 (web, commit `aeb6e99`) de 3
+  hechas el 08/11/2026; falta el móvil.**
   Decisiones del dueño (las recomendadas): (1) ruta `POST /api/auth/logout` y botones por partes (API → web → móvil);
   como hay un solo contador por cuenta, cerrar sesión cierra **en todos los aparatos**; descartada la tabla de sesiones
   por aparato (más tabla, limpieza y pruebas); (2) `require_auth` también rechaza cuentas con estado distinto de
@@ -133,6 +134,28 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   fallos y 9 errores) y 45 resultados en toda la suite; ninguna pasa a propósito (todas prueban comportamiento nuevo). **Falta del dueño:** aplicar la
   migración con respaldo (sin ella la API nueva no arranca) y, opcional, las pruebas con MariaDB. Fuera de alcance:
   no existe “cambiar contraseña”; cuando exista, debe llamar a `cerrar_sesiones()`.
+  **Parte 2 (web, 08/11/2026, commit `aeb6e99`).** Antes, el botón “Cerrar sesión” solo borraba el token del
+  navegador: un token copiado, o la sesión en otro aparato, seguía valiendo hasta 24 h. Decisiones del dueño (las
+  recomendadas): **A1**, avisar cuando el servidor no pudo confirmar el cierre, y **B1**, desactivar el botón mientras
+  espera. Cambios en `PetConnect.Front/petconnect-app`: `src/services/api.js` `cerrarSesionEnServidor()`
+  (`POST /auth/logout` con el token y `AbortSignal.timeout(TIEMPO_CIERRE_MS = 8000)`: si la API no contesta, cuenta
+  como sin red); `src/utils/sesion.js` `cerrarSesion({ leerToken, cerrarEnServidor, borrarLocal })` (JS puro) llama a
+  la API y **siempre** borra la sesión local; devuelve `"cerrada"` (200), `"ya-cerrada"` (401 o sin token: no llama a
+  la API) o `"sin-confirmar"` (503, 502, 500, sin red o tiempo agotado); no borra si mientras esperaba entró otra
+  cuenta (otro token). `src/context/AuthContext.jsx`: `logout()` usa `cerrarSesion` y nuevo `cerrarSesionLocal()`.
+  `src/components/Header.jsx`: los dos botones (escritorio “Salir” y menú móvil) usan `salir()`, quedan
+  desactivados con el texto “Cerrando sesión…” y, con `"sin-confirmar"`, muestran un aviso dentro de una zona
+  `role="status"`, con botón “Cerrar aviso” de 44×44 px (desaparece al cerrarlo o al volver a entrar).
+  `src/components/FormularioSolicitud.jsx`: tras un 401 usa `cerrarSesionLocal()` (ese token ya no vale; no se llama
+  a la API). Regresión: `tests/cerrar-sesion.test.js` (10); `tests/sesion.test.js` acepta que el import de
+  `utils/sesion` traiga también `cerrarSesion`. `npm test` 61 (51 + 10), `npm run lint` sin errores (los 2 avisos de
+  antes) y `npm run build` correctos. Contraprueba (`git stash` de los 5 archivos de `src/`): fallan las 10 nuevas y
+  pasan las 51 anteriores; ninguna nueva pasa a propósito. Revisión en el navegador a 375 px y en escritorio, con
+  respuestas de la API simuladas dentro de la página (sesión inventada): el botón cambia a “Cerrando sesión…” y se
+  desactiva; con 503 aparece el aviso y con 401 no; en ambos casos se borran el token y los datos; sin scroll
+  horizontal. `/impeccable audit`: detector sin hallazgos; pendientes menores fuera del ítem: al cerrar sesión el
+  foco del teclado vuelve al inicio de la página (el botón desaparece) y la web no tiene alternativa
+  `prefers-reduced-motion` para sus animaciones (también la del aviso). Falta la parte 3 (móvil).
 - **Pendiente relacionado (ítem 4.13, texto original del 03/11/2026):** hoy `require_auth` acepta el token solo por su firma, sin
   consultar la BD, así que una sesión no se puede cerrar antes de 24 h (ni al cambiar la contraseña). Además el token
   lleva el **correo**, y el contenido de un JWT se puede leer (base64, no cifrado). Propuesta: columna
