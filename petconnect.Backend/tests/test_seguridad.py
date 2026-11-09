@@ -28,7 +28,12 @@ os.environ["MAILTRAP_SMTP_PASS"] = ""
 import jwt  # noqa: E402
 from flask import jsonify, request  # noqa: E402
 
-import api  # noqa: E402
+# Item 4.14 (A-41): api.py se importa con load_dotenv apagado para no cargar el .env
+# real. Se llama aqui y no en setUpClass porque la ruta de prueba de abajo se registra
+# al importar este archivo.
+from test_errores import _importar_api  # noqa: E402
+
+api = _importar_api()
 from security import jwt_helper  # noqa: E402
 from security.jwt_helper import generate_token, verify_token  # noqa: E402
 from security.passwords import es_hash_heredado, hash_password, verificar_password  # noqa: E402

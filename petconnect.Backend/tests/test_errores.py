@@ -32,7 +32,8 @@ def _importar_api():
     Importa api.py con claves de prueba. Si esta prueba es la primera en importarlo,
     se desactiva load_dotenv para no cargar el .env real (como en test_correo.py).
     Si otra prueba ya lo importo, se reutiliza: estas pruebas no usan ningun valor
-    del .env (pendiente 4.14: test_seguridad.py todavia lo carga).
+    del .env. Item 4.14 (A-41): test_seguridad.py y test_esquema.py tambien la usan, y
+    tests/test_sin_env_real.py vigila que no se llame a load_dotenv.
 
     El limite de peticiones por IP (item 2.6) queda apagado: estas pruebas mandan
     muchas peticiones seguidas. Solo tests/test_limite.py lo enciende.

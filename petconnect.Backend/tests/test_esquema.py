@@ -104,6 +104,11 @@ class PruebasEsquemaSinBD(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.sql = _leer(RUTA_ESQUEMA)
+        # Item 4.14 (A-41): config/ y seed.py (que pide FERNET_KEY) se cargan con claves
+        # de prueba y load_dotenv apagado, para no leer el .env real al correr este
+        # archivo solo. Las clases ...EnBD si leen el .env a proposito (conexion a MariaDB).
+        from test_errores import _importar_api
+        _importar_api()
 
     def test_activa_el_modo_estricto_antes_de_crear_tablas(self):
         modo = self.sql.find("SET SESSION sql_mode")
@@ -294,6 +299,9 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         from cryptography.fernet import Fernet
         os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
         os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
+        # Item 4.14: este import directo se deja a proposito. Solo corre con
+        # PETCONNECT_PRUEBA_BD=1, cuando setUpClass ya leyo el .env para conectarse a
+        # MariaDB (bases temporales); nunca se imprime ningun valor de configuracion.
         import api
 
         # Se llama la funcion de la ruta sin test_client(): una peticion completa
@@ -311,7 +319,7 @@ class PruebasEsquemaEnBD(unittest.TestCase):
         from cryptography.fernet import Fernet
         os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
         os.environ.setdefault("JWT_SECRET", "clave-de-pruebas-petconnect-" + "x" * 32)
-        import api
+        import api   # directo a proposito, como en la prueba anterior (item 4.14)
 
         # Item 4.13: require_auth exige una cuenta activa con su version_sesion, y el
         # refugio de la semilla esta inactivo: se crean dos cuentas activas inventadas
