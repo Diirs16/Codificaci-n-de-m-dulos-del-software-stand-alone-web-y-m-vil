@@ -5,9 +5,8 @@ import ProductCard from "../components/ProductCard";
 import EstadoCarga from "../components/EstadoCarga";
 import { getProductos } from "../services/api";
 import { useScrollReveal } from "../assets/js/useScrollReveal";
-
 // Cuántos productos de la API se muestran en "Productos destacados".
-const CANTIDAD_DESTACADOS = 4;
+import { POR_PAGINA_DESTACADOS } from "../utils/paginacion";
 
 export default function Home() {
   // 3.3 (A-23): antes Home SIEMPRE usaba productos inventados de
@@ -21,10 +20,12 @@ export default function Home() {
 
   useEffect(() => {
     let vigente = true; // evita actualizar la página si el usuario ya se fue
-    getProductos()
+    // 4.17 (NC-003): pide solo los 4 que muestra. Antes pedía el catálogo entero
+    // y se quedaba con los 4 primeros.
+    getProductos({ pagina: 1, porPagina: POR_PAGINA_DESTACADOS })
       .then((data) => {
         if (!vigente) return;
-        setProducts(data.slice(0, CANTIDAD_DESTACADOS));
+        setProducts(data);
         setEstado("listo");
       })
       .catch(() => {

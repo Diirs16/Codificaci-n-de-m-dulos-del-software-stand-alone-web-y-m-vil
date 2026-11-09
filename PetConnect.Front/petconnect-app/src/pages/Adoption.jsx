@@ -1,41 +1,29 @@
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getMascotasAdopcion } from "../services/api";
 import { Heart } from "lucide-react";
 import { useScrollReveal } from "../assets/js/useScrollReveal";
 import EstadoCarga from "../components/EstadoCarga";
+import BotonVerMas from "../components/BotonVerMas";
+import { useListaPaginada } from "../hooks/useListaPaginada";
 import { datosMascota } from "../utils/mascota";
+import { POR_PAGINA_ADOPCION } from "../utils/paginacion";
 
 export default function Adoption() {
   // 3.3 (A-23, NC-009): la lista sale SOLO de la API. Antes empezaba con 6
   // mascotas inventadas y, si la API fallaba o no traía nada, las dejaba en
   // pantalla (así se ocultó NC-009).
-  const [pets, setPets] = useState([]);
-  const [estado, setEstado] = useState("cargando"); // "cargando" | "error" | "listo"
-  const [intento, setIntento] = useState(0); // al sumar 1, se vuelve a pedir la lista
+  // 4.17 (NC-003): se pide de 12 en 12; "Ver más" trae las siguientes.
+  const {
+    items: pets,
+    estado,
+    reintentar,
+    hayMas,
+    verMas,
+    cargandoMas,
+    errorMas,
+  } = useListaPaginada(getMascotasAdopcion, POR_PAGINA_ADOPCION);
 
   useScrollReveal();
-
-  useEffect(() => {
-    let vigente = true; // evita actualizar la página si el usuario ya se fue
-    getMascotasAdopcion()
-      .then((data) => {
-        if (!vigente) return;
-        setPets(data);
-        setEstado("listo");
-      })
-      .catch(() => {
-        if (vigente) setEstado("error");
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [intento]);
-
-  function reintentar() {
-    setEstado("cargando");
-    setIntento((n) => n + 1);
-  }
 
   return (
     <main className="page-enter max-w-7xl mx-auto px-4 py-8">
@@ -109,6 +97,16 @@ export default function Adoption() {
             </div>
           ))}
         </div>
+      )}
+
+      {estado === "listo" && (
+        <BotonVerMas
+          hayMas={hayMas}
+          cargando={cargandoMas}
+          error={errorMas}
+          onVerMas={verMas}
+          texto="Ver más mascotas"
+        />
       )}
     </main>
   );

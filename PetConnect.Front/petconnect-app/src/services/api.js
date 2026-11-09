@@ -1,3 +1,5 @@
+import { rutaPaginada } from "../utils/paginacion.js";
+
 const API_BASE = "/api";
 const TOKEN_KEY = "petconnect_token";
 
@@ -113,11 +115,16 @@ export function validarCorreo(email) {
 }
 
 // --- Productos ---
-export function getProductos() { return apiFetch("/productos"); }
+// Ítem 4.17 (NC-003): los listados van por páginas. Opcional:
+// { pagina, porPagina } → ?pagina=&por_pagina= (sin opciones, la API manda la
+// primera página de 20; nunca más de 50). La respuesta sigue siendo una lista.
+export function getProductos(opciones) { return apiFetch(rutaPaginada("/productos", opciones)); }
 export function getProducto(id) { return apiFetch(`/productos/${id}`); }
 
 // --- Mascotas ---
-export function getMascotasAdopcion() { return apiFetch("/mascotas/adopcion"); }
+export function getMascotasAdopcion(opciones) {
+  return apiFetch(rutaPaginada("/mascotas/adopcion", opciones));
+}
 export function getMascota(id) { return apiFetch(`/mascotas/${id}`); }
 
 // --- Solicitudes (ítem 3.6, A-21) ---

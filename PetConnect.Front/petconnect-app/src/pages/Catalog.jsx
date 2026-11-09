@@ -1,41 +1,33 @@
-import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { useState } from "react";
+import { Info, Search } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import EstadoCarga from "../components/EstadoCarga";
+import BotonVerMas from "../components/BotonVerMas";
+import { useListaPaginada } from "../hooks/useListaPaginada";
 import { getProductos } from "../services/api";
 import { useScrollReveal } from "../assets/js/useScrollReveal";
+import { POR_PAGINA_CATALOGO } from "../utils/paginacion";
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Todos");
   // 3.3 (A-23): los productos y sus categorías salen SOLO de la API. Antes, si
   // la API fallaba o no traía nada, se quedaban los 12 productos inventados.
-  const [products, setProducts] = useState([]);
-  const [estado, setEstado] = useState("cargando"); // "cargando" | "error" | "listo"
-  const [intento, setIntento] = useState(0); // al sumar 1, se vuelve a pedir la lista
+  // 4.17 (NC-003): se piden de 50 en 50 (el máximo de la API). El buscador y las
+  // categorías filtran los productos YA cargados; si quedan más, un aviso lo dice.
+  const {
+    items: products,
+    estado,
+    reintentar,
+    hayMas,
+    verMas,
+    cargandoMas,
+    errorMas,
+  } = useListaPaginada(getProductos, POR_PAGINA_CATALOGO);
 
   useScrollReveal();
 
-  useEffect(() => {
-    let vigente = true; // evita actualizar la página si el usuario ya se fue
-    getProductos()
-      .then((data) => {
-        if (!vigente) return;
-        setProducts(data);
-        setEstado("listo");
-      })
-      .catch(() => {
-        if (vigente) setEstado("error");
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [intento]);
-
-  function reintentar() {
-    setEstado("cargando");
-    setIntento((n) => n + 1);
-  }
+  const filtrando = search.trim() !== "" || category !== "Todos";
 
   const categories = ["Todos", ...new Set(products.map((p) => p.category).filter(Boolean))];
 
@@ -122,6 +114,24 @@ export default function Catalog() {
               </div>
             </>
           )}
+
+          {hayMas && filtrando && (
+            <p className="mt-8 flex items-start justify-center gap-2 text-center text-sm text-gray-600">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>
+                La búsqueda revisa los {products.length} productos cargados. Pulsa «Ver más
+                productos» para buscar también en el resto.
+              </span>
+            </p>
+          )}
+
+          <BotonVerMas
+            hayMas={hayMas}
+            cargando={cargandoMas}
+            error={errorMas}
+            onVerMas={verMas}
+            texto="Ver más productos"
+          />
         </>
       )}
     </main>
