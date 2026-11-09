@@ -4,7 +4,12 @@ Implementa operaciones CRUD sobre la tabla 'usuarios'.
 Equivalente al patrón DAO con PreparedStatement de JDBC.
 Item 4.5 (A-11, NC-003): cada metodo pide una conexion del pool con
 conexion_y_cursor y, al salir del with, cierra el cursor y la devuelve.
-Si la BD falla, imprime y devuelve None, [] o False (item 4.15: propagar).
+Item 4.21 (como el 4.15 con MascotaDAO y ProductoDAO): si la BD falla, el error
+SUBE a quien llamo (la API lo responde como 503 o 500; la consola muestra un
+aviso con vista/aviso_bd.py). Antes se imprimia el mensaje de MySQL, que puede
+traer el correo ("Duplicate entry '...'", Ley 1581), y se devolvia None, [] o
+False: sin BD, "consultar_por_correo" decia que el correo estaba libre.
+Las escrituras hacen rollback() antes de dejar subir el error.
 """
 
 from mysql.connector import Error
@@ -123,116 +128,89 @@ class UsuarioDAO:
 
     def insertar(self, usuario):
         """Registra un nuevo usuario en la base de datos."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                valores = (
-                    usuario.nombres, usuario.apellidos, usuario.correo,
-                    usuario.telefono, usuario.password_hash, usuario.foto_perfil,
-                    usuario.estado, usuario.verificado, usuario.acepta_datos,
-                    usuario.fecha_autorizacion_datos, usuario.version_politica_datos
-                )
-                try:
-                    cursor.execute(self._INSERTAR, valores)
-                    conexion.commit()
-                except Error:
-                    conexion.rollback()
-                    raise
-                usuario.id_usuario = cursor.lastrowid
-            return True
-        except Error as e:
-            print(f"[ERROR] Al insertar usuario: {e}")
-            return False
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            valores = (
+                usuario.nombres, usuario.apellidos, usuario.correo,
+                usuario.telefono, usuario.password_hash, usuario.foto_perfil,
+                usuario.estado, usuario.verificado, usuario.acepta_datos,
+                usuario.fecha_autorizacion_datos, usuario.version_politica_datos
+            )
+            try:
+                cursor.execute(self._INSERTAR, valores)
+                conexion.commit()
+            except Error:
+                conexion.rollback()
+                raise
+            usuario.id_usuario = cursor.lastrowid
+        return True
 
     def consultar_todos(self):
         """Retorna la lista de todos los usuarios registrados."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                cursor.execute(self._CONSULTAR_TODOS)
-                filas = cursor.fetchall()
-                usuarios = [self._mapear_usuario(fila) for fila in filas]
-            return usuarios
-        except Error as e:
-            print(f"[ERROR] Al consultar usuarios: {e}")
-            return []
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            cursor.execute(self._CONSULTAR_TODOS)
+            filas = cursor.fetchall()
+            usuarios = [self._mapear_usuario(fila) for fila in filas]
+        return usuarios
 
     def consultar_por_id(self, id_usuario):
         """Busca un usuario por su ID."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                cursor.execute(self._CONSULTAR_POR_ID, (id_usuario,))
-                fila = cursor.fetchone()
-            return self._mapear_usuario(fila) if fila else None
-        except Error as e:
-            print(f"[ERROR] Al consultar usuario por ID: {e}")
-            return None
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            cursor.execute(self._CONSULTAR_POR_ID, (id_usuario,))
+            fila = cursor.fetchone()
+        return self._mapear_usuario(fila) if fila else None
 
     def consultar_por_correo(self, correo):
         """Busca un usuario por su correo electrónico."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                cursor.execute(self._CONSULTAR_POR_CORREO, (correo,))
-                fila = cursor.fetchone()
-            return self._mapear_usuario(fila) if fila else None
-        except Error as e:
-            print(f"[ERROR] Al consultar usuario por correo: {e}")
-            return None
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            cursor.execute(self._CONSULTAR_POR_CORREO, (correo,))
+            fila = cursor.fetchone()
+        return self._mapear_usuario(fila) if fila else None
 
     def actualizar(self, usuario):
         """Actualiza la información de un usuario existente."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                valores = (
-                    usuario.nombres, usuario.apellidos, usuario.correo,
-                    usuario.telefono, usuario.foto_perfil, usuario.estado,
-                    usuario.verificado, usuario.acepta_datos, usuario.id_usuario
-                )
-                try:
-                    cursor.execute(self._ACTUALIZAR, valores)
-                    conexion.commit()
-                except Error:
-                    conexion.rollback()
-                    raise
-                filas_afectadas = cursor.rowcount
-            return filas_afectadas > 0
-        except Error as e:
-            print(f"[ERROR] Al actualizar usuario: {e}")
-            return False
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            valores = (
+                usuario.nombres, usuario.apellidos, usuario.correo,
+                usuario.telefono, usuario.foto_perfil, usuario.estado,
+                usuario.verificado, usuario.acepta_datos, usuario.id_usuario
+            )
+            try:
+                cursor.execute(self._ACTUALIZAR, valores)
+                conexion.commit()
+            except Error:
+                conexion.rollback()
+                raise
+            filas_afectadas = cursor.rowcount
+        return filas_afectadas > 0
 
     def actualizar_password(self, id_usuario, password_hash):
         """Reemplaza el hash de la contrasena (migracion de SHA-256 a bcrypt)."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                try:
-                    cursor.execute(self._ACTUALIZAR_PASSWORD, (password_hash, id_usuario))
-                    conexion.commit()
-                except Error:
-                    conexion.rollback()
-                    raise
-                filas_afectadas = cursor.rowcount
-            return filas_afectadas > 0
-        except Error as e:
-            print(f"[ERROR] Al actualizar la contrasena: {e}")
-            return False
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            try:
+                cursor.execute(self._ACTUALIZAR_PASSWORD, (password_hash, id_usuario))
+                conexion.commit()
+            except Error:
+                conexion.rollback()
+                raise
+            filas_afectadas = cursor.rowcount
+        return filas_afectadas > 0
 
     def registrar_autorizacion(self, id_usuario, fecha, version):
         """Guarda la autorizacion de datos que la persona dio al iniciar sesion (item 3.5)."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                try:
-                    cursor.execute(self._REGISTRAR_AUTORIZACION, (fecha, version, id_usuario))
-                    conexion.commit()
-                except Error:
-                    conexion.rollback()
-                    raise
-                filas_afectadas = cursor.rowcount
-            return filas_afectadas > 0
-        except Error as e:
-            print(f"[ERROR] Al registrar la autorizacion de datos: {e}")
-            return False
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            try:
+                cursor.execute(self._REGISTRAR_AUTORIZACION, (fecha, version, id_usuario))
+                conexion.commit()
+            except Error:
+                conexion.rollback()
+                raise
+            filas_afectadas = cursor.rowcount
+        return filas_afectadas > 0
 
-    # Item 4.13: estos dos metodos NO se tragan los errores de la BD (como OtpDAO y
-    # SolicitudDAO). Si devolvieran None con la BD caida, require_auth responderia
-    # 401 y la web cerraria la sesion (4.7); dejandolos subir, la API responde 503.
+    # Item 4.13: estos dos metodos fueron los primeros de UsuarioDAO en dejar subir
+    # los errores (los demas, desde el 4.21). Si devolvieran None con la BD caida,
+    # require_auth responderia 401 y la web cerraria la sesion (4.7); dejandolos
+    # subir, la API responde 503.
 
     def consultar_sesion(self, id_usuario):
         """Devuelve (version_sesion, estado) del usuario, o None si no existe."""
@@ -255,29 +233,21 @@ class UsuarioDAO:
 
     def eliminar(self, id_usuario):
         """Elimina un usuario por su ID."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                try:
-                    cursor.execute(self._ELIMINAR, (id_usuario,))
-                    conexion.commit()
-                except Error:
-                    conexion.rollback()
-                    raise
-                filas_afectadas = cursor.rowcount
-            return filas_afectadas > 0
-        except Error as e:
-            print(f"[ERROR] Al eliminar usuario: {e}")
-            return False
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            try:
+                cursor.execute(self._ELIMINAR, (id_usuario,))
+                conexion.commit()
+            except Error:
+                conexion.rollback()
+                raise
+            filas_afectadas = cursor.rowcount
+        return filas_afectadas > 0
 
     def buscar_por_nombre(self, termino):
         """Busca usuarios cuyo nombre o apellido contenga el término."""
-        try:
-            with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
-                patron = f"%{termino}%"
-                cursor.execute(self._BUSCAR_POR_NOMBRE, (patron, patron))
-                filas = cursor.fetchall()
-                usuarios = [self._mapear_usuario(fila) for fila in filas]
-            return usuarios
-        except Error as e:
-            print(f"[ERROR] Al buscar usuarios: {e}")
-            return []
+        with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
+            patron = f"%{termino}%"
+            cursor.execute(self._BUSCAR_POR_NOMBRE, (patron, patron))
+            filas = cursor.fetchall()
+            usuarios = [self._mapear_usuario(fila) for fila in filas]
+        return usuarios

@@ -5,11 +5,14 @@ Interfaz de consola para gestionar las operaciones CRUD de usuarios.
 
 from getpass import getpass
 
+from mysql.connector import Error
+
 from dao.usuario_dao import UsuarioDAO
 from modelo.usuario import Usuario
 from security.datos_usuario import validar_formato_correo, validar_nombre, validar_telefono
 from security.passwords import hash_password
 from security.politica import validar_contrasena
+from vista.aviso_bd import avisar_error_bd
 
 # Item 4.11 (A-18): la consola no puede dar la autorizacion de datos en nombre del
 # titular (Ley 1581, art. 9; politica C.6 y C.10). La cuenta queda en
@@ -46,24 +49,30 @@ class MenuUsuarios:
 
             opcion = input("  Seleccione una opcion: ").strip()
 
-            if opcion == "1":
-                self._registrar_usuario()
-            elif opcion == "2":
-                self._consultar_todos()
-            elif opcion == "3":
-                self._buscar_por_id()
-            elif opcion == "4":
-                self._buscar_por_correo()
-            elif opcion == "5":
-                self._buscar_por_nombre()
-            elif opcion == "6":
-                self._actualizar_usuario()
-            elif opcion == "7":
-                self._eliminar_usuario()
-            elif opcion == "0":
-                break
-            else:
-                print("  [!] Opcion no valida.")
+            # Item 4.21: UsuarioDAO deja subir los errores de la BD. Se atrapan aqui
+            # para avisar (solo el numero, sin el mensaje de MySQL, que puede traer
+            # el correo) y volver al menu en vez de cerrar la consola con una traza.
+            try:
+                if opcion == "1":
+                    self._registrar_usuario()
+                elif opcion == "2":
+                    self._consultar_todos()
+                elif opcion == "3":
+                    self._buscar_por_id()
+                elif opcion == "4":
+                    self._buscar_por_correo()
+                elif opcion == "5":
+                    self._buscar_por_nombre()
+                elif opcion == "6":
+                    self._actualizar_usuario()
+                elif opcion == "7":
+                    self._eliminar_usuario()
+                elif opcion == "0":
+                    break
+                else:
+                    print("  [!] Opcion no valida.")
+            except Error as e:
+                avisar_error_bd(e)
 
     def _registrar_usuario(self):
         """Solicita datos y registra un nuevo usuario con las mismas reglas que la API.

@@ -417,11 +417,11 @@ class PruebasDAOSinFugas(unittest.TestCase):
                     dao._conexion_bd = mock.Mock(obtener_conexion=bd)
                     parametros = list(inspect.signature(funcion).parameters)[1:]   # sin self
                     argumentos = [mock.MagicMock() for _ in parametros]
-                    with contextlib.redirect_stdout(io.StringIO()):     # UsuarioDAO y ProveedorDAO aun imprimen
+                    with contextlib.redirect_stdout(io.StringIO()):     # por si alguno imprimiera
                         try:
                             getattr(dao, nombre)(*argumentos)
                         except (errores_bd.Error, RuntimeError):
-                            pass        # casi todos dejan subir el error (4.15); UsuarioDAO y ProveedorDAO aun no
+                            pass        # todos dejan subir el error (4.15 y 4.21; test_dao_errores.py)
                     self.assertEqual(len(bd.conexiones), 1, "pide una sola conexion por operacion")
                     bd.revisar(self)
 
