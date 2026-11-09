@@ -287,6 +287,24 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   mensaje y `api.py` no tiene SQL) + su caso en `test_sin_env_real.py`; `test_mascotas.py`, `test_endpoints.py` y
   `test_errores.py` (503 con BD caída) pasan sin cambios. Contraprueba: con los DAO viejos fallan 2 (28 casos), con
   los menús viejos 4 y con el `api.py` viejo 2 (3 casos). Hallazgo → 4.21 (`UsuarioDAO` y `ProveedorDAO`).
+- **Actualización 09/11/2026 (ítem 4.21, commits `96e007c` y `c7ecd55`, solo backend; no toca el esquema ni la BD;
+  no cierra NC).** Ya ningún DAO se traga los errores de la BD. Parte 1: `UsuarioDAO` (9 de sus 11 métodos; los
+  otros 2 propagaban desde el 4.13) y `ProveedorDAO` (sus 7) sin `try/except` + `print` (los `rollback()` se quedan);
+  las consolas de usuarios y proveedores atrapan el error en su ciclo con `avisar_error_bd` (la de mascotas ya lo
+  hacía). Parte 2 (opción A del dueño): `_verificar_bd()` sale de las 6 rutas que la llamaban (login, login/verify,
+  register, verify, `/auth/me` y las solicitudes) y queda solo al arrancar: sin BD el error del DAO sube y responde 503,
+  sin pedir una conexión aparte en cada petición. `/login/verify` busca la cuenta **antes** de gastar el código (así
+  sigue sin gastarlo si la BD falla) y `/verify` ya no tiene el 500 “Error al crear el usuario” (un fallo del `INSERT`
+  responde el 500 o 503 genérico, sin el mensaje de MySQL). Cambio menor: si al migrar un hash SHA-256 a bcrypt falla
+  el `UPDATE`, el login ya no lo ignora (responde 503/500). Regresión: `tests/test_dao_errores.py` de 9 a 18 pruebas
+  (6 DAO, todo DAO de `dao/` en la lista, ningún DAO usa `print`, 6 casos de consola y `_verificar_bd()` solo al
+  arrancar), 2 en `test_endpoints.py` (login con BD caída da 503 y no 401; no pide conexión aparte) y 1 en
+  `test_solicitudes.py`; en `test_endpoints.py`, la “BD caída” simulada ahora hace fallar al `UsuarioDAO` falso (5
+  pruebas ajustadas). Suite 468 (415 + 53 omitidas). Contraprueba con `git stash`: `usuario_dao.py` viejo → fallan
+  20, `proveedor_dao.py` viejo → 16, `menu_usuarios.py` viejo → 5, `menu_proveedores.py` viejo → 4 y `api.py` viejo
+  → 5 (cada cuenta incluye `test_sin_env_real`, que repite `test_dao_errores`). Pasan a propósito: `consultar_sesion`
+  y `cerrar_sesiones` con el DAO viejo, mascotas con fallo de `UsuarioDAO` con cualquier menú y, con el `api.py` viejo,
+  los 503 con BD caída y el código sin gastar (el comportamiento se conserva).
 
 #### A-08 · 🟠 Alta · Configuración insegura y errores internos expuestos — NC-007 [A + N]
 - `api.py:458` → `app.run(debug=True)`: el depurador de Werkzeug permite ejecutar código si se expone. [A]
@@ -682,6 +700,9 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   con `git stash`: con la consola anterior fallan 10 (17 casos con los subcasos) y pasan a propósito 12 (cambio
   válido, vacío mantiene, correo propio o libre, regla común); con el `api.py` anterior falla 1. Queda para el 4.21:
   si dos administradores guardan el mismo correo a la vez o la BD falla, el `print` del DAO aún muestra el mensaje.
+  **Resuelto el 09/11/2026 con el 4.21 (`96e007c`):** `UsuarioDAO` ya no imprime; el error sube y la consola avisa
+  “código MySQL 1062” sin el correo y sin “[OK]”. Con la BD caída, la búsqueda del correo ya no lo da por libre
+  (prueba en `tests/test_dao_errores.py`).
 
 #### A-19 · ⚪ Baja · Búsqueda de proveedores devuelve inactivos — NC-011
 - `dao/proveedor_dao.py:49-54` (falta `AND activo = TRUE`, que sí tiene `:56-62`). Una línea.
