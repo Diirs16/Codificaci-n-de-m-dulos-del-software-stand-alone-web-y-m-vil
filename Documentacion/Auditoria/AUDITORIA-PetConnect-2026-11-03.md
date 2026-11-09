@@ -286,7 +286,7 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `tests/test_dao_errores.py` (9: los métodos de 4 DAO dejan subir el error sin imprimir, la consola avisa sin el
   mensaje y `api.py` no tiene SQL) + su caso en `test_sin_env_real.py`; `test_mascotas.py`, `test_endpoints.py` y
   `test_errores.py` (503 con BD caída) pasan sin cambios. Contraprueba: con los DAO viejos fallan 2 (28 casos), con
-  los menús viejos 4 y con el `api.py` viejo 2 (3 casos).
+  los menús viejos 4 y con el `api.py` viejo 2 (3 casos). Hallazgo → 4.21 (`UsuarioDAO` y `ProveedorDAO`).
 
 #### A-08 · 🟠 Alta · Configuración insegura y errores internos expuestos — NC-007 [A + N]
 - `api.py:458` → `app.run(debug=True)`: el depurador de Werkzeug permite ejecutar código si se expone. [A]
