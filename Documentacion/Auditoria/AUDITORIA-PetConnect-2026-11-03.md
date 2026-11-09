@@ -1111,6 +1111,18 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
 - El Móvil usa `--localhost`: no se ve desde fuera del contenedor.
 - **Arreglo:** `.dockerignore` por módulo, compose en la raíz, `host="0.0.0.0"` controlado por variable, MySQL/MariaDB
   con `schema.sql` en `docker-entrypoint-initdb.d`, secretos vía `env_file` (nunca en la imagen), Gunicorn.
+- **Estado: en parte. `.dockerignore` resuelto el 09/11/2026 (ítem 5.1 de PRIORIDADES, commit `a739076`); el compose,
+  los Dockerfile, Gunicorn y `0.0.0.0` siguen pendientes (ítem 5.2).** Los cuatro archivos que nombra este hallazgo
+  ya no existen: el dueño los borró (nunca tuvieron commit) y se rehacen desde cero en el 5.2. Cada módulo
+  (`petconnect.Backend/`, `PetConnect.Front/petconnect-app/`, `PetConnect.Mobile/`) tiene ahora su `.dockerignore`, porque
+  Docker no lee el `.gitignore`: deja fuera de cualquier imagen los `.env` y sus variantes, las claves (`.pem`, `.key`,
+  `.p12` y las de firma del móvil), `__pycache__`, `.venv`, `node_modules`, `dist`, `.expo`, `android`, `ios`, Postman y
+  archivos de herramientas. Los patrones llevan `**/` porque en Docker `__pycache__` solo excluye la carpeta de la raíz
+  (no `dao/__pycache__`). Regresión: `tests/test_dockerignore.py` (8 pruebas, sin Docker ni BD, corre en la CI) simula
+  las reglas de Docker y revisa rutas inventadas que deben quedar fuera (`.env`, `config/.env`, `dao/__pycache__`,
+  `node_modules/…`, `android/…`) y dentro (`api.py`, `package.json`, `src/main.jsx`, `App.js`…); nunca abre un `.env`.
+  Contraprueba: sin los archivos fallan 3; al romper un patrón a propósito (quitar `**/`, borrar `**/.env.*` o excluir
+  `src`) la prueba lo detecta.
 
 #### A-31 · 🟠 Alta · No hay integración continua y las pruebas cubren poco [A]
 - No existe `.github/workflows/`. Solo 13 pruebas (seguridad); **ninguna** prueba endpoints de mascotas, productos,

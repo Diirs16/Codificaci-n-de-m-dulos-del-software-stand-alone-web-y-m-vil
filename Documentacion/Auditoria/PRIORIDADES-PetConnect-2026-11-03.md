@@ -105,7 +105,7 @@ se borra de aquí y se marca `[x]` en su fase.
 
 | ✔ | # | ID | Qué | Esfuerzo |
 |---|---|---|---|---|
-| [ ] | 5.1 | A-30 | `.dockerignore` en cada módulo (excluir `.env`, `node_modules`, `.venv`, `__pycache__`, `dist`) **antes** de construir cualquier imagen | 🟢 |
+| [x] | 5.1 | A-30 | `.dockerignore` en cada módulo (excluir `.env`, `node_modules`, `.venv`, `__pycache__`, `dist`) **antes** de construir cualquier imagen — *Hecho el 09/11/2026 (`a739076`; no toca código, esquema ni BD; no cierra NC). El dueño confirmó que **borró** los `Dockerfile` y el `docker-compose.yml` de A-30 (nunca tuvieron commit): se rehacen desde cero en el 5.2 (6.11 resuelto). Decisiones del dueño: hacerlo ahora (no junto con el 5.2), un solo commit con los 3 módulos y también el móvil. Tres `.dockerignore` (`petconnect.Backend/`, `PetConnect.Front/petconnect-app/`, `PetConnect.Mobile/`): secretos (`**/.env`, `**/.env.*`, `**/*.env` y claves `*.pem`, `*.key`, `*.p12`; en el móvil también `*.jks`, `*.keystore`, `*.p8`, `*.mobileprovision`), dependencias y compilaciones (`**/__pycache__`, `**/*.py[cod]`, `.venv`, `**/node_modules`, `dist`, `.expo`, `android`, `ios`…), Postman (puede traer tokens), `*.docx` y archivos de herramientas (`.git`, `CLAUDE.md`, `Dockerfile*`). Con `**/` porque en Docker `__pycache__` solo excluye la carpeta de la raíz. `tests/` se queda en las imágenes (lo decide el 5.2). Sin `.dockerignore` en la raíz: el compose usará cada módulo como contexto. Regresión: `tests/test_dockerignore.py` (8 pruebas: 5 del simulador de reglas de Docker y 3 por módulo con rutas inventadas que deben quedar fuera y dentro; no abre ningún `.env`). Aplicado a los nombres reales: fuera el `.env`, los 11 `__pycache__`, `postman/`, `node_modules/`, `dist/`, `android/`…; dentro 76, 59 y 44 archivos. Suite 476 (423 + 53 omitidas); web lint (2 avisos previos), `npm test` y build bien; móvil `expo export` bien. Contraprueba: sin los 3 archivos (`git stash -u`) fallan 3 (una por módulo) y pasan a propósito las 5 del simulador; rompiendo patrones: `__pycache__` sin `**/` → 2, `**/.env` y `**/*.env` sin `**/` → 1 (`config/.env`), sin `**/.env.*` → 2, `src` excluido en la web → 4; pasa a propósito quitar `**/` solo a `**/.env` (lo cubre `**/*.env`). Opcional del dueño (si tiene Docker): listar el contexto de construcción con una imagen de prueba* | 🟢 |
 | [ ] | 5.2 | A-30 | `docker-compose.yml` en la raíz: BD con `schema.sql`, secretos por `env_file`, API con Gunicorn en `0.0.0.0`, web compilada (no `npm run dev`) | 🔴 |
 | [ ] | 5.3 | A-27 | Móvil: `EXPO_PUBLIC_API_URL` y HTTPS; `expo-secure-store` para el token (A-28) | 🟡 |
 | [ ] | 5.4 | A-29 | `npm audit fix` en la web; planear actualización de Expo; `pip-audit` en CI | 🟡 |
@@ -125,7 +125,7 @@ se borra de aquí y se marca `[x]` en su fase.
 - [ ] **6.8** `.gitignore`: agregar `~$*` (A-38); borrar `.github/modernize/` local (A-39) · 🟢
 - [ ] **6.9** Hooks de Claude: corregir falsos positivos (A-40) y regla de scripts que importan la API (A-41) · 🟢
 - [ ] **6.10** Renombrar el repositorio en GitHub sin acentos rotos (A-37) · 🟢
-- [ ] **6.11** Decidir qué hacer con los Dockerfile sin commit (se rehacen en 5.2) · 🟢
+- [x] **6.11** Decidir qué hacer con los Dockerfile sin commit (se rehacen en 5.2) · 🟢 — *Resuelto el 09/11/2026 en el 5.1: el dueño los borró (nunca tuvieron commit); se rehacen desde cero en el 5.2*
 
 ---
 
@@ -150,8 +150,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 09/11/2026, actualizada al cerrar el 4.21 (ningún DAO se traga los errores de la BD) y con él la
-**Fase 4**. Lo próximo es la Fase 5 (Despliegue), empezando por el 5.1 (`.dockerignore`, A-30).
+*Versión del 09/11/2026, actualizada al cerrar el 5.1 (`.dockerignore` en los 3 módulos, A-30), primer ítem de la
+**Fase 5** (Despliegue). Lo próximo es el 5.2 (`docker-compose.yml` en la raíz, Dockerfile nuevos y Gunicorn).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -170,7 +170,7 @@ Lee primero:
   VEZ POR FASE, al terminar toda la fase (Fase 3 subida el 07/11/2026;
   Fase 4 subida el 09/11/2026 con el sí del dueño: 58 commits,
   9854464..9c386a4). Desde ahí los commits nuevos quedan en local (el
-  primero, el que anota la CI). Fase 5: NO hagas push ni lo preguntes al
+  primero, 9d0d442, el que anota la CI; luego los del 5.1). Fase 5: NO hagas push ni lo preguntes al
   cerrar cada ítem; solo al marcar el último [ ] de la fase, recuerda los
   commits pendientes y pregunta (push normal, nunca --force). Cada push
   hace correr la CI de GitHub (.github/workflows/ci.yml; la primera, el
@@ -178,6 +178,23 @@ Lee primero:
 
 Estado conocido (9/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - FASE 4 CERRADA el 09/11/2026 (4.1 a 4.21, incluidos 4.17 y 4.12).
+- 5.1 HECHO el 09/11/2026 (a739076; no toca código, esquema ni BD; no
+  cierra NC; GA9: una nota en la fila del entorno Docker). El dueño BORRÓ
+  los Dockerfile y el docker-compose.yml de A-30 (6.11 resuelto: se
+  rehacen en el 5.2). Tres .dockerignore (Backend, web y móvil, un solo
+  commit, aprobado): secretos (**/.env, **/.env.*, **/*.env, claves),
+  **/__pycache__, **/*.py[cod], .venv, **/node_modules, dist, .expo,
+  android, ios, postman, *.docx, .git, CLAUDE.md, Dockerfile*. tests/ SÍ
+  entra en las imágenes (decidirlo en el 5.2). Sin .dockerignore en la
+  raíz (el compose usará cada módulo como contexto).
+  tests/test_dockerignore.py: 8 (5 del simulador de reglas de Docker, 3
+  por módulo con rutas inventadas fuera/dentro). Suite 476 (423 + 53
+  omitidas). Contraprueba: sin los archivos → 3; patrones rotos → 2, 1, 2
+  y 4; pasa a propósito quitar **/ solo a **/.env (lo cubre **/*.env).
+  El hook de Bash bloquea cualquier comando cuyo TEXTO lleve ".env"
+  (también git commit -m y sed sobre .dockerignore; falso positivo de
+  A-40, ítem 6.9): usar git commit -F con el mensaje en un archivo del
+  scratchpad, o un script de Python ahí.
 - 4.21 HECHO el 09/11/2026 en 2 partes (solo backend; no toca el esquema
   ni la BD; no cierra NC; GA9 sin cambios). Parte 1 (96e007c): UsuarioDAO
   (9 métodos; consultar_sesion y cerrar_sesiones ya propagaban) y
@@ -1319,33 +1336,48 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (5.1: .dockerignore en cada módulo, A-30;
-primer ítem de la Fase 5, Despliegue):
-- Leer la fila del 5.1 (y la del 5.2, que depende de él) en PRIORIDADES y
-  A-30 en la AUDITORÍA ("Los archivos de Docker no funcionan y filtrarían
-  secretos").
-- OJO, hallazgo del 09/11/2026: los archivos que nombra A-30
-  (petconnect.Backend/Dockerfile, docker-compose.yml y los Dockerfile de
-  la web y el móvil) estaban SIN commit el 3/11 y hoy NO existen en la
-  carpeta ni en el historial de git. Preguntar al dueño si los borró o si
-  están en otro lado, y si el 5.1 se hace ahora (los .dockerignore
-  protegen desde ya cualquier imagen futura) o junto con el 5.2 (el
-  compose y los Dockerfile nuevos).
-- Qué hay en cada módulo (lo que un "COPY . ." metería en la imagen):
-  petconnect.Backend: .env (¡secreto!), __pycache__, tests, postman,
-  DOCUMENTACION_PETCONNECT.docx (el .venv está en la RAÍZ, no aquí).
-  PetConnect.Front/petconnect-app: node_modules, dist, tests.
-  PetConnect.Mobile: node_modules, dist, .expo, android (compilación
-  nativa), .postman, postman, tests. Cualquier .env o *.env de cada uno.
-  Los .gitignore ya ignoran los .env, pero Docker NO lee .gitignore.
-- Son archivos de configuración de 3 módulos: la regla 3 de CLAUDE.md pide
-  no mezclar Front, Móvil y Backend salvo que el plan aprobado lo diga
-  (proponer: un commit con los 3 .dockerignore o uno por módulo).
-- Prueba de regresión posible sin Docker: un test en Python (backend) que
-  lea cada .dockerignore y exija las líneas clave (.env, *.env, .venv,
-  __pycache__, node_modules, dist), así la CI lo vigila. Si el dueño tiene
-  Docker, una comprobación opcional (construir y listar la imagen) la
-  corre él.
+Contexto del próximo paso (5.2: docker-compose.yml en la raíz, A-30;
+segundo ítem de la Fase 5, 🔴 grande):
+- Leer la fila del 5.2 en PRIORIDADES y A-30 en la AUDITORÍA (su
+  "Arreglo" y el "Estado" del 5.1). Los Dockerfile viejos ya no existen:
+  todo se escribe desde cero (backend, web y compose; el móvil NO va en
+  el compose).
+- Es grande y toca 3 cosas (backend, web y la raíz): proponer un plan por
+  partes, cada una con su commit y su prueba. Por ejemplo: (1) backend:
+  Dockerfile (python:3.14-slim) + Gunicorn + host 0.0.0.0 controlado por
+  variable (hoy app.run escucha en 127.0.0.1; buscar el app.run en
+  api.py); (2) web: Dockerfile en dos etapas (npm ci + npm run build y
+  luego un servidor estático, p. ej. nginx, que además pase /api a la
+  API: en producción no existe el proxy de Vite); (3) compose en la raíz
+  con db + api + web, secretos por env_file (nunca en la imagen) y el
+  esquema en docker-entrypoint-initdb.d.
+- Decisiones del dueño a pedir: ¿tiene Docker Desktop instalado? (todo lo
+  de Docker lo corre él: dar comandos de PowerShell 5.1, uno por bloque,
+  diciendo la carpeta); motor de la BD en el compose: mariadb (igual que
+  el local, 10.4) o mysql:8.0 (lo que dice GA9 para el staging, modo
+  estricto); ¿tests/ dentro de la imagen de la API? (hoy entra; si sale,
+  ajustar el .dockerignore y tests/test_dockerignore.py); nginx u otra
+  opción para servir la web.
+- Gunicorn es una dependencia nueva: pedir permiso y fijar la versión en
+  requirements.txt. Ojo: Gunicorn no corre en Windows (en local se sigue
+  usando python api.py); se prueba dentro del contenedor.
+- sql/: docker-entrypoint-initdb.d corre en orden alfabético TODOS los
+  .sql de la carpeta montada: montar solo schema.sql (las migraciones ya
+  están incluidas en él; comprobarlo antes). seed.py es Python: decidir
+  si el compose lo corre o se deja manual.
+- Los .dockerignore del 5.1 ya excluyen .env, node_modules, __pycache__,
+  dist, Dockerfile* y docker-compose*; tests/test_dockerignore.py debe
+  seguir pasando (si un Dockerfile necesita algo excluido, cambiar los
+  dos a la vez).
+- Pruebas posibles sin Docker: un test en Python que lea el compose y los
+  Dockerfile y exija lo clave (env_file, sin secretos escritos, gunicorn,
+  0.0.0.0, nada de "npm run dev"); la prueba real (docker compose up y
+  abrir la web) la corre el dueño.
+- El hook de Bash bloquea comandos cuyo texto lleve ".env" (ver el 5.1):
+  usar archivos del scratchpad para mensajes de commit y scripts.
+- Archivo vacío "=" sin seguimiento en la raíz (del 06/11, seguramente un
+  comando de PowerShell mal escrito): preguntar al dueño si lo borra; no
+  meterlo en ningún commit.
 - Pendientes sin ítem: el móvil borra la sesión ante cualquier error de
   /auth/me (preguntar si se anota como 4.20); el export web del móvil en
   el 8090 no está en el CORS de api.py (5173, 8081 y 19006); el aviso
@@ -1394,4 +1426,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 5.1 (`.dockerignore` en cada módulo, A-30)**: primer ítem de la Fase 5 (Despliegue). Antes de proponer, preguntar al dueño por los `Dockerfile` y el `docker-compose.yml` de A-30, que ya no están en la carpeta (nunca tuvieron commit). **La Fase 4 quedó cerrada el 09/11/2026** con el 4.21: ningún DAO se traga ya los errores de la BD (`UsuarioDAO` y `ProveedorDAO` los dejan subir, las consolas avisan con `avisar_error_bd` sin el mensaje de MySQL) y `_verificar_bd()` solo se usa al arrancar la API (commits `96e007c` y `c7ecd55`). El 4.19 quedó hecho el 09/11/2026: “6. Actualizar usuario” de la consola revisa nombre, apellidos, correo, teléfono y estado con `security/datos_usuario.py` (el teléfono, con la regla de las solicitudes, que pasó de `api.py` a ese módulo) y avisa “Ese correo ya tiene una cuenta” antes del `UPDATE`, sin mostrar el correo. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** la decisión D.7 de la política. En la Fase 5 el push se pregunta solo al cerrar su último [ ].
+**Próximo ítem: 5.2 (`docker-compose.yml` en la raíz, A-30)**: 🔴 grande; proponer un plan por partes (Dockerfile del backend con Gunicorn y `0.0.0.0`, Dockerfile de la web compilada, compose con BD + API + web y secretos por `env_file`) y preguntar al dueño si tiene Docker Desktop y qué motor de BD usar. El 5.1 quedó hecho el 09/11/2026 (`a739076`): `.dockerignore` en backend, web y móvil (secretos, `node_modules`, `__pycache__`, `dist`… fuera de cualquier imagen), vigilados por `tests/test_dockerignore.py`; el dueño confirmó que borró los Dockerfile viejos (6.11 resuelto). **La Fase 4 quedó cerrada el 09/11/2026** con el 4.21: ningún DAO se traga ya los errores de la BD (`UsuarioDAO` y `ProveedorDAO` los dejan subir, las consolas avisan con `avisar_error_bd` sin el mensaje de MySQL) y `_verificar_bd()` solo se usa al arrancar la API (commits `96e007c` y `c7ecd55`). El 4.19 quedó hecho el 09/11/2026: “6. Actualizar usuario” de la consola revisa nombre, apellidos, correo, teléfono y estado con `security/datos_usuario.py` (el teléfono, con la regla de las solicitudes, que pasó de `api.py` a ese módulo) y avisa “Ese correo ya tiene una cuenta” antes del `UPDATE`, sin mostrar el correo. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** la decisión D.7 de la política. En la Fase 5 el push se pregunta solo al cerrar su último [ ].
