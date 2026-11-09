@@ -1117,8 +1117,8 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   OTP ni errores.
 - **Arreglo:** GitHub Actions con `unittest` + `npm run lint` + `npm run build`; pruebas de regresión para cada NC
   (p. ej. `/api/mascotas/<id>` sin token → 404; 6.º intento OTP → bloqueado; ruta inexistente → 404).
-- **Estado: resuelto el 07/11/2026 (ítems 4.3 y 4.4 de PRIORIDADES; solo falta ver la primera ejecución de la CI
-  en GitHub, que llega con el push final).**
+- **Estado: resuelto el 07/11/2026 (ítems 4.3 y 4.4 de PRIORIDADES). Primera ejecución de la CI en GitHub: 09/11/2026,
+  aprobada (ver “Integración continua”).**
 - **Pruebas de endpoints (ítem 4.4, commit `37f8126`):** antes de escribir pruebas se hizo un inventario de las 14
   rutas de `api.py` × caso (éxito, 400, 401, 403, 404, 503 sin BD) y de cada NC × la prueba que la cubre. Ya había
   15 archivos de pruebas con el cliente de Flask (mascotas, solicitudes, login, registro, OTP, límite, errores);
@@ -1149,8 +1149,10 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   secreto: las pruebas ponen sus propias claves de prueba. Validado en local sin push: YAML revisado y los mismos
   comandos corridos en una copia limpia del último commit (`git archive`, sin `.env` ni `node_modules`): backend
   200 pruebas (176 correctas y 24 omitidas que requieren MariaDB), web lint sin errores + 42/42 + build, móvil
-  35/35 + export. Sin diferencias de mayúsculas en los imports (Linux las distingue). La primera ejecución en
-  GitHub queda pendiente del push, que se hace al terminar todo el plan.
+  35/35 + export. Sin diferencias de mayúsculas en los imports (Linux las distingue).
+  **Primera ejecución en GitHub: 09/11/2026, aprobada.** Con el push de la Fase 4 (58 commits, `9854464..9c386a4`,
+  con el sí del dueño) corrió la ejecución 42708649355 sobre `9c386a4`: los 3 jobs en verde (backend con
+  `unittest`; web con lint, pruebas y build; móvil con pruebas y `expo export`), en una máquina limpia sin `.env`.
 
 ### 3.8 Documentación y orden
 
