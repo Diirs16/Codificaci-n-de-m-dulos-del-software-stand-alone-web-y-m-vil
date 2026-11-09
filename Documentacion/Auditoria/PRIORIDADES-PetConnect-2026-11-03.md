@@ -94,7 +94,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.14 | A-41 | — | `tests/test_seguridad.py` importa `api.py`, que carga el `.env` real con `load_dotenv()` (no imprime nada, pero choca con la regla): desactivarlo como en `tests/test_correo.py` — *Hecho el 09/11/2026 en una parte (`08e61ec`, solo pruebas del backend; no toca la BD ni `api.py`). Revisión con un “espía” (cambia `load_dotenv` por una función que no carga nada y cuenta las llamadas): `test_seguridad.py` lo cargaba también en la suite completa (unittest importa todos los archivos antes de correr la primera prueba y era el primero en importar `api.py`), y `test_esquema.py` corrido solo lo cargaba en `PruebasEsquemaSinBD` (`config.db_config` y `seed.py`, que pedía la `FERNET_KEY` real). Decisión del dueño: opción A, `_importar_api()` de `tests/test_errores.py`, y opción 2, arreglar también `test_esquema.py`. `test_seguridad.py`: `api = _importar_api()` al importarse (la ruta de prueba se registra ahí). `test_esquema.py`: `_importar_api()` en el `setUpClass` de `PruebasEsquemaSinBD`; los `import api` de las pruebas con BD (~297 y ~314) se dejan a propósito, con un comentario (solo corren con `PETCONNECT_PRUEBA_BD=1`, cuando el `.env` ya se leyó para conectarse a MariaDB). Regresión: `tests/test_sin_env_real.py` (2): corre cada archivo en un Python aparte con el espía y un entorno mínimo; exige 0 llamadas y 0 fallos. Suite 397 (347 + 50 omitidas); el espía sobre la suite completa: 0 llamadas (antes 1). Contraprueba con `git stash` de los dos archivos: fallan 2 de 2 (`test_seguridad`: 3 llamadas; `test_esquema`: 1 prueba se rompe sin el `.env`). No cierra NC* | 🟢 |
 | [x] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`. **Hecho el 09/11/2026 en 2 partes (solo backend; no toca el esquema).** Parte 1 (`d03871b`): `MascotaDAO` y `ProductoDAO` sin `try/except` + `print` en sus 14 métodos (dejan subir el error; los `rollback()` se quedan); hallazgo del plan: la consola también los usa y se habría cerrado con una traza, así que `vista/menu_mascotas.py` y `vista/menu_productos.py` atrapan el error en su ciclo con `vista/aviso_bd.py` (solo el número del error de MySQL, nunca el mensaje). Parte 2 (`400061f`): las 5 consultas pasan tal cual a `ProductoDAO.consultar_catalogo`/`consultar_catalogo_por_id` y `MascotaDAO.consultar_en_adopcion`/`consultar_en_adopcion_por_id`/`consultar_del_dueno` (diccionarios con los mismos alias: el JSON no cambia); `api.py` sin cursores; `_verificar_bd()` sigue para `UsuarioDAO`. Regresión: `tests/test_dao_errores.py` (9) + 1 caso en `test_sin_env_real.py`; `test_pool.py` cuenta 46 métodos (22 escrituras, 24 lecturas); `test_mascotas`, `test_endpoints` y `test_errores` sin cambios. Suite 407 (357 + 50 omitidas). Contraprueba: DAO viejos → fallan 2 (28 casos); menús viejos → 4; `api.py` viejo → 2 (3 casos). No cierra NC. Opcional del dueño: `PETCONNECT_PRUEBA_BD=1` y la consola. Hallazgo: `UsuarioDAO` y `ProveedorDAO` todavía se tragan los errores y hacen `print` → 4.21* | 🟡 |
 | [x] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 — *Hecho el 09/11/2026 en una parte, justo después del 4.15 (`4b5d18e`, solo backend). El SQL de `ProductoDAO.consultar_catalogo_por_id` filtra `activo = TRUE` y `api.py` lo revisa otra vez (doble barrera, como las mascotas); web y móvil sin cambios (ya muestran el 404). Regresión: 2 pruebas en `PruebasProductos` (la nota de pendiente se quitó). Suite 409 (359 + 50 omitidas). Contraprueba: sin el filtro del DAO falla 1; sin la revisión de `api.py` fallan 2 casos. Sin datos personales; no cierra NC* | 🟢 |
-| [ ] | 4.17 | A-11 | NC-003 | Paginación e índices (la otra mitad de la acción correctiva de NC-003). **Paginación:** `GET /api/productos` y `GET /api/mascotas/adopcion` devuelven todas las filas sin `LIMIT`; la web y el móvil las consumen (`src/services/api.js` en ambos), así que cambiar la forma de la respuesta toca los 3 módulos: decidir antes si se usan parámetros opcionales (`?pagina=&por_pagina=` con un máximo fijo, parametrizados) que mantengan la lista de hoy o un objeto con `total`, y hacerlo por partes (API, web, móvil). **Índices:** `mascotas` solo tiene la clave primaria y `id_usuario` (falta `estado`), `productos` no tiene índice en `activo` y `proveedores_servicio` solo la clave primaria (`ciudad`, `activo`, `nombre`); el `LIKE '%texto%'` no usa índice. Va en `sql/schema.sql` y en una migración de `sql/migraciones/` con su prueba en `tests/test_esquema.py` (toca la BD: plan primero, respaldo y que el dueño la aplique). Agregado el 07/11/2026 con el sí del dueño, al cerrar el 4.5. Hacerlo antes del 4.12 | 🟡 |
+| [ ] | 4.17 | A-11 | NC-003 | Paginación e índices (la otra mitad de la acción correctiva de NC-003). **Paginación:** `GET /api/productos` y `GET /api/mascotas/adopcion` devuelven todas las filas sin `LIMIT`; la web y el móvil las consumen (`src/services/api.js` en ambos), así que cambiar la forma de la respuesta toca los 3 módulos: decidir antes si se usan parámetros opcionales (`?pagina=&por_pagina=` con un máximo fijo, parametrizados) que mantengan la lista de hoy o un objeto con `total`, y hacerlo por partes (API, web, móvil). **Índices:** `mascotas` solo tiene la clave primaria y `id_usuario` (falta `estado`), `productos` no tiene índice en `activo` y `proveedores_servicio` solo la clave primaria (`ciudad`, `activo`, `nombre`); el `LIKE '%texto%'` no usa índice. Va en `sql/schema.sql` y en una migración de `sql/migraciones/` con su prueba en `tests/test_esquema.py` (toca la BD: plan primero, respaldo y que el dueño la aplique). Agregado el 07/11/2026 con el sí del dueño, al cerrar el 4.5. Hacerlo antes del 4.12 — *En curso desde el 09/11/2026, en 4 partes. Decisiones del dueño: opción A, parámetros opcionales `?pagina=&por_pagina=` (20 por defecto, máximo 50, recortar si piden más; texto, 0, negativos o `pagina` > 10.000 → 400) y la respuesta sigue siendo una lista, sin `total` (si llega una página llena se muestra “Ver más”); web: Home pide 4, Adopción de 12 en 12 y Catálogo de 50 en 50, las tres con “Ver más” donde aplica, y el buscador del catálogo filtra lo cargado con un aviso (la búsqueda en el servidor queda descartada por ahora); móvil: botón “Ver más” al pie de la lista. **Parte 1 hecha (índices, `ea95ed5`):** `idx_mascotas_estado`, `idx_productos_activo` e `idx_proveedores_ciudad` (`ciudad`,`activo`,`nombre`) en `schema.sql` y en `sql/migraciones/2026-11-09_indices_listados.sql` (`CREATE INDEX IF NOT EXISTS`, propio de MariaDB; no toca datos). `tests/test_esquema.py`: 3 sin BD y 2 con MariaDB (`petconnect_prueba_indices`: crear dos veces sin perder filas y `EXPLAIN` de los DAO con el índice en `possible_keys`). Contraprueba: con el `schema.sql` anterior fallan 3. Suite 414 (362 + 52 omitidas). **Falta del dueño: aplicar la migración con respaldo** (y, opcional, `PETCONNECT_PRUEBA_BD=1`). Siguen: parte 2 (API: `LIMIT %s OFFSET %s` en los DAO y validación en `api.py`), parte 3 (web), parte 4 (móvil)* | 🟡 |
 | [ ] | 4.18 | A-14 | — | `/api/auth/login` revela cuentas por **tiempo**: si el correo no existe responde enseguida (`usuario is None` corta antes de bcrypt) y si existe calcula bcrypt (~0,3 s) aunque la contraseña sea mala. Arreglo: comparar contra un hash bcrypt fijo de relleno cuando no hay usuario (mismo costo 12), responder el mismo 401 y una prueba que cuente las llamadas a `verificar_password`/bcrypt en los dos casos. Solo backend. Surgió en el 4.10 (08/11/2026) | 🟢 |
 | [ ] | 4.19 | A-18 | — | Consola, “6. Actualizar usuario” (`vista/menu_usuarios.py`, `_actualizar_usuario`): cambia nombres, apellidos y correo **sin validar** (acepta una URL como nombre o `x` como correo) y un correo que ya tiene otra cuenta hace fallar el `UPDATE`, cuyo `print` muestra el mensaje de MySQL con el correo (Ley 1581). Arreglo: usar `validar_nombre` y `validar_formato_correo` de `security/datos_usuario.py` (ya comunes desde el 4.11) y avisar “ese correo ya tiene una cuenta” como el registro; prueba en `tests/test_consola_registro.py` o una nueva. Solo backend. Surgió en el 4.11 (08/11/2026) | 🟢 |
 | [ ] | 4.21 | — | — | `UsuarioDAO` (9 de sus 11 métodos; `consultar_sesion` y `cerrar_sesiones` ya propagan desde el 4.13) y `ProveedorDAO` (sus 7 métodos) todavía se tragan los errores de la BD: hacen `print` del mensaje de MySQL (puede traer un correo: Ley 1581) y devuelven `None`/`[]`/`False`. Por eso `api.py` llama a `_verificar_bd()` antes de `UsuarioDAO` en varias rutas de auth y de solicitudes. Arreglo, igual que el 4.15: quitar el `try/except Error` + `print` (dejar los `rollback()`), que la consola de usuarios y proveedores (`vista/menu_usuarios.py`, `vista/menu_proveedores.py`) atrape el error en su ciclo con `avisar_error_bd` de `vista/aviso_bd.py`, revisar si `_verificar_bd()` sigue haciendo falta y sumar los dos DAO a `DAOS_QUE_PROPAGAN` en `tests/test_dao_errores.py`. Solo backend; no toca el esquema. Se cruza con el 4.19 (el `UPDATE` con correo repetido es justo uno de esos `print`): conviene hacerlos seguidos. Surgió en el 4.15 (09/11/2026); anotado con el sí del dueño | 🟢 |
@@ -150,10 +150,10 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 09/11/2026, actualizada al terminar el 4.15 y el 4.16 (el SQL de productos y mascotas salió de
-`api.py` a `dao/`, los DAO dejan subir los errores y el detalle de producto oculta los descontinuados; solo backend;
-no cierran NC). Lo próximo es el 4.17 (paginación e índices; toca la BD y los 3 módulos). El 4.12 se salta hasta
-tener el 4.17; el 4.18 y el 4.19 se pueden adelantar.
+*Versión del 09/11/2026, actualizada al terminar la parte 1 del 4.17 (índices de los listados en `schema.sql` y en
+la migración `2026-11-09_indices_listados.sql`, commit `ea95ed5`; la migración la aplica el dueño). Lo próximo es la
+parte 2 del 4.17 (paginación en la API); después la web y el móvil. El 4.12 se salta hasta tener el 4.17; el 4.18,
+el 4.19 y el 4.21 se pueden adelantar.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -180,6 +180,24 @@ Lee primero:
   todavía: desde 240116e (4.1) en adelante.
 
 Estado conocido (9/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.17 EN CURSO (4 partes; NC-003 sigue abierta). Decisiones del dueño
+  (09/11/2026): opción A, ?pagina=&por_pagina= opcionales, 20 por defecto,
+  máximo 50 (más se recorta a 50; texto, 0, negativos o pagina > 10.000 →
+  400 en español); la respuesta sigue siendo una lista, sin total ("Ver más"
+  si llega una página llena). Web: Home pide 4, Adopción 12 y Catálogo 50
+  con "Ver más"; el buscador del catálogo filtra lo cargado con un aviso
+  (búsqueda en el servidor descartada por ahora). Móvil: botón "Ver más" al
+  pie de la FlatList.
+  Parte 1 HECHA (ea95ed5, solo backend): idx_mascotas_estado,
+  idx_productos_activo e idx_proveedores_ciudad (ciudad, activo, nombre) en
+  sql/schema.sql y en sql/migraciones/2026-11-09_indices_listados.sql
+  (CREATE INDEX IF NOT EXISTS: propio de MariaDB; no toca datos; se puede
+  repetir). sql/README.md explica cómo aplicarla. tests/test_esquema.py:
+  3 sin BD + 2 con MariaDB (PruebasMigracionIndicesEnBD, base temporal
+  petconnect_prueba_indices; usa EXPLAIN de MascotaDAO._EN_ADOPCION,
+  ProductoDAO._CATALOGO y ProveedorDAO._CONSULTAR_POR_CIUDAD). Contraprueba:
+  con el schema.sql anterior fallan 3. Suite 414 (362 + 52 omitidas).
+  Falta del dueño: aplicar la migración con respaldo.
 - 4.16 HECHO el 09/11/2026 (commit 4b5d18e, solo backend; no toca la BD; no
   cierra NC). ProductoDAO.consultar_catalogo_por_id filtra activo = TRUE y
   api.py lo revisa otra vez (doble barrera): un producto descontinuado
@@ -1207,24 +1225,29 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.17: paginación e índices, A-11, NC-003; toca
-la BD y los 3 módulos):
+Contexto del próximo paso (4.17 parte 2: paginación en la API, A-11,
+NC-003; solo backend, no toca la BD; el plan y las opciones ya están
+aprobados, ver "Estado conocido"):
 - Leer la fila del 4.17 en PRIORIDADES y el A-11 en la AUDITORÍA.
-- Paginación: GET /api/productos y GET /api/mascotas/adopcion devuelven
-  todas las filas. Desde el 4.15 el SQL está en dao/: el LIMIT/OFFSET va
-  en ProductoDAO.consultar_catalogo y MascotaDAO.consultar_en_adopcion
-  (parametrizado), no en api.py (tests/test_dao_errores.py vigila que
-  api.py no tenga SQL). La web y el móvil las leen en src/services/api.js:
-  decidir antes si se usan parámetros opcionales (?pagina=&por_pagina=
-  con un máximo fijo) que mantengan la lista de hoy, o un objeto con
-  total; hacerlo por partes (API, web, móvil).
-- Índices: mascotas(estado), productos(activo) y proveedores_servicio
-  (ciudad, activo, nombre). Van en sql/schema.sql y en una migración de
-  sql/migraciones/ con su prueba en tests/test_esquema.py. Toca la BD:
-  plan primero, respaldo y la migración la aplica el dueño (MariaDB: avisar
-  si algo es SQL propio de MySQL).
+- ProductoDAO.consultar_catalogo y MascotaDAO.consultar_en_adopcion
+  reciben (limite, desplazamiento) y agregan LIMIT %s OFFSET %s
+  (parametrizado) a _CATALOGO y _EN_ADOPCION. El ORDER BY por id ya es
+  estable (no repite ni salta filas entre páginas).
+- api.py: una función sin SQL (tests/test_dao_errores.py lo vigila) lee
+  ?pagina= y ?por_pagina= (enteros), aplica 20 por defecto, recorta a 50 y
+  responde 400 en español con texto, 0, negativos o pagina > 10.000. La
+  respuesta sigue siendo una lista: la web y el móvil no cambian todavía.
+- Ojo: test_esquema.PruebasMigracionIndicesEnBD hace EXPLAIN de _CATALOGO
+  y _EN_ADOPCION sin parámetros; con el LIMIT hay que pasarle (limite,
+  desplazamiento).
+- Prueba nueva tests/test_paginacion.py (DAO falso: valores por defecto,
+  pagina=2&por_pagina=5 → LIMIT 5 OFFSET 5, recorte a 50, los 400, la
+  lista; el SQL de los DAO lleva LIMIT %s OFFSET %s) y revisar
+  test_endpoints.py, test_errores.py y test_limite.py (llaman a esas
+  rutas). Contraprueba con el api.py y los DAO anteriores.
 - Pendientes del dueño que se cruzan: migraciones 2026-11-07_otp_pendientes.sql
-  (sin confirmar) y 2026-11-08_version_sesion.sql sin aplicar.
+  (sin confirmar), 2026-11-08_version_sesion.sql y
+  2026-11-09_indices_listados.sql sin aplicar.
 - Luego el 4.12 (repetir la prueba de carga). El 4.18, el 4.19 y el 4.21
   son solo backend y se pueden adelantar si el dueño quiere (el 4.19 y el
   4.21 conviene hacerlos seguidos).
@@ -1266,4 +1289,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.17**: paginación e índices (la otra mitad de la acción correctiva de NC-003); toca la BD (migración con respaldo, la aplica el dueño) y los 3 módulos: plan primero y por partes. El SQL de productos y mascotas ya está en `dao/` (4.15), así que el `LIMIT` va en `ProductoDAO.consultar_catalogo` y `MascotaDAO.consultar_en_adopcion`. El 4.15 y el 4.16 quedaron hechos el 09/11/2026 (`d03871b`, `400061f`, `4b5d18e`). El 4.12 va después del 4.17. El 4.18 (`/login` revela cuentas por tiempo) y el 4.19 (consola: “Actualizar usuario” sin validar) son solo backend y se pueden adelantar. El 4.21 (`UsuarioDAO`/`ProveedorDAO` todavía se tragan los errores de la BD) es solo backend y conviene hacerlo junto al 4.19. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar) y `2026-11-08_version_sesion.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.
+**Próximo ítem: 4.17, parte 2 (paginación en la API)**: el plan y las opciones ya están aprobados (`?pagina=&por_pagina=` opcionales, 20 por defecto, máximo 50, la respuesta sigue siendo lista). El `LIMIT %s OFFSET %s` va en `ProductoDAO.consultar_catalogo` y `MascotaDAO.consultar_en_adopcion`; la validación, en `api.py` sin SQL. Después, parte 3 (web) y parte 4 (móvil). La parte 1 (índices) quedó hecha el 09/11/2026 (`ea95ed5`); su migración `2026-11-09_indices_listados.sql` la aplica el dueño con respaldo. El 4.15 y el 4.16 quedaron hechos el 09/11/2026 (`d03871b`, `400061f`, `4b5d18e`). El 4.12 va después del 4.17. El 4.18 (`/login` revela cuentas por tiempo) y el 4.19 (consola: “Actualizar usuario” sin validar) son solo backend y se pueden adelantar. El 4.21 (`UsuarioDAO`/`ProveedorDAO` todavía se tragan los errores de la BD) es solo backend y conviene hacerlo junto al 4.19. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** aplicar las migraciones `2026-11-07_otp_pendientes.sql` (sin confirmar), `2026-11-08_version_sesion.sql` y `2026-11-09_indices_listados.sql` con respaldo, y la decisión D.7 de la política. NC-003 sigue abierta hasta el 4.17 y la medición del 4.12.

@@ -435,6 +435,19 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   que las listas de métodos y rutas estén completas); con solo el `api.py` anterior fallan las 12 rutas que usan
   la BD en los 3 escenarios; con solo los DAO anteriores, los 32 métodos; con solo el `seed.py` o el `main.py`
   anterior, su prueba.
+- **Ítem 4.17 (paginación e índices, NC-003), en curso desde el 09/11/2026.** Decisiones del dueño: parámetros
+  opcionales `?pagina=&por_pagina=` (20 por defecto, máximo 50) que mantienen la respuesta como lista; catálogo web
+  con “Ver más” y búsqueda sobre lo cargado; móvil con botón “Ver más”. **Parte 1 hecha (índices, commit
+  `ea95ed5`):** `sql/schema.sql` y la migración `sql/migraciones/2026-11-09_indices_listados.sql` crean
+  `idx_mascotas_estado`, `idx_productos_activo` e `idx_proveedores_ciudad` (`ciudad`, `activo`, `nombre`). La
+  migración usa `CREATE INDEX IF NOT EXISTS` (MariaDB, no MySQL), no toca datos y se puede repetir; **falta que el
+  dueño la aplique con respaldo**. La búsqueda por nombre de proveedores (`LIKE '%texto%'`) no puede usar un índice
+  normal y queda sin él. Regresión en `tests/test_esquema.py`: 3 pruebas sin BD (los índices están en el esquema; la
+  migración solo crea esos índices y no apaga el modo estricto) y 2 con MariaDB en la base temporal
+  `petconnect_prueba_indices` (sin índices, aplicar la migración dos veces los crea con las columnas en orden y sin
+  tocar filas; `EXPLAIN` de las consultas de los DAO los lista en `possible_keys`). Contraprueba: con el `schema.sql`
+  anterior fallan los 3 casos de índices; sin la migración falla su clase. Suite: 414 (362 correctas y 52
+  omitidas). Faltan las partes 2 (API), 3 (web) y 4 (móvil).
 
 #### A-12 · 🟠 Alta · Pasar a Gunicorn romperá los OTP [N]
 - **Dónde:** `api.py:44-45` (`AlmacenOTP()` en memoria), `otp/servicio.py`.
