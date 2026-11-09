@@ -404,8 +404,9 @@ class PruebasDAOSinFugas(unittest.TestCase):
 
     def test_todos_los_metodos_publicos_se_revisan(self):
         nombres = {f"{clase}.{nombre}" for clase, _, nombre, _ in self._metodos()}
-        # 32 hasta el 4.5 + 7 de OtpDAO (item 4.6); si se agrega uno, entra solo
-        self.assertEqual(len(nombres), 41, sorted(nombres))
+        # 32 hasta el 4.5 + 7 de OtpDAO (item 4.6) + 5 consultas de la API que salieron
+        # de api.py (item 4.15); si se agrega uno, entra solo
+        self.assertEqual(len(nombres), 46, sorted(nombres))
 
     def test_cada_metodo_devuelve_la_conexion_y_cierra_el_cursor(self):
         for escenario, error in ESCENARIOS.items():
@@ -461,12 +462,12 @@ class PruebasTransacciones(unittest.TestCase):
             resultados.append((f"{clase}.{nombre}", escribe, bd.conexiones[0]))
         return resultados
 
-    def test_hay_22_escrituras_y_19_lecturas(self):
+    def test_hay_22_escrituras_y_24_lecturas(self):
         resultados = self._llamar(None)
         escrituras = sorted(m for m, escribe, _ in resultados if escribe)
         lecturas = sorted(m for m, escribe, _ in resultados if not escribe)
         self.assertEqual(len(escrituras), 22, escrituras)
-        self.assertEqual(len(lecturas), 19, lecturas)
+        self.assertEqual(len(lecturas), 24, lecturas)      # 19 + 5 del item 4.15
 
     def test_cada_escritura_confirma_una_vez_y_las_lecturas_no_confirman(self):
         for metodo, escribe, conexion in self._llamar(None):

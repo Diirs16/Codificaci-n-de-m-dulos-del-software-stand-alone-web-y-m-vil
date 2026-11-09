@@ -31,7 +31,9 @@ from mysql.connector import errorcode
 from mysql.connector.errors import InterfaceError, OperationalError, ProgrammingError
 from werkzeug.exceptions import BadRequest, HTTPException
 
-from conexion.conexion_bd import ConexionBD, conexion_y_cursor
+from conexion.conexion_bd import ConexionBD
+from dao.mascota_dao import MascotaDAO
+from dao.producto_dao import ProductoDAO
 from dao.usuario_dao import UsuarioDAO
 from dao.solicitud_dao import SolicitudDAO
 from dao.otp_dao import OtpDAO
@@ -204,6 +206,8 @@ def _verificar_bd():
     """
     Comprueba que la BD responde; si no, lanza BDNoDisponible (la API contesta 503).
     Va antes de los DAO viejos, que sin BD devuelven None y pareceria "no encontrado".
+    Item 4.15: MascotaDAO y ProductoDAO ya dejan subir el error y no la necesitan;
+    sigue haciendo falta con UsuarioDAO, que todavia se traga los errores.
     Item 4.5 (A-11, NC-003): la conexion se pide al pool y se devuelve enseguida.
     Antes se pedia y nunca se devolvia: con el pool, eso lo habria agotado.
     """
@@ -378,39 +382,20 @@ def require_auth(f):
 # ---------------------------------------------------------------------------
 # Las rutas no atrapan los errores de la BD: los responden los manejadores
 # globales (503 si la BD no responde, 500 generico en otro caso).
-
-_SQL_PRODUCTOS = """
-    SELECT p.id_producto AS id, p.nombre AS name, p.descripcion AS description,
-           p.precio AS price, p.stock, p.imagen_url AS image, p.activo,
-           COALESCE(c.nombre, CONCAT('Categoria ', p.id_categoria_producto)) AS category
-    FROM productos p
-    LEFT JOIN categorias_producto c ON p.id_categoria_producto = c.id_categoria_producto
-    WHERE p.activo = TRUE ORDER BY p.id_producto
-"""
-
-_SQL_PRODUCTO_BY_ID = """
-    SELECT p.id_producto AS id, p.nombre AS name, p.descripcion AS description,
-           p.precio AS price, p.stock, p.imagen_url AS image, p.activo,
-           COALESCE(c.nombre, CONCAT('Categoria ', p.id_categoria_producto)) AS category
-    FROM productos p
-    LEFT JOIN categorias_producto c ON p.id_categoria_producto = c.id_categoria_producto
-    WHERE p.id_producto = %s
-"""
+# Item 4.15: el SQL vive en dao/producto_dao.py y dao/mascota_dao.py (regla de
+# petconnect.Backend/CLAUDE.md). Esos DAO dejan subir los errores, asi que estas
+# rutas no necesitan _verificar_bd().
 
 
 @app.route("/api/productos", methods=["GET"])
 def get_productos():
-    with conexion_y_cursor(_conexion_bd, dictionary=True) as (_, cursor):
-        cursor.execute(_SQL_PRODUCTOS)
-        rows = cursor.fetchall()
+    rows = ProductoDAO().consultar_catalogo()
     return jsonify([_row_to_dict(r) for r in rows])
 
 
 @app.route("/api/productos/<int:id_producto>", methods=["GET"])
 def get_producto(id_producto):
-    with conexion_y_cursor(_conexion_bd, dictionary=True) as (_, cursor):
-        cursor.execute(_SQL_PRODUCTO_BY_ID, (id_producto,))
-        row = cursor.fetchone()
+    row = ProductoDAO().consultar_catalogo_por_id(id_producto)
     if row is None:
         return jsonify({"error": "Producto no encontrado"}), 404
     return jsonify(_row_to_dict(row))
@@ -420,29 +405,8 @@ def get_producto(id_producto):
 # Mascotas  (publico - catalogo)
 # ---------------------------------------------------------------------------
 
-_SQL_MASCOTAS_ADOPCION = """
-    SELECT id_mascota AS id, nombre AS name, especie AS species, raza AS breed,
-           sexo AS gender, edad_aprox AS age, foto AS image,
-           observaciones AS description, estado
-    FROM mascotas WHERE estado = 'en_adopcion' ORDER BY id_mascota
-"""
-
-# NC-002 (item 2.9): la ruta publica solo encuentra mascotas en adopcion. Las demas
-# (activas, perdidas, adoptadas...) son privadas de su dueno.
-_SQL_MASCOTA_ADOPCION_BY_ID = """
-    SELECT id_mascota AS id, nombre AS name, especie AS species, raza AS breed,
-           sexo AS gender, edad_aprox AS age, foto AS image,
-           observaciones AS description, estado
-    FROM mascotas WHERE id_mascota = %s AND estado = 'en_adopcion'
-"""
-
-# Mascota de un usuario: solo la encuentra su dueno (id_usuario del token)
-_SQL_MASCOTA_DEL_USUARIO = """
-    SELECT id_mascota AS id, nombre AS name, especie AS species, raza AS breed,
-           sexo AS gender, edad_aprox AS age, foto AS image,
-           observaciones AS description, estado, id_usuario
-    FROM mascotas WHERE id_mascota = %s AND id_usuario = %s
-"""
+# NC-002 (item 2.9): la ruta publica solo encuentra mascotas en adopcion; las demas
+# son privadas de su dueno. Las consultas estan en dao/mascota_dao.py (item 4.15).
 
 # Mismo mensaje si no existe, si no esta en adopcion o si es de otro usuario:
 # asi la respuesta no revela que la mascota existe (NC-002)
@@ -460,18 +424,8 @@ def _mascota_to_dict(row):
 
 @app.route("/api/mascotas/adopcion", methods=["GET"])
 def get_mascotas_adopcion():
-    with conexion_y_cursor(_conexion_bd, dictionary=True) as (_, cursor):
-        cursor.execute(_SQL_MASCOTAS_ADOPCION)
-        rows = cursor.fetchall()
+    rows = MascotaDAO().consultar_en_adopcion()
     return jsonify([_mascota_to_dict(r) for r in rows])
-
-
-def _consultar_mascota(sql, params):
-    """Devuelve la fila de la mascota (o None) con la consulta parametrizada dada."""
-    with conexion_y_cursor(_conexion_bd, dictionary=True) as (_, cursor):
-        cursor.execute(sql, params)
-        row = cursor.fetchone()
-    return row
 
 
 def _mascota_no_encontrada():
@@ -480,7 +434,7 @@ def _mascota_no_encontrada():
 
 @app.route("/api/mascotas/<int:id_mascota>", methods=["GET"])
 def get_mascota(id_mascota):
-    row = _consultar_mascota(_SQL_MASCOTA_ADOPCION_BY_ID, (id_mascota,))
+    row = MascotaDAO().consultar_en_adopcion_por_id(id_mascota)
     # Doble barrera: el SQL ya filtra por estado y aqui se vuelve a revisar, por si
     # alguien cambia la consulta. Cualquier otro estado responde como si no existiera.
     if row is None or row.get("estado") != "en_adopcion":
@@ -495,7 +449,7 @@ def get_mascota(id_mascota):
 @app.route("/api/usuarios/me/mascotas/<int:id_mascota>", methods=["GET"])
 @require_auth
 def get_mi_mascota(id_mascota):
-    row = _consultar_mascota(_SQL_MASCOTA_DEL_USUARIO, (id_mascota, request.current_user_id))
+    row = MascotaDAO().consultar_del_dueno(id_mascota, request.current_user_id)
     # Doble barrera: el SQL filtra por dueno y aqui se compara otra vez. Una mascota
     # ajena responde 404, igual que una inexistente (no 403: no se revela que existe).
     if row is None or row.pop("id_usuario", None) != request.current_user_id:

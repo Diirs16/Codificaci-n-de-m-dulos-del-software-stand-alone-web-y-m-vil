@@ -65,8 +65,52 @@ class MascotaDAO:
         FROM mascotas WHERE nombre LIKE %s ORDER BY nombre
     """
 
+    # Item 4.15: consultas de la API (antes estaban en api.py). Los alias (name,
+    # species...) son los nombres que leen la web y el movil en el JSON.
+    _EN_ADOPCION = """
+        SELECT id_mascota AS id, nombre AS name, especie AS species, raza AS breed,
+               sexo AS gender, edad_aprox AS age, foto AS image,
+               observaciones AS description, estado
+        FROM mascotas WHERE estado = 'en_adopcion' ORDER BY id_mascota
+    """
+
+    # NC-002 (item 2.9): la ruta publica solo encuentra mascotas en adopcion. Las demas
+    # (activas, perdidas, adoptadas...) son privadas de su dueno.
+    _EN_ADOPCION_POR_ID = """
+        SELECT id_mascota AS id, nombre AS name, especie AS species, raza AS breed,
+               sexo AS gender, edad_aprox AS age, foto AS image,
+               observaciones AS description, estado
+        FROM mascotas WHERE id_mascota = %s AND estado = 'en_adopcion'
+    """
+
+    # Mascota de un usuario: solo la encuentra su dueno (id_usuario del token)
+    _DEL_DUENO = """
+        SELECT id_mascota AS id, nombre AS name, especie AS species, raza AS breed,
+               sexo AS gender, edad_aprox AS age, foto AS image,
+               observaciones AS description, estado, id_usuario
+        FROM mascotas WHERE id_mascota = %s AND id_usuario = %s
+    """
+
     def __init__(self):
         self._conexion_bd = ConexionBD()
+
+    def consultar_en_adopcion(self):
+        """Mascotas en adopcion para la API, como diccionarios con los alias del JSON."""
+        with conexion_y_cursor(self._conexion_bd, dictionary=True) as (_, cursor):
+            cursor.execute(self._EN_ADOPCION)
+            return cursor.fetchall()
+
+    def consultar_en_adopcion_por_id(self, id_mascota):
+        """La mascota si existe y esta en adopcion (diccionario); None si no."""
+        with conexion_y_cursor(self._conexion_bd, dictionary=True) as (_, cursor):
+            cursor.execute(self._EN_ADOPCION_POR_ID, (id_mascota,))
+            return cursor.fetchone()
+
+    def consultar_del_dueno(self, id_mascota, id_usuario):
+        """La mascota si es de ese usuario (diccionario, con id_usuario); None si no."""
+        with conexion_y_cursor(self._conexion_bd, dictionary=True) as (_, cursor):
+            cursor.execute(self._DEL_DUENO, (id_mascota, id_usuario))
+            return cursor.fetchone()
 
     def _mapear_mascota(self, fila):
         """Convierte una fila del ResultSet a un objeto Mascota."""

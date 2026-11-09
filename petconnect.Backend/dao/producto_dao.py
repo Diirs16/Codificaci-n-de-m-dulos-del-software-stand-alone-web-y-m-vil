@@ -59,8 +59,40 @@ class ProductoDAO:
         FROM productos WHERE nombre LIKE %s ORDER BY nombre
     """
 
+    # Item 4.15: consultas del catalogo de la API (antes estaban en api.py). Los alias
+    # (name, price, category...) son los nombres que leen la web y el movil en el JSON.
+    _CATALOGO = """
+        SELECT p.id_producto AS id, p.nombre AS name, p.descripcion AS description,
+               p.precio AS price, p.stock, p.imagen_url AS image, p.activo,
+               COALESCE(c.nombre, CONCAT('Categoria ', p.id_categoria_producto)) AS category
+        FROM productos p
+        LEFT JOIN categorias_producto c ON p.id_categoria_producto = c.id_categoria_producto
+        WHERE p.activo = TRUE ORDER BY p.id_producto
+    """
+
+    _CATALOGO_POR_ID = """
+        SELECT p.id_producto AS id, p.nombre AS name, p.descripcion AS description,
+               p.precio AS price, p.stock, p.imagen_url AS image, p.activo,
+               COALESCE(c.nombre, CONCAT('Categoria ', p.id_categoria_producto)) AS category
+        FROM productos p
+        LEFT JOIN categorias_producto c ON p.id_categoria_producto = c.id_categoria_producto
+        WHERE p.id_producto = %s
+    """
+
     def __init__(self):
         self._conexion_bd = ConexionBD()
+
+    def consultar_catalogo(self):
+        """Productos activos para la API, como diccionarios con los alias del JSON."""
+        with conexion_y_cursor(self._conexion_bd, dictionary=True) as (_, cursor):
+            cursor.execute(self._CATALOGO)
+            return cursor.fetchall()
+
+    def consultar_catalogo_por_id(self, id_producto):
+        """Un producto para la API (diccionario con los alias del JSON) o None."""
+        with conexion_y_cursor(self._conexion_bd, dictionary=True) as (_, cursor):
+            cursor.execute(self._CATALOGO_POR_ID, (id_producto,))
+            return cursor.fetchone()
 
     def _mapear_producto(self, fila):
         """Convierte una fila del ResultSet a un objeto Producto."""

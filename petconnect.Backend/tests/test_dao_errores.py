@@ -1,6 +1,7 @@
 """
-Pruebas de regresion del item 4.15 de PRIORIDADES (parte 1): los DAO dejan subir los
-errores de la base de datos y nunca imprimen el mensaje de MySQL.
+Pruebas de regresion del item 4.15 de PRIORIDADES: los DAO dejan subir los errores de
+la base de datos y nunca imprimen el mensaje de MySQL (parte 1), y el SQL vive solo en
+dao/, no en api.py (parte 2).
 
 Antes MascotaDAO y ProductoDAO atrapaban el error, hacian print del mensaje (puede
 traer un correo: "Duplicate entry 'correo@...'", Ley 1581) y devolvian None, [] o
@@ -13,6 +14,10 @@ en vez de 503. Estas pruebas cuidan:
 - La consola (vista/menu_mascotas.py y vista/menu_productos.py) atrapa ese error en
   su ciclo, muestra un aviso con el numero del error pero SIN el mensaje de MySQL, y
   vuelve al menu en vez de cerrarse con una traza.
+- api.py no tiene SQL: ningun texto con SELECT ... FROM, INSERT INTO, UPDATE ... SET
+  o DELETE FROM, ni cursor.execute ni conexion_y_cursor (regla de
+  petconnect.Backend/CLAUDE.md). Que las rutas sigan respondiendo igual lo cuidan
+  test_mascotas.py, test_endpoints.py y test_errores.py, que no cambiaron.
 
 UsuarioDAO y ProveedorDAO todavia se tragan los errores (fuera del 4.15).
 
@@ -22,11 +27,13 @@ Los correos son inventados (Ley 1581).
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -p "test_dao_errores.py" -v
 """
+import ast
 import contextlib
 import importlib
 import inspect
 import io
 import os
+import re
 import sys
 import unittest
 from unittest import mock
@@ -42,8 +49,8 @@ CORREO = "dueno.repetido@ejemplo.test"      # inventado (Ley 1581)
 # DAO que propagan los errores y cuantos metodos publicos tiene cada uno. Si se
 # agrega un metodo, la cuenta falla y obliga a mirarlo.
 DAOS_QUE_PROPAGAN = {
-    ("dao.mascota_dao", "MascotaDAO"): 7,
-    ("dao.producto_dao", "ProductoDAO"): 7,
+    ("dao.mascota_dao", "MascotaDAO"): 10,      # 7 + 3 de la API (parte 2)
+    ("dao.producto_dao", "ProductoDAO"): 9,     # 7 + 2 de la API (parte 2)
     ("dao.solicitud_dao", "SolicitudDAO"): 2,
     ("dao.otp_dao", "OtpDAO"): 7,
 }
@@ -166,6 +173,36 @@ class PruebasConsolaAvisaErrorBD(unittest.TestCase):
                 texto = self._correr(menu, ["2", "0"])
                 self.assertIn("La base de datos no respondio", texto)
                 self.assertNotIn("No hay conexion", texto)     # el mensaje interno no sale
+
+
+RUTA_API = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "api.py")
+
+# Sentencias SQL escritas en mayusculas, como en los DAO
+_PARECE_SQL = re.compile(
+    r"\bSELECT\b.*\bFROM\b|\bINSERT\s+INTO\b|\bUPDATE\s+\w+\s+SET\b|\bDELETE\s+FROM\b",
+    re.DOTALL)
+
+
+class PruebasSQLSoloEnDAO(unittest.TestCase):
+    """Parte 2: el SQL de productos y mascotas salio de api.py a dao/."""
+
+    @classmethod
+    def setUpClass(cls):
+        # Se lee el texto del archivo (no se importa): no ejecuta nada ni lee el .env
+        with open(RUTA_API, encoding="utf-8") as archivo:
+            cls.codigo = archivo.read()
+
+    def test_ningun_texto_de_api_es_una_consulta_sql(self):
+        textos = [nodo.value for nodo in ast.walk(ast.parse(self.codigo))
+                  if isinstance(nodo, ast.Constant) and isinstance(nodo.value, str)]
+        consultas = [" ".join(t.split())[:80] for t in textos if _PARECE_SQL.search(t)]
+        self.assertEqual(consultas, [], "el SQL va en dao/, no en api.py")
+
+    def test_api_no_usa_cursores(self):
+        for pista in ("cursor.execute", "conexion_y_cursor", ".cursor("):
+            with self.subTest(pista=pista):
+                # assertFalse y no assertNotIn: si falla, no imprime todo api.py
+                self.assertFalse(pista in self.codigo, f"api.py usa {pista}: el SQL va en dao/")
 
 
 if __name__ == "__main__":
