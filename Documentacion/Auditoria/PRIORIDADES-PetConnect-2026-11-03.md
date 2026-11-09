@@ -95,7 +95,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | [x] | 4.15 | — | — | Mover el SQL de productos y mascotas de `api.py` a `dao/` (regla de `petconnect.Backend/CLAUDE.md`). Antes, que los DAO **propaguen** los errores de la BD (hoy los imprimen y devuelven `None`/`[]`), o el 503 del 2.3 se volvería 404 o lista vacía. Surgió en el 2.9. *El 07/11/2026 el dueño decidió hacerlo aparte del 4.5. Ya existe `conexion_y_cursor()` (4.5): basta quitar el `try/except Error` + `print` de cada método (el `print` muestra el mensaje de MySQL, que puede traer un correo: Ley 1581) y, en `api.py`, `_verificar_bd()` deja de hacer falta. Modelo: `dao/solicitud_dao.py`. **Hecho el 09/11/2026 en 2 partes (solo backend; no toca el esquema).** Parte 1 (`d03871b`): `MascotaDAO` y `ProductoDAO` sin `try/except` + `print` en sus 14 métodos (dejan subir el error; los `rollback()` se quedan); hallazgo del plan: la consola también los usa y se habría cerrado con una traza, así que `vista/menu_mascotas.py` y `vista/menu_productos.py` atrapan el error en su ciclo con `vista/aviso_bd.py` (solo el número del error de MySQL, nunca el mensaje). Parte 2 (`400061f`): las 5 consultas pasan tal cual a `ProductoDAO.consultar_catalogo`/`consultar_catalogo_por_id` y `MascotaDAO.consultar_en_adopcion`/`consultar_en_adopcion_por_id`/`consultar_del_dueno` (diccionarios con los mismos alias: el JSON no cambia); `api.py` sin cursores; `_verificar_bd()` sigue para `UsuarioDAO`. Regresión: `tests/test_dao_errores.py` (9) + 1 caso en `test_sin_env_real.py`; `test_pool.py` cuenta 46 métodos (22 escrituras, 24 lecturas); `test_mascotas`, `test_endpoints` y `test_errores` sin cambios. Suite 407 (357 + 50 omitidas). Contraprueba: DAO viejos → fallan 2 (28 casos); menús viejos → 4; `api.py` viejo → 2 (3 casos). No cierra NC. Opcional del dueño: `PETCONNECT_PRUEBA_BD=1` y la consola. Hallazgo: `UsuarioDAO` y `ProveedorDAO` todavía se tragan los errores y hacen `print` → 4.21* | 🟡 |
 | [x] | 4.16 | — | — | `GET /api/productos/<id>` no filtra `activo = TRUE`: un producto descontinuado se ve (y se puede agregar al carrito) si se escribe su URL. Agregar el filtro para que responda el 404 “Producto no encontrado” de siempre y su prueba en `tests/test_endpoints.py` (`PruebasProductos` ya tiene la nota). Sin datos personales. Surgió en el 4.4 (07/11/2026); el dueño decidió no tocar `api.py` en ese ítem. Se puede hacer junto con 4.15 — *Hecho el 09/11/2026 en una parte, justo después del 4.15 (`4b5d18e`, solo backend). El SQL de `ProductoDAO.consultar_catalogo_por_id` filtra `activo = TRUE` y `api.py` lo revisa otra vez (doble barrera, como las mascotas); web y móvil sin cambios (ya muestran el 404). Regresión: 2 pruebas en `PruebasProductos` (la nota de pendiente se quitó). Suite 409 (359 + 50 omitidas). Contraprueba: sin el filtro del DAO falla 1; sin la revisión de `api.py` fallan 2 casos. Sin datos personales; no cierra NC* | 🟢 |
 | [x] | 4.17 | A-11 | NC-003 | Paginación e índices (la otra mitad de la acción correctiva de NC-003). **Paginación:** `GET /api/productos` y `GET /api/mascotas/adopcion` devuelven todas las filas sin `LIMIT`; la web y el móvil las consumen (`src/services/api.js` en ambos), así que cambiar la forma de la respuesta toca los 3 módulos: decidir antes si se usan parámetros opcionales (`?pagina=&por_pagina=` con un máximo fijo, parametrizados) que mantengan la lista de hoy o un objeto con `total`, y hacerlo por partes (API, web, móvil). **Índices:** `mascotas` solo tiene la clave primaria y `id_usuario` (falta `estado`), `productos` no tiene índice en `activo` y `proveedores_servicio` solo la clave primaria (`ciudad`, `activo`, `nombre`); el `LIKE '%texto%'` no usa índice. Va en `sql/schema.sql` y en una migración de `sql/migraciones/` con su prueba en `tests/test_esquema.py` (toca la BD: plan primero, respaldo y que el dueño la aplique). Agregado el 07/11/2026 con el sí del dueño, al cerrar el 4.5. Hacerlo antes del 4.12 — *Hecho el 09/11/2026 en 4 partes (`ea95ed5`, `d5502a8`, `55fa8bf`, `a42a038`). Decisiones del dueño: opción A, parámetros opcionales `?pagina=&por_pagina=` (20 por defecto, máximo 50, recortar si piden más; texto, 0, negativos o `pagina` > 10.000 → 400) y la respuesta sigue siendo una lista, sin `total` (si llega una página llena se muestra “Ver más”); web: Home pide 4, Adopción de 12 en 12 y Catálogo de 50 en 50, las tres con “Ver más” donde aplica, y el buscador del catálogo filtra lo cargado con un aviso (la búsqueda en el servidor queda descartada por ahora); móvil: botón “Ver más” al pie de la lista. **Parte 1 hecha (índices, `ea95ed5`):** `idx_mascotas_estado`, `idx_productos_activo` e `idx_proveedores_ciudad` (`ciudad`,`activo`,`nombre`) en `schema.sql` y en `sql/migraciones/2026-11-09_indices_listados.sql` (`CREATE INDEX IF NOT EXISTS`, propio de MariaDB; no toca datos). `tests/test_esquema.py`: 3 sin BD y 2 con MariaDB (`petconnect_prueba_indices`: crear dos veces sin perder filas y `EXPLAIN` de los DAO con el índice en `possible_keys`). Contraprueba: con el `schema.sql` anterior fallan 3. Suite 414 (362 + 52 omitidas). **Migración aplicada por el dueño el 09/11/2026**, con respaldo (`SHOW INDEX`: `ciudad`, `activo`, `nombre` en orden); opcional: `PETCONNECT_PRUEBA_BD=1`. **Parte 2 hecha (API, `d5502a8`; solo backend, no toca la BD):** `ProductoDAO.consultar_catalogo(limite, desplazamiento)` y `MascotaDAO.consultar_en_adopcion(...)` terminan en `ORDER BY` id `LIMIT %s OFFSET %s` (parametrizado). `api.py` (sin SQL): `_leer_paginacion()` y `_entero_de_la_url()` con `POR_PAGINA_DEFECTO = 20`, `POR_PAGINA_MAXIMA = 50` y `PAGINA_MAXIMA = 10000`; errores con `EntradaInvalida` (400 “El parametro 'pagina' debe ser un numero entero mayor que 0” / “no puede ser mayor que 10000”), sin tocar la BD; solo dígitos ASCII (“²” → 400); con más de 9 cifras cuenta como enorme sin convertir el texto (5.000 cifras no dan 500). Hallazgo de la prueba: `000` daba 500, corregido. `tests/test_paginacion.py` (8 pruebas); `test_endpoints.py` ahora espera `(20, 0)`; `test_esquema.py`: EXPLAIN con `(20, 0)` y una prueba nueva con MariaDB (6 mascotas de 4 en 4 = 4 + 2 + 0, sin repetir). Contraprueba: con el código anterior fallan 7 de 8 (pasa a propósito “sigue siendo una lista”); solo con el `api.py` anterior, 7; solo con los DAO anteriores, 6. Suite 423 (370 + 53 omitidas). **Parte 3 hecha (web, `55fa8bf`; no toca la BD ni la API):** `src/utils/paginacion.js` (`POR_PAGINA_DESTACADOS = 4`, `POR_PAGINA_ADOPCION = 12`, `POR_PAGINA_CATALOGO = 50`; `rutaPaginada` con `URLSearchParams`, que ignora lo que no sea entero positivo; `hayMas`; `unirSinRepetir` por id), `src/hooks/useListaPaginada.js` (primera página con cargando/error/listo como antes; `verMas` agrega al final; un error al pedir más no borra lo cargado y avisa; un clic doble no pide dos veces) y `src/components/BotonVerMas.jsx` (se oculta si no hay más, `min-h-11`, foco visible). `api.js`: `getProductos(opciones)` y `getMascotasAdopcion(opciones)`. Home pide `?pagina=1&por_pagina=4` (antes todo y `slice`); Adopción de 12 en 12 y Catálogo de 50 en 50 con “Ver más”; el buscador y las categorías filtran lo cargado y, si quedan páginas, el aviso “La búsqueda revisa los N productos cargados…”. `tests/paginacion.test.js` (10). Contraprueba: con `api.js` y las páginas anteriores fallan 3 (pasan a propósito las de la utilidad nueva y “sin opciones sigue pidiendo la ruta de siempre”). `npm test` 71/71, lint sin avisos nuevos (quedan los 2 viejos de los contextos), build OK. En el navegador a 375 px, con la API real y los tamaños bajados a 4 y 5 solo para la prueba: Adopción 4 → “Ver más” → 6 (ids 3 a 8 sin repetir, una sola petición `pagina=2`) y el botón desaparece; Catálogo 5 → 10 → 12 con el aviso al buscar, que desaparece al cargar todo; sin scroll horizontal. No se probó en el navegador el error de “Ver más” (sí en el código: lo cargado se queda). **Parte 4 hecha (móvil, `a42a038`):** `src/utils/paginacion.js` (igual que la web; `POR_PAGINA_CATALOGO = 20` para `HomeScreen`, que es el catálogo en 2 columnas sin buscador, y `POR_PAGINA_ADOPCION = 12`), `src/hooks/useListaPaginada.js` (mismo hook; conserva `loading`/`error` de las pantallas) y `src/components/BotonVerMas.js` (`ListFooterComponent`; `minHeight` 48, `role="button"`, `aria-busy`; colores del botón secundario de `FormularioSolicitud.js`). `api.js`: `getProductos(opciones)` y `getMascotasAdopcion(opciones)`. `tests/paginacion.test.mjs` (8); `npm test` 55/55; `npx expo export --platform web` OK. Contraprueba: con `api.js` y las pantallas anteriores fallan 2 (pasan a propósito las 6 de la utilidad nueva). Probado en el export web a 375 px con la API real y los tamaños bajados a 5 y 4 solo para la prueba: catálogo 5 → 10 → 12 y adopción 4 → 6, una petición por “Ver más”, sin repetir, y el botón desaparece. Hallazgo: el export se sirve en el puerto 8090, que no está en el CORS de la API (solo 5173, 8081 y 19006); se probó sirviéndolo en el 8081 (configuración local `movil-web-export-api` en `.claude/launch.json`, sin commit). No se probó en el emulador Android (opcional del dueño). NC-003 sigue abierta hasta el 4.12* | 🟡 |
-| [ ] | 4.18 | A-14 | — | `/api/auth/login` revela cuentas por **tiempo**: si el correo no existe responde enseguida (`usuario is None` corta antes de bcrypt) y si existe calcula bcrypt (~0,3 s) aunque la contraseña sea mala. Arreglo: comparar contra un hash bcrypt fijo de relleno cuando no hay usuario (mismo costo 12), responder el mismo 401 y una prueba que cuente las llamadas a `verificar_password`/bcrypt en los dos casos. Solo backend. Surgió en el 4.10 (08/11/2026) | 🟢 |
+| [x] | 4.18 | A-14 | — | `/api/auth/login` revela cuentas por **tiempo**: si el correo no existe responde enseguida (`usuario is None` corta antes de bcrypt) y si existe calcula bcrypt (~0,3 s) aunque la contraseña sea mala. Arreglo: comparar contra un hash bcrypt fijo de relleno cuando no hay usuario (mismo costo 12), responder el mismo 401 y una prueba que cuente las llamadas a `verificar_password`/bcrypt en los dos casos. Solo backend. Surgió en el 4.10 (08/11/2026) — *Hecho el 09/11/2026 en una parte (solo backend; no toca el esquema ni cierra NC). `security/passwords.py`: `hash_de_relleno()` (bcrypt de un texto aleatorio, costo 12, creado una vez al importar; nada fijo en el código). `api.py`, `login()`: `verificar_password` se llama siempre, sin cuenta contra el relleno, y el mismo 401. Decisión del dueño: opción B, el hash SHA-256 heredado también paga un bcrypt de relleno (resultado descartado; la migración de NC-001 no cambia). Medido (BD simulada): antes 1 ms sin cuenta y 237 ms con cuenta; ahora 235 y 236 ms. Regresión: `tests/test_login_tiempo.py` (11, cuenta las llamadas reales a `bcrypt.checkpw` con un espía). Suite 434 (381 + 53 omitidas). Contraprueba: `api.py` viejo → fallan 6 (5 pruebas, una con 2 subcasos) y pasan a propósito 6 (relleno y login correcto); sin el bcrypt de la rama heredada → 1; relleno nuevo en cada petición → 2. GA9: CP-005. Opcional del dueño: probarlo con la API real* | 🟢 |
 | [ ] | 4.19 | A-18 | — | Consola, “6. Actualizar usuario” (`vista/menu_usuarios.py`, `_actualizar_usuario`): cambia nombres, apellidos y correo **sin validar** (acepta una URL como nombre o `x` como correo) y un correo que ya tiene otra cuenta hace fallar el `UPDATE`, cuyo `print` muestra el mensaje de MySQL con el correo (Ley 1581). Arreglo: usar `validar_nombre` y `validar_formato_correo` de `security/datos_usuario.py` (ya comunes desde el 4.11) y avisar “ese correo ya tiene una cuenta” como el registro; prueba en `tests/test_consola_registro.py` o una nueva. Solo backend. Surgió en el 4.11 (08/11/2026) | 🟢 |
 | [ ] | 4.21 | — | — | `UsuarioDAO` (9 de sus 11 métodos; `consultar_sesion` y `cerrar_sesiones` ya propagan desde el 4.13) y `ProveedorDAO` (sus 7 métodos) todavía se tragan los errores de la BD: hacen `print` del mensaje de MySQL (puede traer un correo: Ley 1581) y devuelven `None`/`[]`/`False`. Por eso `api.py` llama a `_verificar_bd()` antes de `UsuarioDAO` en varias rutas de auth y de solicitudes. Arreglo, igual que el 4.15: quitar el `try/except Error` + `print` (dejar los `rollback()`), que la consola de usuarios y proveedores (`vista/menu_usuarios.py`, `vista/menu_proveedores.py`) atrape el error en su ciclo con `avisar_error_bd` de `vista/aviso_bd.py`, revisar si `_verificar_bd()` sigue haciendo falta y sumar los dos DAO a `DAOS_QUE_PROPAGAN` en `tests/test_dao_errores.py`. Solo backend; no toca el esquema. Se cruza con el 4.19 (el `UPDATE` con correo repetido es justo uno de esos `print`): conviene hacerlos seguidos. Surgió en el 4.15 (09/11/2026); anotado con el sí del dueño | 🟢 |
 
@@ -150,9 +150,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 09/11/2026, actualizada al cerrar el 4.12 (prueba de carga: 0 % de error con 500, 1000 y 1500
-usuarios; NC-003 cerrada). Lo próximo es el 4.18 (`/login` revela cuentas por tiempo); después el 4.19 y el 4.21,
-mejor seguidos. Con el último [ ] de la Fase 4 se pregunta por el push.
+*Versión del 09/11/2026, actualizada al cerrar el 4.18 (`/login` ya no revela cuentas por tiempo: bcrypt también sin
+cuenta y con hash heredado). Lo próximo es el 4.19 (consola: “Actualizar usuario” sin validar) y enseguida el 4.21;
+son los dos últimos [ ] de la Fase 4. Al cerrar el último se pregunta por el push.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -179,6 +179,23 @@ Lee primero:
   todavía: desde 240116e (4.1) en adelante.
 
 Estado conocido (9/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 4.18 HECHO el 09/11/2026 (A-14; un commit, solo backend; no toca el
+  esquema ni la BD; no cierra NC; GA9: CP-005). security/passwords.py:
+  hash_de_relleno() (bcrypt de secrets.token_urlsafe(32) con COSTO_BCRYPT,
+  creado una vez al importar; nada fijo en el código) y _bcrypt_coincide().
+  api.py, login(): verificar_password se llama SIEMPRE (sin cuenta, contra
+  el relleno) y el mismo 401. Opción B del dueño: con hash SHA-256
+  heredado también se calcula un bcrypt de relleno (resultado descartado;
+  la migración de NC-001 no cambia). Medido con BD simulada: antes 1 ms sin
+  cuenta y 237 ms con cuenta; ahora 235 y 236 ms. tests/test_login_tiempo.py
+  (11; espía mock(wraps=bcrypt.checkpw) que cuenta las llamadas, sin
+  cronómetro). Suite 434 (381 + 53 omitidas). Contraprueba: api.py viejo →
+  fallan 6 (5 pruebas, una con 2 subcasos), pasan a propósito 6 (relleno y
+  login correcto); sin el bcrypt de la rama heredada → 1; relleno nuevo en
+  cada petición → 2. Ojo: correr un solo archivo con
+  "-m unittest discover -s tests -p test_login_tiempo.py" (con
+  "tests.test_login_tiempo" no encuentra test_errores). Opcional del
+  dueño: probar /login con la API real (correo sin cuenta y con cuenta).
 - 4.12 HECHO el 09/11/2026 (NC-003 CERRADA; script dde0ce0 + commit de
   documentación; no toca la API, el esquema ni la BD real). Opción A del
   dueño: script nuevo Documentacion/Evidencias-4.12-carga/carga_nc003.py
@@ -1266,27 +1283,31 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (4.18: /api/auth/login revela cuentas por
-tiempo, A-14; solo backend, no toca la BD):
-- Leer la fila del 4.18 en PRIORIDADES y el A-14 en la AUDITORÍA (el 4.10
-  ya dejó neutra la respuesta del registro).
-- En api.py, login(): `if usuario is None or not verificar_password(...)`
-  corta antes de bcrypt cuando el correo no existe (responde enseguida);
-  si existe, calcula bcrypt (COSTO_BCRYPT = 12 en security/passwords.py)
-  aunque la contraseña sea mala. La diferencia de tiempo revela si hay
-  cuenta.
-- Arreglo propuesto en la fila: sin usuario, comparar contra un hash
-  bcrypt de relleno con el mismo costo y responder el mismo 401. Revisar
-  que no cambie el camino de es_hash_heredado (SHA-256 de NC-001).
-- Prueba de regresión sin BD (modelos: tests/test_registro_neutro.py y
-  tests/test_errores.py): contar las llamadas a bcrypt con correo
-  inexistente y con correo existente + contraseña mala (deben ser
-  iguales) y que la respuesta sea idéntica. Contraprueba con el api.py
-  anterior.
-- Después: 4.19 (consola, "Actualizar usuario" sin validar) y 4.21
-  (UsuarioDAO/ProveedorDAO se tragan los errores de la BD), seguidos.
-  Con el último [ ] de la Fase 4 se pregunta por el push (uno solo,
-  nunca --force).
+Contexto del próximo paso (4.19: consola, "6. Actualizar usuario" sin
+validar, A-18; solo backend, no toca el esquema ni la BD real):
+- Leer la fila del 4.19 (y la del 4.21) en PRIORIDADES y el A-18 en la
+  AUDITORÍA (el 4.11 ya arregló el registro de la consola).
+- vista/menu_usuarios.py, _actualizar_usuario(): toma nombres, apellidos,
+  correo y teléfono con input().strip() y los guarda sin validar (acepta
+  una URL como nombre o "x" como correo). El estado ya se limita a
+  activo/inactivo/bloqueado.
+- Un correo que ya tiene otra cuenta hace fallar el UPDATE de
+  UsuarioDAO.actualizar(), cuyo except hace print(f"[ERROR] ... {e}") con
+  el mensaje de MySQL, que trae el correo (Ley 1581), y devuelve False.
+- Arreglo propuesto en la fila: validar_nombre y validar_formato_correo
+  de security/datos_usuario.py (comunes desde el 4.11; la consola no
+  importa api.py, A-41) y avisar "Ese correo ya tiene una cuenta" como el
+  registro de la consola (consultar_por_correo antes del UPDATE, sin
+  repetir el correo). Preguntar qué hacer con el teléfono (hoy sin regla).
+- Se cruza con el 4.21 (quitar el try/except + print de UsuarioDAO y
+  ProveedorDAO; la consola atrapa con avisar_error_bd de vista/aviso_bd.py):
+  si el plan del 4.19 depende de ese print, decir si conviene agruparlos.
+- Prueba de regresión sin BD (modelo: tests/test_consola_registro.py,
+  que simula input, getpass y UsuarioDAO y desactiva load_dotenv).
+  Contraprueba con git stash de menu_usuarios.py.
+- El 4.19 y el 4.21 son los dos últimos [ ] de la Fase 4: al cerrar el
+  último se recuerdan los commits sin subir (desde 240116e) y se pregunta
+  por el push (uno solo, nunca --force).
 - Pendientes sin ítem: el móvil borra la sesión ante cualquier error de
   /auth/me (preguntar si se anota como 4.20); el export web del móvil en
   el 8090 no está en el CORS de api.py (5173, 8081 y 19006); el aviso
@@ -1335,4 +1356,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 4.18 (`/api/auth/login` revela cuentas por tiempo, A-14)**: solo backend. Sin usuario, comparar contra un hash bcrypt de relleno con el mismo costo, responder el mismo 401 y una prueba que cuente las llamadas a bcrypt en los dos casos. Después el 4.19 (consola: “Actualizar usuario” sin validar) y el 4.21 (`UsuarioDAO`/`ProveedorDAO` se tragan los errores de la BD), mejor seguidos. El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** la decisión D.7 de la política. Al cerrar el último [ ] de la Fase 4 se pregunta por el push.
+**Próximo ítem: 4.19 (consola: “6. Actualizar usuario” sin validar, A-18)**: solo backend. Validar nombres, apellidos y correo con `security/datos_usuario.py` y avisar “Ese correo ya tiene una cuenta” sin que el `print` del DAO muestre el correo; enseguida el 4.21 (`UsuarioDAO`/`ProveedorDAO` se tragan los errores de la BD). Son los dos últimos [ ] de la Fase 4. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** la decisión D.7 de la política. Al cerrar el último [ ] de la Fase 4 se pregunta por el push.

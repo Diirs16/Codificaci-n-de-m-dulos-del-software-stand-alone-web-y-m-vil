@@ -582,6 +582,25 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   mandan correos al titular, que así se entera. **Hallazgo → ítem 4.18:** `/api/auth/login` revela cuentas por
   tiempo: con un correo sin cuenta responde enseguida y con uno que sí existe calcula bcrypt (~0,3 s) aunque la
   contraseña sea mala. `/api/utils/validar-correo` no revela cuentas (no consulta la BD).
+- **Estado del login por tiempo: resuelto el 09/11/2026 (ítem 4.18 de PRIORIDADES, en una parte; solo backend; no toca
+  el esquema ni cierra NC; en la GA9 se anota en CP-005).** En `login()` el `usuario is None` cortaba el `or` antes de
+  bcrypt. Ahora `verificar_password` se llama **siempre**: sin cuenta, contra `hash_de_relleno()` (nuevo en
+  `security/passwords.py`: bcrypt de un texto aleatorio con `COSTO_BCRYPT`, creado una vez al importar el módulo; no
+  es un secreto y no se escribe en el código), y se responde el mismo 401. Decisión del dueño: **opción B**, una cuenta
+  con hash SHA-256 heredado (NC-001), que se compara al instante, también paga un bcrypt de relleno cuyo resultado se
+  descarta; la migración a bcrypt tras una contraseña correcta no cambia. Una cuenta inactiva o bloqueada con
+  contraseña mala sigue dando el mismo 401 (el 403 solo sale con la correcta). Medición en el mismo PC (BD simulada,
+  mediana de 8): antes, sin cuenta 1 ms y con cuenta 237 ms; ahora, 235 ms y 236 ms. Regresión:
+  `tests/test_login_tiempo.py` (11; bcrypt real, contado con un espía `mock(wraps=bcrypt.checkpw)` en vez de un
+  cronómetro, que fallaría al azar): una llamada a bcrypt y la misma respuesta byte a byte sin cuenta, con cuenta, con
+  hash heredado, con cuenta inactiva o bloqueada y con más de 72 bytes; la contraseña correcta sigue enviando el código
+  y migrando el hash heredado; el relleno es `$2b$12$`, se crea una sola vez y no acepta claves comunes. Suite 434
+  (381 + 53 omitidas). Contraprueba: con el `api.py` anterior fallan 6 (5 pruebas, una con 2 subcasos: sin cuenta, igual
+  trabajo, heredada, inactiva/bloqueada y más de 72 bytes) y pasan a propósito las 4 del relleno y las 2 del login
+  correcto, que prueban `passwords.py` y el camino bueno; sin el bcrypt de la rama heredada falla 1; con un relleno
+  nuevo en cada petición fallan 2. **Sigue abierto (no es de este ítem):** el 401 sale antes del 403 de cuenta
+  inactiva y del correo del OTP, así que con la contraseña **correcta** el tiempo varía (es lo esperado: quien la
+  tiene ya sabe que la cuenta existe).
 
 #### A-15 · 🟡 Media · `autocommit=True` vuelve inútiles los `rollback()` [N]
 - `config/db_config.py:13` → `autocommit: True`; los DAO llaman `commit()/rollback()` como si hubiera transacciones.

@@ -41,7 +41,7 @@ from modelo.usuario import Usuario
 from correo import enviar_codigo, enviar_bienvenida, enviar_aviso_cuenta_existente
 from otp import AlmacenOTP
 from security.jwt_helper import generate_token, verify_token
-from security.passwords import hash_password, verificar_password, es_hash_heredado
+from security.passwords import hash_password, verificar_password, es_hash_heredado, hash_de_relleno
 from security.politica import validar_contrasena
 # Item 4.11 (A-18): nombre y formato del correo se validan en un modulo comun que
 # tambien usa la consola (vista/menu_usuarios.py) sin importar este archivo
@@ -547,7 +547,12 @@ def login():
     dao = UsuarioDAO()
     usuario = dao.consultar_por_correo(email)
 
-    if usuario is None or not verificar_password(password, usuario.password_hash):
+    # Item 4.18 (A-14): bcrypt se calcula SIEMPRE, tambien sin cuenta (contra un hash
+    # de relleno). Antes el "usuario is None" cortaba antes de bcrypt y un correo sin
+    # cuenta respondia ~0,3 s mas rapido: el tiempo revelaba quien estaba registrado.
+    hash_guardado = usuario.password_hash if usuario is not None else hash_de_relleno()
+    contrasena_ok = verificar_password(password, hash_guardado)
+    if usuario is None or not contrasena_ok:
         return jsonify({"error": "Correo o contrasena incorrectos"}), 401
 
     # NC-001: los hashes SHA-256 del sistema anterior se reemplazan por bcrypt
