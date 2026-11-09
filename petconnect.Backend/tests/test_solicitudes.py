@@ -269,6 +269,20 @@ class PruebasEnvioDeSolicitudes(unittest.TestCase):
 
     # -- Fallos de la BD ----------------------------------------------------------
 
+    def test_si_la_bd_cae_al_revisar_la_cuenta_responde_503_sin_guardar(self):
+        # Item 4.21: ya no hay _verificar_bd() antes de UsuarioDAO; su error sube solo.
+        # require_auth ya paso (consultar_sesion simulado), falla consultar_por_id.
+        self.usuarios.consultar_por_id.side_effect = errores_bd.InterfaceError(
+            "No hay conexion con la base de datos")
+        for ruta in RUTAS:
+            with self.subTest(ruta=ruta):
+                with self.assertLogs(self.api.app.logger, "ERROR"):
+                    r = self._enviar(ruta)
+                self.assertEqual(r.status_code, 503)
+                self.assertNotIn("enviad", r.get_data(as_text=True).lower())
+                self._nada_guardado()
+        self.obtener_conexion.assert_not_called()      # sin conexion aparte para revisar
+
     def test_si_la_bd_falla_no_dice_enviada_ni_registra_el_mensaje(self):
         fallos = {
             500: errores_bd.IntegrityError(f"Duplicate entry '{TELEFONO}' {MENSAJE}"),

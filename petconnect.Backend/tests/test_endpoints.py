@@ -37,6 +37,7 @@ import bcrypt
 import dns.exception
 import dns.resolver
 import jwt
+from mysql.connector import errors as errores_bd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -166,7 +167,25 @@ class _BaseEndpoints(unittest.TestCase):
         self.addCleanup(self.api._liberar_aviso, CORREO)
 
     def _bd_apagada(self):
+        """Sin BD: el pool no presta conexion y UsuarioDAO deja subir el InterfaceError.
+
+        Item 4.21: las rutas ya no llaman a _verificar_bd(); el 503 sale del error que
+        sube del DAO, como haria el UsuarioDAO real sin conexion (test_dao_errores.py).
+        """
         self.obtener_conexion.return_value = None
+        sin_bd = errores_bd.InterfaceError("No hay conexion con la base de datos")
+        for metodo in self._metodos_de_usuario_dao():
+            getattr(self.dao, metodo).side_effect = sin_bd
+
+    def _bd_de_vuelta(self):
+        self.obtener_conexion.return_value = self.conexion
+        for metodo in self._metodos_de_usuario_dao():
+            getattr(self.dao, metodo).side_effect = None
+
+    @staticmethod
+    def _metodos_de_usuario_dao():
+        clase = importlib.import_module("dao.usuario_dao").UsuarioDAO   # la real, no el parche
+        return [nombre for nombre in vars(clase) if not nombre.startswith("_")]
 
     def _sql_y_parametros(self):
         """Consulta (en una linea) y parametros con que la ruta llamo a cursor.execute."""
@@ -431,6 +450,26 @@ class PruebasLogin(_BaseEndpoints):
         self.assertEqual(r.status_code, 200)
         self.dao.actualizar_password.assert_not_called()
 
+    def test_bd_caida_responde_503_y_no_credenciales_incorrectas(self):
+        # Item 4.21: sin _verificar_bd(), el 503 sale del error de UsuarioDAO. Antes,
+        # sin ese chequeo, el DAO devolvia None y la ruta decia 401.
+        self._bd_apagada()
+        with self.assertLogs(self.api.app.logger, "ERROR"):
+            r = self._login()
+        self.assertEqual(r.status_code, 503)
+        self._sin_datos_internos(r)
+        self.enviar_codigo.assert_not_called()
+        self.assertFalse(self.api._otp_login.tiene_pendiente(CORREO))
+
+    def test_no_pide_una_conexion_aparte_para_revisar_la_bd(self):
+        # Item 4.21: antes _verificar_bd() pedia una conexion al pool en cada login solo
+        # para comprobar la BD. Aqui UsuarioDAO es falso y los OTP estan en memoria:
+        # ninguna conexion del pool debe usarse.
+        self.dao.consultar_por_correo.return_value = self._usuario_autorizado(self.hash_bcrypt)
+        r = self._login()
+        self.assertEqual(r.status_code, 200)
+        self.obtener_conexion.assert_not_called()
+
     def test_hash_heredado_con_contrasena_mala_no_se_migra(self):
         heredado = hashlib.sha256(CLAVE.encode()).hexdigest()
         self.dao.consultar_por_correo.return_value = self._usuario_autorizado(heredado)
@@ -515,7 +554,7 @@ class PruebasVerificacionDelCodigo(_BaseEndpoints):
         self.assertTrue(self.api._otp_login.tiene_pendiente(CORREO))
 
         # Vuelve la BD: el mismo codigo sirve (no hay que iniciar sesion otra vez)
-        self.obtener_conexion.return_value = self.conexion
+        self._bd_de_vuelta()
         self.dao.consultar_por_correo.return_value = _usuario(
             version_politica_datos=self.api.VERSION_POLITICA_DATOS)
         r = self._verificar(self.LOGIN_VERIFY, codigo)
@@ -530,18 +569,28 @@ class PruebasVerificacionDelCodigo(_BaseEndpoints):
             r = self._verificar(self.VERIFY, codigo)
         self.assertEqual(r.status_code, 503)
         self._sin_token(r)
-        self.dao.insertar.assert_not_called()
+        # Item 4.21: insertar se intenta y su error sube; la cuenta no se crea
+        self.dao.insertar.assert_called_once()
         self.enviar_bienvenida.assert_not_called()
         self.assertTrue(self.api._otp_registro.tiene_pendiente(CORREO))
 
     def test_verify_si_no_se_puede_crear_la_cuenta_responde_500_sin_token(self):
+        # Item 4.21: antes insertar devolvia False (y hacia print del mensaje de MySQL)
+        # y la ruta respondia 500 "Error al crear el usuario". Ahora el error sube (por
+        # ejemplo, el mismo correo verificado dos veces a la vez) y responde el 500
+        # generico, sin el mensaje de MySQL, que trae el correo (Ley 1581).
         codigo = self._pendiente_de_registro()
-        self.dao.insertar.return_value = False
-        r = self._verificar(self.VERIFY, codigo)
+        self.dao.insertar.side_effect = errores_bd.IntegrityError(
+            msg=f"Duplicate entry '{CORREO}' for key 'correo'", errno=1062)
+        with self.assertLogs(self.api.app.logger, "ERROR") as logs:
+            r = self._verificar(self.VERIFY, codigo)
         self.assertEqual(r.status_code, 500)
-        self.assertEqual(r.get_json(), {"error": "Error al crear el usuario"})
+        self.assertIn("Error interno del servidor", r.get_json()["error"])
         self._sin_token(r)
+        self._sin_datos_internos(r)
+        self.assertNotIn(CORREO, "\n".join(logs.output))
         self.enviar_bienvenida.assert_not_called()
+        self.assertTrue(self.api._otp_registro.tiene_pendiente(CORREO))   # puede reintentar
 
 
 # ---------------------------------------------------------------------------

@@ -204,10 +204,12 @@ _MENSAJE_FALLO_CORREO = "No pudimos enviar el código a tu correo. Intenta de nu
 
 def _verificar_bd():
     """
-    Comprueba que la BD responde; si no, lanza BDNoDisponible (la API contesta 503).
-    Va antes de los DAO viejos, que sin BD devuelven None y pareceria "no encontrado".
-    Item 4.15: MascotaDAO y ProductoDAO ya dejan subir el error y no la necesitan;
-    sigue haciendo falta con UsuarioDAO, que todavia se traga los errores.
+    Comprueba que la BD responde; si no, lanza BDNoDisponible.
+    Item 4.21: solo se usa al arrancar (python api.py), para no levantar la API sin
+    BD. Las rutas ya no la llaman: desde el 4.15 y el 4.21 ningun DAO se traga los
+    errores, asi que sin BD el error sube solo y manejar_bd_no_disponible responde
+    503. Antes iba antes de cada UsuarioDAO, que sin BD devolvia None y pareceria
+    "no encontrado" o "credenciales incorrectas".
     Item 4.5 (A-11, NC-003): la conexion se pide al pool y se devuelve enseguida.
     Antes se pedia y nunca se devolvia: con el pool, eso lo habria agotado.
     """
@@ -542,8 +544,8 @@ def login():
     if not email or not password:
         return jsonify({"error": "Correo y contrasena son requeridos"}), 400
 
-    # Sin BD el DAO devuelve None y pareceria "credenciales incorrectas": mejor 503
-    _verificar_bd()
+    # Item 4.21: sin BD, consultar_por_correo deja subir el error y se responde 503
+    # (antes devolvia None y pareceria "credenciales incorrectas")
     dao = UsuarioDAO()
     usuario = dao.consultar_por_correo(email)
 
@@ -614,11 +616,12 @@ def login_verify():
     if error == "incorrecto":
         return jsonify({"error": "Codigo incorrecto"}), 400
 
-    _verificar_bd()   # 503 antes de gastar el codigo si la BD no responde
-    _otp_login.descartar(email)
-
+    # Item 4.21: primero se busca la cuenta y despues se gasta el codigo. Si la BD
+    # no responde, el error sube (503) antes de descartar y el codigo sigue valido
+    # para reintentar (antes lo cuidaba _verificar_bd()).
     dao = UsuarioDAO()
     usuario = dao.consultar_por_correo(email)
+    _otp_login.descartar(email)
     if usuario is None:
         return jsonify({"error": "Usuario no encontrado"}), 404
 
@@ -758,9 +761,8 @@ def register():
     if error_pw:
         return jsonify({"error": error_pw}), 400
 
-    _verificar_bd()
     dao = UsuarioDAO()
-    usuario_existente = dao.consultar_por_correo(email)
+    usuario_existente = dao.consultar_por_correo(email)     # sin BD: 503 (item 4.21)
     if usuario_existente is not None:
         # Item 4.10 (A-14): ya no hay 409; misma respuesta + aviso al titular
         return _registro_con_cuenta_existente(email, password, usuario_existente)
@@ -882,10 +884,10 @@ def verify():
         version_politica_datos=version_politica,
     )
 
-    _verificar_bd()
-    dao = UsuarioDAO()
-    if not dao.insertar(usuario):
-        return jsonify({"error": "Error al crear el usuario"}), 500
+    # Item 4.21: si la BD falla, insertar deja subir el error (503 sin conexion, 500
+    # en otro caso) antes de descartar: el codigo sigue valido para reintentar.
+    # Antes devolvia False y aqui se respondia 500 "Error al crear el usuario".
+    UsuarioDAO().insertar(usuario)
 
     _otp_registro.descartar(email)
 
@@ -941,8 +943,7 @@ def _cuenta_que_envia():
     cuenta se bloqueara o de que subiera la version de la politica (vale 24 h).
     Devuelve (usuario, None) o (None, respuesta de error).
     """
-    _verificar_bd()
-    usuario = UsuarioDAO().consultar_por_id(request.current_user_id)
+    usuario = UsuarioDAO().consultar_por_id(request.current_user_id)    # sin BD: 503
     if usuario is None:
         return None, (jsonify({"error": "Usuario no encontrado"}), 404)
     if usuario.estado != "activo":
@@ -1013,9 +1014,7 @@ def enviar_mensaje_contacto():
 @require_auth
 def me():
     """Endpoint protegido - valida que el token JWT es valido."""
-    _verificar_bd()
-    dao = UsuarioDAO()
-    usuario = dao.consultar_por_id(request.current_user_id)
+    usuario = UsuarioDAO().consultar_por_id(request.current_user_id)    # sin BD: 503
     if not usuario:
         return jsonify({"error": "Usuario no encontrado"}), 404
     return jsonify({
