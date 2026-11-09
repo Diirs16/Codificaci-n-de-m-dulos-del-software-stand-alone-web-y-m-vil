@@ -447,7 +447,15 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   `petconnect_prueba_indices` (sin índices, aplicar la migración dos veces los crea con las columnas en orden y sin
   tocar filas; `EXPLAIN` de las consultas de los DAO los lista en `possible_keys`). Contraprueba: con el `schema.sql`
   anterior fallan los 3 casos de índices; sin la migración falla su clase. Suite: 414 (362 correctas y 52
-  omitidas). Faltan las partes 2 (API), 3 (web) y 4 (móvil).
+  omitidas). **Parte 2 hecha (API, commit `d5502a8`; no toca la BD):** `ProductoDAO.consultar_catalogo` y
+  `MascotaDAO.consultar_en_adopcion` reciben `(limite, desplazamiento)` y terminan en `ORDER BY` id
+  `LIMIT %s OFFSET %s`, parametrizado. `api.py` (sin SQL) los lee de `?pagina=&por_pagina=`: 20 por defecto, más de 50
+  se recorta a 50; texto, 0, negativos, decimales o `pagina` > 10.000 responden 400 en español sin tocar la BD (solo
+  dígitos ASCII; un número de miles de cifras no da 500). La respuesta sigue siendo una lista. Hallazgo de la prueba:
+  `000` daba 500 antes de publicar el cambio; corregido. Regresión: `tests/test_paginacion.py` (8 pruebas) y, con
+  MariaDB, 6 mascotas de 4 en 4 dan 4 + 2 + 0 sin repetir ni saltar. Contraprueba: con el código anterior fallan 7 de
+  8 (pasa a propósito la que revisa que sigue siendo una lista); solo con el `api.py` anterior, 7; solo con los DAO
+  anteriores, 6. Suite: 423 (370 correctas y 53 omitidas). Faltan las partes 3 (web) y 4 (móvil).
 
 #### A-12 · 🟠 Alta · Pasar a Gunicorn romperá los OTP [N]
 - **Dónde:** `api.py:44-45` (`AlmacenOTP()` en memoria), `otp/servicio.py`.
