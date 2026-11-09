@@ -92,6 +92,19 @@ export function getPerfil() {
   return apiFetch("/auth/me");
 }
 
+// Ítem 4.13 (A-03): cierra la sesión EN LA API. La API suma 1 a version_sesion y
+// así el token deja de valer en todos los aparatos de la cuenta (200). Si el token ya
+// no valía responde 401. Se rinde a los TIEMPO_CIERRE_MS (status 0, como sin red)
+// para que nadie quede esperando: utils/sesion.js borra la sesión local de todos modos.
+export const TIEMPO_CIERRE_MS = 8000;
+
+export function cerrarSesionEnServidor() {
+  return apiFetch("/auth/logout", {
+    method: "POST",
+    signal: AbortSignal.timeout(TIEMPO_CIERRE_MS),
+  });
+}
+
 export function validarCorreo(email) {
   return apiFetch("/utils/validar-correo", {
     method: "POST",

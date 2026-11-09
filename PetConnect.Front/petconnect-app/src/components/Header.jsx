@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, ShoppingCart, User } from "lucide-react";
+import { AlertTriangle, Menu, X, ShoppingCart, User } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 
@@ -9,6 +9,22 @@ export default function Header() {
   const { totalItems, setIsOpen } = useCart();
   const { user, logout, openLogin } = useAuth();
   const location = useLocation();
+  // Ítem 4.13 (A-03): mientras la API responde, el botón queda desactivado
+  // (decisión B1) y, si no pudo confirmar el cierre, se avisa (decisión A1).
+  const [cerrando, setCerrando] = useState(false);
+  const [avisoCierre, setAvisoCierre] = useState(false);
+
+  async function salir() {
+    if (cerrando) return;
+    setCerrando(true);
+    try {
+      const resultado = await logout();
+      setAvisoCierre(resultado === "sin-confirmar");
+    } finally {
+      setCerrando(false);
+      setMenuOpen(false);
+    }
+  }
 
   const navLinks = [
     { to: "/", label: "Inicio" },
@@ -65,10 +81,12 @@ export default function Header() {
               <div className="hidden md:flex items-center gap-2">
                 <span className="text-sm text-gray-600">{user.name.replace(/\b\w/g, c => c.toUpperCase())}</span>
                 <button
-                  onClick={logout}
-                  className="text-sm text-gray-500 hover:text-black transition-colors"
+                  type="button"
+                  onClick={salir}
+                  disabled={cerrando}
+                  className="text-sm text-gray-500 hover:text-black transition-colors disabled:cursor-wait disabled:hover:text-gray-500"
                 >
-                  Salir
+                  {cerrando ? "Cerrando sesión…" : "Salir"}
                 </button>
               </div>
             ) : (
@@ -113,13 +131,12 @@ export default function Header() {
             ))}
             {user ? (
               <button
-                onClick={() => {
-                  logout();
-                  setMenuOpen(false);
-                }}
-                className="py-3 text-sm text-left text-gray-500 hover:text-black"
+                type="button"
+                onClick={salir}
+                disabled={cerrando}
+                className="py-3 text-sm text-left text-gray-500 hover:text-black disabled:cursor-wait disabled:hover:text-gray-500"
               >
-                Cerrar sesión ({user.name})
+                {cerrando ? "Cerrando sesión…" : `Cerrar sesión (${user.name})`}
               </button>
             ) : (
               <button
@@ -135,6 +152,32 @@ export default function Header() {
           </nav>
         </div>
       )}
+
+      {/* Aviso del ítem 4.13: la zona role="status" existe siempre para que los
+          lectores de pantalla lean el mensaje cuando aparece. Se oculta solo con la
+          X o al volver a iniciar sesión. */}
+      <div
+        role="status"
+        className="pointer-events-none fixed inset-x-4 top-20 z-[60] flex justify-end sm:left-auto sm:right-5"
+      >
+        {avisoCierre && !user && (
+          <div className="toast-enter pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg bg-[#111] px-4 py-3 text-sm text-white shadow-lg">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+            <p className="flex-1">
+              Cerraste sesión en este navegador, pero no pudimos confirmarlo con el
+              servidor. Si usas PetConnect en otro aparato, cierra sesión también allí.
+            </p>
+            <button
+              type="button"
+              onClick={() => setAvisoCierre(false)}
+              className="-my-2.5 -mr-2.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white"
+              aria-label="Cerrar aviso"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
     </header>
   );
 }

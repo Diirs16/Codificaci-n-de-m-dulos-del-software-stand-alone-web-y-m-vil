@@ -28,7 +28,7 @@ const BOTON_SECUNDARIO =
  * onCerrar (opcional: muestra el botón "Cerrar").
  */
 export default function FormularioSolicitud({ tipo, mascota, onCerrar }) {
-  const { user, logout, openLogin, openRegister } = useAuth();
+  const { user, cerrarSesionLocal, openLogin, openRegister } = useAuth();
   const esAdopcion = tipo === "adopcion";
   const id = (campo) => `${tipo}-${campo}`;
 
@@ -98,7 +98,9 @@ export default function FormularioSolicitud({ tipo, mascota, onCerrar }) {
   function volverAIniciarSesion() {
     setError("");
     setVolverAEntrar(false);
-    logout();
+    // Ítem 4.13: la API ya respondió 401 (el token no vale), así que no se le pide
+    // cerrar la sesión: solo se borra la de este navegador.
+    cerrarSesionLocal();
     openLogin();
   }
 

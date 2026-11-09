@@ -30,3 +30,36 @@ export async function revalidarSesion({ leerToken, obtenerPerfil }) {
   if (leerToken() !== token) return { accion: "ignorar" };
   return resultado;
 }
+
+// Ítem 4.13 (A-03): botón "Cerrar sesión". Pide a la API que cierre la sesión
+// (POST /auth/logout, todos los aparatos) y SIEMPRE borra la sesión de este
+// navegador, responda lo que responda: nadie queda "atrapado" con la sesión abierta.
+// Lo usa src/context/AuthContext.jsx (logout).
+//
+// Devuelve cómo quedó la sesión en el servidor:
+//   "cerrada"        → 200: el token ya no vale en ningún aparato
+//   "ya-cerrada"     → 401 (el token ya no valía) o no había token: no se avisa nada
+//   "sin-confirmar"  → 503, 502, 500, sin red o tiempo agotado: este navegador sí
+//                      cerró, pero los otros aparatos podrían seguir con la sesión
+//                      (decisión del dueño, A1: se muestra un aviso)
+export async function cerrarSesion({ leerToken, cerrarEnServidor, borrarLocal }) {
+  const token = leerToken();
+  if (!token) {
+    borrarLocal(); // sin token no hay nada que cerrar en la API
+    return "ya-cerrada";
+  }
+
+  let resultado;
+  try {
+    await cerrarEnServidor();
+    resultado = "cerrada";
+  } catch (error) {
+    resultado = error?.status === 401 ? "ya-cerrada" : "sin-confirmar";
+  }
+
+  // Se borra siempre, salvo que mientras se esperaba entrara OTRA cuenta
+  // (un token distinto): esa sesión nueva no se toca.
+  const tokenAhora = leerToken();
+  if (!tokenAhora || tokenAhora === token) borrarLocal();
+  return resultado;
+}

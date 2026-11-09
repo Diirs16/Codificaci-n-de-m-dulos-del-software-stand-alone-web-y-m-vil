@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
+  cerrarSesionEnServidor,
   getPerfil,
   loginUser,
   registerUser,
   verifyCode as apiVerifyCode,
   verifyLoginCode as apiVerifyLoginCode,
 } from "../services/api";
-import { revalidarSesion } from "../utils/sesion";
+import { cerrarSesion, revalidarSesion } from "../utils/sesion";
 
 const AuthContext = createContext();
 const SESSION_KEY = "petconnect_session";
@@ -99,11 +100,23 @@ export function AuthProvider({ children }) {
     setShowRegister(false);
   };
 
-  const logout = () => {
+  // Solo borra la sesión de este navegador (sin llamar a la API). Se usa cuando la
+  // API ya dijo que el token no vale (401), p. ej. en FormularioSolicitud.jsx.
+  const cerrarSesionLocal = () => {
     _setUser(null);
     setPendingEmail(null);
     setPendingLoginEmail(null);
   };
+
+  // Ítem 4.13 (A-03): botón "Cerrar sesión". Cierra en la API (todos los aparatos) y
+  // siempre en este navegador. Devuelve "cerrada", "ya-cerrada" o "sin-confirmar"
+  // (ver utils/sesion.js); con "sin-confirmar" el Header muestra un aviso.
+  const logout = () =>
+    cerrarSesion({
+      leerToken: () => localStorage.getItem(TOKEN_KEY),
+      cerrarEnServidor: cerrarSesionEnServidor,
+      borrarLocal: cerrarSesionLocal,
+    });
 
   const openLogin = () => {
     setShowRegister(false);
@@ -138,6 +151,7 @@ export function AuthProvider({ children }) {
         register,
         verifyCode,
         logout,
+        cerrarSesionLocal,
         openLogin,
         openRegister,
       }}

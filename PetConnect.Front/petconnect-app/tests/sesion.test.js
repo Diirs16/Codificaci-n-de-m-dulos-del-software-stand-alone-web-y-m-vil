@@ -137,7 +137,8 @@ test("si la sesión cambia mientras se espera (cerrar sesión u otra cuenta), se
 
 test("AuthContext revalida al iniciar con revalidarSesion y getPerfil", () => {
   const contexto = leer("../src/context/AuthContext.jsx");
-  assert.match(contexto, /import \{ revalidarSesion \} from "\.\.\/utils\/sesion"/);
+  // (desde el 4.13 el mismo import también trae cerrarSesion)
+  assert.match(contexto, /import \{[^}]*\brevalidarSesion\b[^}]*\} from "\.\.\/utils\/sesion"/);
   assert.match(contexto, /\bgetPerfil\b/);
   assert.match(contexto, /useEffect\(\(\) => \{[\s\S]*revalidarSesion\(/);
   // Cierra solo con "cerrar" y conserva el token al actualizar
