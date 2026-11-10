@@ -1110,8 +1110,8 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
   móvil); falta la parte 3 (borrar la sesión al abrir la app solo ante 401 de `/auth/me`).** Con permiso del dueño:
   `expo-secure-store` ~57.0.4 (`npx expo install`, versión de Expo 57; el lock fija 57.0.4) y su *plugin* en `app.json`
   (saca los datos de SecureStore de las copias de seguridad de Android: en otro celular no se podrían descifrar).
-  `src/utils/almacenToken.js` (puro; el dueño reescribió la primera versión durante la sesión y se adaptó todo a la
-  suya): `leer`, `guardar` y `borrar` **nunca lanzan error**. En Android e iOS (`tieneAlmacenSeguro`) el token va en
+  `src/utils/almacenToken.js` (puro; la primera versión se reescribió fuera de la conversación mientras se trabajaba y
+  el dueño eligió quedarse con esa: se adaptaron `api.js` y las pruebas): `leer`, `guardar` y `borrar` **nunca lanzan error**. En Android e iOS (`tieneAlmacenSeguro`) el token va en
   SecureStore (Keystore de Android / Keychain de iOS); el que quedó en AsyncStorage se pasa a SecureStore y se borra
   de AsyncStorage solo si la copia salió bien (nadie pierde la sesión). Si SecureStore no deja guardar, la sesión dura
   en memoria hasta cerrar la app y **nunca** se guarda en texto plano. Los avisos van a la consola de Metro
