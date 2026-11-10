@@ -1,9 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { errorDeApi, cuerpoLogin, cuerpoSolicitudAdopcion, cuerpoMensajeContacto } from "../utils/peticiones";
 import { conLimiteDeTiempo } from "../utils/sesion";
 import { rutaPaginada } from "../utils/paginacion";
 import { resolverUrlApi, resolverUrlPolitica } from "../utils/configApi";
+import { crearAlmacenToken, tieneAlmacenSeguro } from "../utils/almacenToken";
 
 // Ítem 5.3, parte 1 (A-27): las direcciones salen de EXPO_PUBLIC_API_URL y
 // EXPO_PUBLIC_WEB_URL (plantilla: PetConnect.Mobile/.env.example). Vacías = el
@@ -35,13 +37,22 @@ export const API_BASE = CONFIG_API.url;
  */
 export const POLITICA_URL = CONFIG_POLITICA.url;
 
-const TOKEN_KEY = "petconnect_token";
+// Ítem 5.3, parte 2 (A-28): el token va cifrado en expo-secure-store (Keystore de
+// Android / Keychain de iOS); el que quedó en AsyncStorage se pasa ahí y se borra
+// (src/utils/almacenToken.js). En web SecureStore no existe: ahí sigue en
+// AsyncStorage (localStorage), como la web React. Si un almacén falla, el aviso
+// va solo a la consola de Metro (nunca lleva el token).
+const almacenToken = crearAlmacenToken({
+  seguro: tieneAlmacenSeguro(Platform.OS) ? SecureStore : null,
+  viejo: AsyncStorage,
+  avisar: (aviso) => console.warn(`Sesión: ${aviso}`),
+});
 
 async function apiFetch(path, options = {}) {
   // Sin status, como un error de red: no cierra la sesión ni se confunde con un 401.
   if (!API_BASE) throw errorDeApi("la app no tiene configurada una dirección segura (https) del servidor", undefined, null);
 
-  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  const token = await almacenToken.leer();
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -143,13 +154,13 @@ export function enviarMensajeContacto(mensaje) {
 }
 
 export async function saveToken(token) {
-  await AsyncStorage.setItem(TOKEN_KEY, token);
+  await almacenToken.guardar(token);
 }
 
 export async function clearToken() {
-  await AsyncStorage.removeItem(TOKEN_KEY);
+  await almacenToken.borrar();
 }
 
 export async function getToken() {
-  return AsyncStorage.getItem(TOKEN_KEY);
+  return almacenToken.leer();
 }

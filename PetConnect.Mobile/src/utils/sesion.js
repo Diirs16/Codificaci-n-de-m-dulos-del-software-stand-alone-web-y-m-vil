@@ -2,7 +2,7 @@
 // JavaScript puro (sin React Native) para que `npm test` lo pruebe con Node
 // (tests/cerrar-sesion.test.mjs). Hace lo mismo que cerrarSesion de la web
 // (PetConnect.Front/petconnect-app/src/utils/sesion.js), pero con await porque
-// AsyncStorage (donde el móvil guarda el token) es asíncrono.
+// el almacén del token (SecureStore; AsyncStorage en web, ver almacenToken.js) es asíncrono.
 
 // Si la API no contesta en este tiempo, se deja de esperar (cuenta como sin red).
 export const TIEMPO_CIERRE_MS = 8000;
