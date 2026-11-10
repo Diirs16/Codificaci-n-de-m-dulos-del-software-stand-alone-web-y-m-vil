@@ -1206,6 +1206,10 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   dos claves pasan a `ON UPDATE RESTRICT` (los `id` nunca cambian; `ON DELETE CASCADE` se queda) en `schema.sql` y
   en las migraciones del 07/11, con una migración opcional del 10/11/2026 para la base local. `tests/test_esquema.py`
   revisa ahora que ninguna tabla repita esa combinación; con los `.sql` viejos fallan 5 de las 8 pruebas nuevas.
+- **Prueba real del dueño, 10/11/2026 (aprobada), commit `bfa94ec`:** `docker compose up --build -d` deja `db`,
+  `api` y `web` arriba y `seed.py` carga los datos de ejemplo. Dos ajustes vistos en esa prueba: Gunicorn 25.1+ ya no
+  crea su socket de control (lo intentaba en una carpeta personal que el usuario sin root no tiene) y el chequeo de
+  salud de la BD da 120 s de gracia (la primera carga del esquema tardó más de 80 s).
 
 #### A-31 · 🟠 Alta · No hay integración continua y las pruebas cubren poco [A]
 - No existe `.github/workflows/`. Solo 13 pruebas (seguridad); **ninguna** prueba endpoints de mascotas, productos,
