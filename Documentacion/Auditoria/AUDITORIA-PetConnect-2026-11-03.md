@@ -1106,9 +1106,24 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
 #### A-28 · ⚪ Baja · Token en AsyncStorage sin cifrar y cierre de sesión ante cualquier error
 - `src/services/api.js:87` (el plan ya propone `expo-secure-store`). `AuthContext.js:22-25` borra el token ante
   **cualquier** error (también sin internet), no solo ante 401.
-- **Estado: pendiente (ítem 5.3 de PRIORIDADES, partes 2 y 3).** Aprobado por el dueño el 10/11/2026: parte 2 =
-  `expo-secure-store` (~57.0.1, con `npx expo install`) y paso del token viejo de AsyncStorage; en web sigue
-  AsyncStorage (`localStorage`). Parte 3 = borrar la sesión al abrir la app solo ante 401 de `/auth/me`.
+- **Estado: en curso (ítem 5.3 de PRIORIDADES). Token cifrado resuelto el 10/11/2026 (parte 2, `eeda879`, solo
+  móvil); falta la parte 3 (borrar la sesión al abrir la app solo ante 401 de `/auth/me`).** Con permiso del dueño:
+  `expo-secure-store` ~57.0.4 (`npx expo install`, versión de Expo 57; el lock fija 57.0.4) y su *plugin* en `app.json`
+  (saca los datos de SecureStore de las copias de seguridad de Android: en otro celular no se podrían descifrar).
+  `src/utils/almacenToken.js` (puro; el dueño reescribió la primera versión durante la sesión y se adaptó todo a la
+  suya): `leer`, `guardar` y `borrar` **nunca lanzan error**. En Android e iOS (`tieneAlmacenSeguro`) el token va en
+  SecureStore (Keystore de Android / Keychain de iOS); el que quedó en AsyncStorage se pasa a SecureStore y se borra
+  de AsyncStorage solo si la copia salió bien (nadie pierde la sesión). Si SecureStore no deja guardar, la sesión dura
+  en memoria hasta cerrar la app y **nunca** se guarda en texto plano. Los avisos van a la consola de Metro
+  (`console.warn`) sin el token. En web (el módulo viene vacío) sigue AsyncStorage = `localStorage`, como la web React
+  (decisión del dueño). `api.js` ya no llama a AsyncStorage directo. Regresión: `tests/almacen-token.test.mjs` (17);
+  `npm test` 85/85; `expo export --platform web` bien. Contraprueba (`git stash` de `api.js`, `package.json`,
+  `package-lock.json`, `app.json` y `sesion.js`): fallan 2 (la que lee `api.js` y la de la dependencia y el plugin);
+  pasan a propósito las 15 de `almacenToken.js` (archivo nuevo). Mutaciones (9, una a la vez), todas detectadas:
+  migrar sin borrar el viejo, borrarlo aunque no se copió, respaldo en texto plano, `borrar` sin limpiar la memoria,
+  `guardar` sin borrar el sobrante, aviso con el token o SecureStore en web (1 cada una); no leer primero SecureStore o
+  `borrar` sin tocar AsyncStorage (3 cada una). Prueba del dueño: reconstruir con `npm run android`, iniciar sesión,
+  cerrar la app y volver a abrirla.
 
 ### 3.6 Dependencias
 
@@ -1185,6 +1200,12 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   `git check-ignore`); 16 roturas a propósito (`mysql:8.0`, montar toda `sql/`, publicar el puerto de la BD o de la
   API, quitar `PROXY_CONFIABLE`, `DB_HOST=localhost`, renombrar `api`, escribir una contraseña, no esperar a la BD,
   quitar el `env_file`…) se detectan todas. Prueba real (la corre el dueño): `docker compose up --build`.
+- **Corrección del 10/11/2026, commit `fe75856`:** en la prueba del dueño, MariaDB 10.11 rechazó `schema.sql` con el
+  error 1901: una regla `CHECK` no puede usar una columna cuya clave foránea la cambia sola (`ON UPDATE CASCADE`), y
+  así estaban `solicitudes.id_mascota` y `otp_pendientes.id_usuario` (MariaDB 10.4, la local, sí lo aceptaba). Las
+  dos claves pasan a `ON UPDATE RESTRICT` (los `id` nunca cambian; `ON DELETE CASCADE` se queda) en `schema.sql` y
+  en las migraciones del 07/11, con una migración opcional del 10/11/2026 para la base local. `tests/test_esquema.py`
+  revisa ahora que ninguna tabla repita esa combinación; con los `.sql` viejos fallan 5 de las 8 pruebas nuevas.
 
 #### A-31 · 🟠 Alta · No hay integración continua y las pruebas cubren poco [A]
 - No existe `.github/workflows/`. Solo 13 pruebas (seguridad); **ninguna** prueba endpoints de mascotas, productos,
