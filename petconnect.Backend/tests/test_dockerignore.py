@@ -114,9 +114,13 @@ MODULOS = {
             "api.log",
             ".git/config",
             "CLAUDE.md",
+            # Item 5.2 (decision del dueno): las pruebas no van en la imagen
+            "tests/test_seguridad.py",
+            "tests/test_dockerignore.py",
         ],
         "dentro": [
             "api.py",
+            "gunicorn.conf.py",
             "main.py",
             "seed.py",
             "requirements.txt",

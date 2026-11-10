@@ -1,6 +1,7 @@
 """
 API REST de PetConnect.
-Ejecutar con: python api.py
+Ejecutar con: python api.py                            (tu computador, Windows)
+         o:   gunicorn -c gunicorn.conf.py api:app     (Docker/Linux, item 5.2)
 """
 
 import sys
@@ -57,11 +58,30 @@ CORS(app, origins=[
 # NC-006 / A-04 y A-05: limite de peticiones por IP en las rutas de autenticacion.
 # Frena la fuerza bruta de contrasenas y codigos, y el envio de correos sin fin.
 # Se cuenta en memoria (se reinicia al reiniciar la API), como los OTP (ver 4.6).
-# La IP es request.remote_addr: si algun dia la API va detras de un proxy, hay
-# que agregar ProxyFix para leer la IP real (ver 5.2).
 LIMITE_AUTH = "5 per minute"
+
+
+def _ip_cliente() -> str:
+    """
+    Item 5.2 (A-30): la IP con la que se cuenta el limite.
+
+    Sin proxy (python api.py en tu PC) es request.remote_addr. Detras de nginx
+    (docker-compose) TODAS las peticiones llegan desde la IP de nginx: contar por
+    ella haria que 5 intentos fallidos de una persona bloquearan el login de
+    todos. Con PROXY_CONFIABLE=1 se usa la ULTIMA IP de X-Forwarded-For, la que
+    anota nginx: las anteriores las puede escribir el cliente y no se creen.
+    Sin PROXY_CONFIABLE=1 el encabezado se ignora (cualquiera podria inventarlo).
+    Se lee en cada peticion para que las pruebas puedan cambiarlo.
+    """
+    if os.getenv("PROXY_CONFIABLE", "").strip() == "1":
+        ultima = request.headers.get("X-Forwarded-For", "").split(",")[-1].strip()
+        if ultima:
+            return ultima
+    return get_remote_address()
+
+
 limiter = Limiter(
-    get_remote_address,
+    _ip_cliente,
     app=app,
     storage_uri="memory://",
     headers_enabled=True,   # cabecera Retry-After: cuantos segundos esperar
@@ -1076,20 +1096,43 @@ def _preparar_sesiones() -> bool:
     return True
 
 
-if __name__ == "__main__":
+def preparar_arranque() -> bool:
+    """
+    Item 5.2 (A-30): las revisiones de antes de atender peticiones (BD, tabla de
+    OTP con limpieza de vencidos y columna version_sesion). Antes estaban sueltas en
+    el bloque __main__, que Gunicorn NUNCA ejecuta (importa "api:app"): en Docker
+    la API habria arrancado sin revisar nada. Ahora las llaman "python api.py" y
+    gunicorn.conf.py (post_worker_init). Devuelve False si la API no debe arrancar.
+    """
     try:
         _verificar_bd()
     except BDNoDisponible:
         print("[ERROR] No se pudo conectar a la base de datos.")
-        sys.exit(1)
+        return False
     if not _preparar_otp() or not _preparar_sesiones():
-        sys.exit(1)
+        return False
     print("[OK] Conexion a la base de datos establecida.")
-    modo_debug = _modo_debug()
-    if modo_debug:
-        print("[AVISO] Modo debug activo (FLASK_DEBUG=1): usalo solo en tu computador.")
     if _es_desarrollo():
         print("[AVISO] APP_ENV=desarrollo: si el correo falla, el codigo OTP se muestra en esta consola. "
               "Usalo solo en tu computador.")
-    print("[OK] API PetConnect corriendo en http://localhost:5000")
-    app.run(debug=modo_debug, port=5000)
+    return True
+
+
+def _host_api() -> str:
+    """
+    Item 5.2 (A-30): donde escucha "python api.py". Vacio = 127.0.0.1 (solo este
+    computador, como siempre). API_HOST=0.0.0.0 la abre a otros equipos. En Docker
+    no se usa: Gunicorn escucha en 0.0.0.0 segun gunicorn.conf.py.
+    """
+    return os.getenv("API_HOST", "").strip() or "127.0.0.1"
+
+
+if __name__ == "__main__":
+    if not preparar_arranque():
+        sys.exit(1)
+    modo_debug = _modo_debug()
+    if modo_debug:
+        print("[AVISO] Modo debug activo (FLASK_DEBUG=1): usalo solo en tu computador.")
+    host = _host_api()
+    print(f"[OK] API PetConnect corriendo en http://{host}:5000")
+    app.run(host=host, debug=modo_debug, port=5000)

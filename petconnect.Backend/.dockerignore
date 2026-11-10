@@ -24,6 +24,10 @@
 **/.venv
 **/venv
 
+# Pruebas (item 5.2, decision del dueno): no corren en produccion. Se siguen
+# corriendo en tu computador y en la CI de GitHub.
+tests
+
 # Colecciones de Postman (pueden traer tokens) y documentos pesados
 postman
 **/*.docx

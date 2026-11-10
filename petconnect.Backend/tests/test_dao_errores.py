@@ -288,11 +288,14 @@ class PruebasSQLSoloEnDAO(unittest.TestCase):
     def test_verificar_bd_solo_se_usa_al_arrancar(self):
         # Item 4.21: con todos los DAO propagando, las rutas no necesitan comprobar la
         # BD antes (el error sube solo y se responde 503). _verificar_bd() queda solo
-        # en "if __name__ == '__main__'", fuera de toda funcion.
+        # en el arranque. Item 5.2: el arranque paso del bloque __main__ a
+        # preparar_arranque() (la llaman python api.py y Gunicorn), unica funcion
+        # que puede llamarla.
         arbol = ast.parse(self.codigo)
         dentro_de_funciones = []
         for funcion in ast.walk(arbol):
-            if isinstance(funcion, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if (isinstance(funcion, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and funcion.name != "preparar_arranque"):
                 for nodo in ast.walk(funcion):
                     if (isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Name)
                             and nodo.func.id == "_verificar_bd"):
