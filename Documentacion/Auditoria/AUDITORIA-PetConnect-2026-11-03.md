@@ -1084,8 +1084,8 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
 - `src/services/api.js:9-14`: `10.0.2.2` (Android) o `localhost`, por HTTP. HTTP sin cifrar solo está permitido en
   los manifiestos *debug* (`usesCleartextTraffic`), así que el APK *release* no conectaría.
 - **Arreglo:** `EXPO_PUBLIC_API_URL` y HTTPS al desplegar.
-- **Estado: en curso (ítem 5.3 de PRIORIDADES, en 3 partes). Parte 1 de 3 hecha el 10/11/2026 (`7e963c5`, solo
-  móvil).** Decisiones del dueño: variable vacía para probar (todavía no hay API alojada, 5.5); `POLITICA_URL` también
+- **Estado: resuelto el 10/11/2026 (ítem 5.3 de PRIORIDADES, en 3 partes; lo de este hallazgo es la parte 1,
+  `7e963c5`, solo móvil; las partes 2 y 3 son de A-28).** Decisiones del dueño: variable vacía para probar (todavía no hay API alojada, 5.5); `POLITICA_URL` también
   configurable; el cierre de sesión solo ante 401 entra como parte 3; en el export web el token seguirá en AsyncStorage
   (`localStorage`, como la web). `src/utils/configApi.js` (puro): la dirección sale de `EXPO_PUBLIC_API_URL` (se le
   agrega `/api` si no lo trae) y la política de `EXPO_PUBLIC_WEB_URL` (+ `/politica-de-datos`); vacías = `10.0.2.2` en
@@ -1101,13 +1101,14 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
   a propósito las 10 de `configApi.js`, que es un archivo nuevo. Mutaciones (8, una a la vez), todas detectadas: sin
   exigir https, host local por prefijo (`localhost.ejemplo.com`), siempre `localhost` o no quitar barras finales (2 cada
   una); https también en desarrollo, aceptar `usuario:clave@`, `/api` dos veces o aceptar `?consulta` (1 cada una).
-  Pendiente: el APK *release* sigue necesitando una API con HTTPS (5.5).
+  **Probado por el dueño en el emulador el 10/11/2026** (Tienda y Adopción cargan sin la variable). Fuera de este
+  hallazgo: el APK *release* necesita una API alojada con HTTPS a la cual apuntar `EXPO_PUBLIC_API_URL` (ítem 5.5).
 
 #### A-28 · ⚪ Baja · Token en AsyncStorage sin cifrar y cierre de sesión ante cualquier error
 - `src/services/api.js:87` (el plan ya propone `expo-secure-store`). `AuthContext.js:22-25` borra el token ante
   **cualquier** error (también sin internet), no solo ante 401.
-- **Estado: en curso (ítem 5.3 de PRIORIDADES). Token cifrado resuelto el 10/11/2026 (parte 2, `eeda879`, solo
-  móvil); falta la parte 3 (borrar la sesión al abrir la app solo ante 401 de `/auth/me`).** Con permiso del dueño:
+- **Estado: resuelto el 10/11/2026 (ítem 5.3 de PRIORIDADES, partes 2 y 3, solo móvil): token cifrado (parte 2,
+  `eeda879`) y sesión borrada al abrir la app solo ante 401 (parte 3, `fd2a2cc`).** Parte 2. Con permiso del dueño:
   `expo-secure-store` ~57.0.4 (`npx expo install`, versión de Expo 57; el lock fija 57.0.4) y su *plugin* en `app.json`
   (saca los datos de SecureStore de las copias de seguridad de Android: en otro celular no se podrían descifrar).
   `src/utils/almacenToken.js` (puro; la primera versión se reescribió fuera de la conversación mientras se trabajaba y
@@ -1128,6 +1129,22 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
   native module 'ExpoSecureStore'”): Tienda y Adopción cargan (parte 1, sin variable); iniciar sesión → Perfil con su
   nombre; cerrar la app del todo y reabrir → pantalla de carga y Perfil **sigue con la sesión** (token en SecureStore);
   cerrar sesión, cerrar y reabrir → pide iniciar sesión.
+  **Parte 3 (10/11/2026, `fd2a2cc`):** `src/utils/sesion.js` tiene la función pura `debeBorrarSesion(error)`, que
+  devuelve `true` solo con `error?.status === 401`; `AuthContext.js`, al abrir la app, la usa en el `catch` de
+  `getPerfil()` (`/auth/me`). Antes borraba el token ante **cualquier** error. Ahora, sin red, tiempo agotado,
+  dirección insegura de la parte 1 (errores sin status), 503, 500 o cualquier otro código, el token se queda: la app
+  abre sin perfil y, al reabrirla con internet, la sesión vuelve (sin botón “Reintentar”: descartado por el dueño).
+  `/auth/me` (`api.py`, solo leído) responde 200, 401 (sin token, token inválido o vencido, `version_sesion` distinta
+  o cuenta no activa: `require_auth` no da 403), 503 o 500; el 404 “Usuario no encontrado” solo saldría si borran la
+  cuenta entre las dos consultas, y tampoco borra (al reabrir ya sería 401). Regresión: `tests/sesion-al-abrir.test.mjs`
+  (6: 401 borra; 503/500/502, 403/404/429, sin red/`AbortError`/dirección insegura/502 sin JSON y valores raros
+  —`null`, `"401"` en texto— no borran; el texto de `AuthContext.js`); en `tests/cerrar-sesion.test.mjs` la
+  revisión del `import` acepta las dos funciones. `npm test` 91/91; `npx expo export --platform web` bien.
+  Contraprueba (`git stash` de `sesion.js` y `AuthContext.js`): fallan las 6 nuevas; pasan las 85 de antes, que no
+  dependen de este cambio. Mutaciones (8, una a la vez), todas detectadas: borrar ante cualquier error o ante
+  cualquier 4xx/5xx (4 cada una), borrar sin red o con 401 (2), borrar también con 403, `==` en vez de `===`, nunca
+  borrar, `AuthContext` que ignora la función o que la niega (1 cada una). No agrega dependencias ni módulos nativos:
+  basta recargar en Metro.
 
 ### 3.6 Dependencias
 
