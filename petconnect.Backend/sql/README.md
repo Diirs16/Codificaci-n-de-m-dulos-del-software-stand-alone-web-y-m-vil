@@ -5,8 +5,10 @@
 | `schema.sql` | Crea las 34 tablas y los catálogos fijos (roles y planes). **Solo estructura, sin datos personales.** |
 | `../seed.py` | Inserta datos de ejemplo: categorías, 12 productos, una cuenta ficticia de refugio y 6 mascotas en adopción. |
 
-Motor probado: **MariaDB 10.4.32** (XAMPP) en el puerto **3310**. También sirve en MySQL 8.0.16 o superior
-(necesario para que se cumplan las reglas `CHECK`).
+Motor probado: **MariaDB 10.4.32** (XAMPP) en el puerto **3310**. En Docker (`docker-compose.yml`) se usa
+**MariaDB 10.11**: ninguna regla `CHECK` puede usar una columna que una clave foránea cambie sola (`ON UPDATE CASCADE`),
+lo revisa `tests/test_esquema.py`. **No se ha probado en MySQL 8**: MySQL es más estricto y prohíbe cualquier acción de
+clave foránea (también `ON DELETE CASCADE`) en una columna usada por una regla `CHECK`, como `solicitudes.id_mascota`.
 
 ## Orden para crear la base desde cero
 
@@ -272,6 +274,38 @@ mysql -u root -p -P 3310 petconnect -e "SHOW INDEX FROM proveedores_servicio WHE
 ```
 
 El segundo debe mostrar 3 filas: `ciudad`, `activo` y `nombre`, en ese orden (columna `Seq_in_index` 1, 2 y 3).
+
+## ¿Ya tenías la base creada antes del 10/11/2026? (claves de `solicitudes` y `otp_pendientes`, ítem 5.2)
+
+En Docker (`docker compose`, MariaDB 10.11) `schema.sql` fallaba con el **error 1901**: *"Function or expression
+'id_mascota' cannot be used in the CHECK clause"*. Dos tablas tenían una regla `CHECK` sobre una columna cuya clave
+foránea usaba `ON UPDATE CASCADE` (si cambiaba el número de la mascota o de la cuenta, la base lo cambiaba sola aquí,
+sin poder revisar la regla). MariaDB 10.5 en adelante no lo permite; la 10.4 de XAMPP sí, por eso tu base funciona.
+
+| Clave | Columna | Antes | Ahora |
+|---|---|---|---|
+| `fk_solicitud_mascota` | `solicitudes.id_mascota` | `ON DELETE CASCADE ON UPDATE CASCADE` | `ON DELETE CASCADE ON UPDATE RESTRICT` |
+| `fk_otp_usuario` | `otp_pendientes.id_usuario` | `ON DELETE CASCADE ON UPDATE CASCADE` | `ON DELETE CASCADE ON UPDATE RESTRICT` |
+
+En la práctica no cambia nada: los `id` los crea la base (`AUTO_INCREMENT`) y el código nunca los modifica. Borrar una
+mascota o una cuenta sigue borrando sus solicitudes y sus códigos.
+
+La migración `migraciones/2026-11-10_llaves_sin_cascada_update.sql` es **opcional** en tu base local (todo funciona
+igual sin ella); sirve para que quede idéntica a `schema.sql` y lista para una versión nueva de MariaDB. Solo quita y
+vuelve a crear esas dos claves: no cambia ni borra ningún dato y se puede ejecutar varias veces. Desde la carpeta
+`petconnect.Backend`, con un respaldo nuevo como el del paso 1 de arriba:
+
+```bash
+mysql -u root -p -P 3310 petconnect -e "source sql/migraciones/2026-11-10_llaves_sin_cascada_update.sql"
+```
+
+**Comprobar** (solo muestra la estructura, no datos):
+
+```bash
+mysql -u root -p -P 3310 -e "SELECT CONSTRAINT_NAME, UPDATE_RULE, DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = 'petconnect' AND CONSTRAINT_NAME IN ('fk_solicitud_mascota', 'fk_otp_usuario')"
+```
+
+Las dos filas deben decir `RESTRICT` y `CASCADE`.
 
 ## Prueba automática
 

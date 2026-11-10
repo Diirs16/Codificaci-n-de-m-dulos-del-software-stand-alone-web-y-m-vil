@@ -37,6 +37,12 @@ y modo estricto) y NC-010 (fechas de vacunas).
   (PETCONNECT_PRUEBA_BD=1) quita los indices en "petconnect_prueba_indices" (base vieja),
   aplica la migracion dos veces, revisa que las consultas de los DAO puedan usarlos
   y borra esa base al final.
+- Item 5.2 (A-30, 10/11/2026): MariaDB 10.11 (la de Docker) rechazaba schema.sql con el
+  error 1901 porque una regla CHECK usaba una columna cuya clave foranea la cambia sola
+  (ON UPDATE CASCADE). PruebasEsquemaSinBD revisa que ninguna tabla de schema.sql ni de
+  las migraciones lo haga, PruebasMigracionLlavesSinBD revisa la migracion del 10/11/2026
+  y PruebasMigracionLlavesEnBD (PETCONNECT_PRUEBA_BD=1) la aplica dos veces en
+  "petconnect_prueba_llaves" (base vieja) y la borra al final.
 
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -v
@@ -67,6 +73,13 @@ RUTA_MIGRACION_OTP = os.path.join(RAIZ, "sql", "migraciones", "2026-11-07_otp_pe
 RUTA_MIGRACION_SESION = os.path.join(RAIZ, "sql", "migraciones", "2026-11-08_version_sesion.sql")
 RUTA_MIGRACION_INDICES = os.path.join(RAIZ, "sql", "migraciones", "2026-11-09_indices_listados.sql")
 BD_PRUEBA_INDICES = "petconnect_prueba_indices"
+RUTA_MIGRACION_LLAVES = os.path.join(RAIZ, "sql", "migraciones", "2026-11-10_llaves_sin_cascada_update.sql")
+BD_PRUEBA_LLAVES = "petconnect_prueba_llaves"
+# Item 5.2: (tabla, clave foranea) que pasaron de ON UPDATE CASCADE a ON UPDATE RESTRICT
+LLAVES_SIN_CASCADA_UPDATE = (
+    ("solicitudes", "fk_solicitud_mascota"),
+    ("otp_pendientes", "fk_otp_usuario"),
+)
 
 # Item 4.17 (NC-003): (tabla, indice, columnas en orden). Iguales en schema.sql y en la
 # migracion. Las columnas siguen el WHERE (y el ORDER BY) de la consulta que atienden.
@@ -116,6 +129,32 @@ def _bloque_tabla(sql, tabla):
     encontrado = re.search(
         r"CREATE TABLE IF NOT EXISTS `%s` \((.*?)\n\) ENGINE" % tabla, sql, re.DOTALL
     )
+    return encontrado.group(1) if encontrado else ""
+
+
+def _columnas_en_checks(bloque):
+    """Columnas que aparecen dentro de las reglas CHECK de una tabla."""
+    columnas = set()
+    for linea in bloque.splitlines():
+        if "CHECK (" in linea:
+            columnas |= set(re.findall(r"`(\w+)`", linea.split("CHECK", 1)[1]))
+    return columnas
+
+
+def _columnas_que_cambian_las_llaves(bloque):
+    """Columnas que una clave foranea cambia sola: ON UPDATE CASCADE / SET NULL u
+    ON DELETE SET NULL. ON DELETE CASCADE no cuenta: borra la fila, no la cambia."""
+    columnas = set()
+    for propias, acciones in re.findall(
+            r"FOREIGN KEY \(([^)]*)\) REFERENCES `\w+` \([^)]*\)([^,\n]*)", bloque):
+        if re.search(r"ON UPDATE (CASCADE|SET NULL)|ON DELETE SET NULL", acciones):
+            columnas |= set(re.findall(r"`(\w+)`", propias))
+    return columnas
+
+
+def _definicion_llave(sql, llave):
+    """'CONSTRAINT `fk_...` FOREIGN KEY ...' tal como lo escribe schema.sql (sin la coma)."""
+    encontrado = re.search(r"^\s*(CONSTRAINT `%s` FOREIGN KEY .*?),?\s*$" % llave, sql, re.MULTILINE)
     return encontrado.group(1) if encontrado else ""
 
 
@@ -188,6 +227,37 @@ class PruebasEsquemaSinBD(unittest.TestCase):
             with self.subTest(indice=indice):
                 self.assertIn(f"KEY `{indice}` ({_columnas_sql(columnas)})",
                               _bloque_tabla(self.sql, tabla))
+
+    def test_detecta_la_combinacion_que_rechaza_mariadb(self):
+        """El caso del error 1901 (MDEV-31769) y lo que si se permite."""
+        rechazado = ("  `a_id` int,\n  CONSTRAINT `fk_a` FOREIGN KEY (`a_id`) REFERENCES `a` (`id`) "
+                     "ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT `chk_a` CHECK (`a_id` > 7)")
+        self.assertEqual(_columnas_en_checks(rechazado) & _columnas_que_cambian_las_llaves(rechazado),
+                         {"a_id"})
+        permitido = rechazado.replace("ON UPDATE CASCADE", "ON UPDATE RESTRICT")
+        self.assertEqual(_columnas_que_cambian_las_llaves(permitido), set())
+        con_null = permitido.replace("ON DELETE CASCADE", "ON DELETE SET NULL")
+        self.assertEqual(_columnas_que_cambian_las_llaves(con_null), {"a_id"})
+
+    def test_ninguna_regla_check_usa_una_columna_que_cambie_una_llave(self):
+        """Item 5.2: MariaDB 10.5+ (Docker usa 10.11) rechaza la tabla entera (error 1901)."""
+        archivos = [RUTA_ESQUEMA] + sorted(glob.glob(os.path.join(RAIZ, "sql", "migraciones", "*.sql")))
+        revisadas = 0
+        for ruta in archivos:
+            sql = _leer(ruta)
+            for tabla in _tablas_del_esquema(sql):
+                bloque = _bloque_tabla(sql, tabla)
+                revisadas += 1
+                with self.subTest(archivo=os.path.basename(ruta), tabla=tabla):
+                    self.assertEqual(_columnas_en_checks(bloque) & _columnas_que_cambian_las_llaves(bloque),
+                                     set())
+        self.assertGreaterEqual(revisadas, 36)  # las 34 de schema.sql + solicitudes y otp
+
+    def test_las_llaves_de_las_reglas_check_no_cambian_al_actualizar(self):
+        for tabla, llave in LLAVES_SIN_CASCADA_UPDATE:
+            with self.subTest(llave=llave):
+                definicion = _definicion_llave(self.sql, llave)
+                self.assertIn("ON DELETE CASCADE ON UPDATE RESTRICT", definicion)
 
     def test_tiene_las_34_tablas(self):
         # 32 hasta el 07/11/2026, + solicitudes (item 3.6) + otp_pendientes (item 4.6)
@@ -1368,6 +1438,138 @@ class PruebasMigracionSolicitudesEnBD(unittest.TestCase):
         self.cursor.execute("DELETE FROM usuarios WHERE id_usuario = 1")
         self.cursor.execute("SELECT COUNT(*) FROM solicitudes")
         self.assertEqual(self.cursor.fetchone()[0], 0)
+
+
+class PruebasMigracionLlavesSinBD(unittest.TestCase):
+    """Item 5.2: la migracion del 10/11/2026 deja las dos claves igual que schema.sql."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sentencias = [" ".join(s.split()) for s in _sentencias(_leer(RUTA_MIGRACION_LLAVES))]
+
+    def test_nunca_apaga_el_modo_estricto(self):
+        self.assertTrue(self.sentencias[0].startswith("SET SESSION sql_mode"))
+        self.assertIn("STRICT_TRANS_TABLES", self.sentencias[0])
+
+    def test_cambia_solo_las_dos_claves_y_se_puede_repetir(self):
+        esquema = _leer(RUTA_ESQUEMA)
+        esperadas = []
+        for tabla, llave in LLAVES_SIN_CASCADA_UPDATE:
+            definicion = _definicion_llave(esquema, llave)
+            self.assertNotEqual(definicion, "")
+            esperadas.append(f"ALTER TABLE `{tabla}` DROP FOREIGN KEY IF EXISTS `{llave}`")
+            esperadas.append(f"ALTER TABLE `{tabla}` ADD {definicion}")
+        self.assertEqual(self.sentencias[1:], esperadas)
+
+    def test_no_borra_ni_cambia_datos(self):
+        for sentencia in self.sentencias:
+            sin_claves = re.sub(r"\bON (DELETE|UPDATE)\b|DROP FOREIGN KEY", "", sentencia)
+            self.assertNotRegex(sin_claves, r"\b(DROP|DELETE|UPDATE|INSERT|TRUNCATE)\b")
+
+
+@unittest.skipUnless(os.getenv("PETCONNECT_PRUEBA_BD") == "1",
+                     "Prueba con MariaDB real: activar con PETCONNECT_PRUEBA_BD=1")
+class PruebasMigracionLlavesEnBD(unittest.TestCase):
+    """Item 5.2: en una base vieja (claves con ON UPDATE CASCADE) la migracion las deja en
+    RESTRICT, no pierde filas, se puede correr dos veces y las reglas y el borrado en
+    cascada siguen funcionando."""
+
+    @classmethod
+    def setUpClass(cls):
+        import mysql.connector
+        from config.db_config import DB_CONFIG
+
+        cls.Error = mysql.connector.Error
+        servidor = {k: v for k, v in DB_CONFIG.items() if k not in ("database", "sql_mode")}
+        try:
+            cls.conn = mysql.connector.connect(**servidor)
+        except mysql.connector.Error:
+            raise unittest.SkipTest("No hay conexion con MariaDB")
+        cls.conn.autocommit = True
+
+        cursor = cls.conn.cursor()
+        # Nombre constante del archivo: los identificadores no van como parametro.
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_LLAVES}`")
+        cursor.execute(f"CREATE DATABASE `{BD_PRUEBA_LLAVES}` "
+                       "CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci")
+        cls.addClassCleanup(cls._borrar_bd_prueba)
+        cursor.execute(f"USE `{BD_PRUEBA_LLAVES}`")
+        cursor.close()
+
+    @classmethod
+    def _borrar_bd_prueba(cls):
+        cursor = cls.conn.cursor()
+        cursor.execute(f"DROP DATABASE IF EXISTS `{BD_PRUEBA_LLAVES}`")
+        cursor.close()
+        cls.conn.close()
+
+    def setUp(self):
+        self.cursor = self.conn.cursor()
+        for tabla in ("solicitudes", "otp_pendientes", "mascotas", "usuarios"):
+            self.cursor.execute(f"DROP TABLE IF EXISTS {tabla}")
+        self.cursor.execute("CREATE TABLE usuarios (id_usuario int(11) AUTO_INCREMENT PRIMARY KEY) "
+                            "ENGINE=InnoDB")
+        self.cursor.execute("CREATE TABLE mascotas (id_mascota int(11) AUTO_INCREMENT PRIMARY KEY) "
+                            "ENGINE=InnoDB")
+        # Base "vieja": las dos tablas como antes del 10/11/2026 (ON UPDATE CASCADE)
+        for sentencia in _sentencias(_leer(RUTA_ESQUEMA)):
+            if re.match(r"CREATE TABLE IF NOT EXISTS `(solicitudes|otp_pendientes)`", sentencia):
+                vieja = sentencia.replace("ON UPDATE RESTRICT", "ON UPDATE CASCADE")
+                try:
+                    self.cursor.execute(vieja)
+                except self.Error:
+                    raise unittest.SkipTest("Esta MariaDB ya no acepta la definicion vieja (10.5 o mas)")
+        # Datos inventados, sin personas reales
+        self.cursor.execute("INSERT INTO usuarios VALUES (1)")
+        self.cursor.execute("INSERT INTO mascotas VALUES (1)")
+        self.cursor.execute(
+            "INSERT INTO solicitudes (id_usuario, tipo, id_mascota, mensaje, version_politica_datos) "
+            "VALUES (%s, %s, %s, %s, %s)", (1, "adopcion", 1, "Mensaje de prueba", "1.1"))
+        self.cursor.execute(
+            "INSERT INTO otp_pendientes (correo, proposito, codigo_cifrado, vence, ultimo_envio, "
+            "id_usuario) VALUES (%s, %s, %s, %s, %s, %s)",
+            ("persona@example.com", "login", "cifrado-de-prueba", 2.0, 1.0, 1))
+
+    def tearDown(self):
+        self.cursor.close()
+
+    def _migrar(self):
+        for sentencia in _sentencias(_leer(RUTA_MIGRACION_LLAVES)):
+            self.cursor.execute(sentencia)
+
+    def _reglas(self):
+        self.cursor.execute(
+            "SELECT CONSTRAINT_NAME, UPDATE_RULE, DELETE_RULE "
+            "FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = %s",
+            (BD_PRUEBA_LLAVES,))
+        return {nombre: (al_cambiar, al_borrar) for nombre, al_cambiar, al_borrar in self.cursor.fetchall()}
+
+    def _contar(self, tabla):
+        self.cursor.execute(f"SELECT COUNT(*) FROM {tabla}")
+        return self.cursor.fetchone()[0]
+
+    def test_deja_las_claves_en_restrict_sin_perder_filas_y_se_puede_repetir(self):
+        for _, llave in LLAVES_SIN_CASCADA_UPDATE:
+            self.assertEqual(self._reglas()[llave], ("CASCADE", "CASCADE"))   # base vieja de verdad
+        self._migrar()
+        self._migrar()
+        for _, llave in LLAVES_SIN_CASCADA_UPDATE:
+            with self.subTest(llave=llave):
+                self.assertEqual(self._reglas()[llave], ("RESTRICT", "CASCADE"))
+        self.assertEqual((self._contar("solicitudes"), self._contar("otp_pendientes")), (1, 1))
+
+    def test_las_reglas_y_el_borrado_en_cascada_siguen_funcionando(self):
+        self._migrar()
+        with self.assertRaises(self.Error):   # chk_solicitud_tipo: adopcion sin mascota
+            self.cursor.execute(
+                "INSERT INTO solicitudes (id_usuario, tipo, id_mascota, mensaje, version_politica_datos) "
+                "VALUES (%s, %s, %s, %s, %s)", (1, "adopcion", None, "Mensaje de prueba", "1.1"))
+        with self.assertRaises(self.Error):   # RESTRICT: el id de una mascota con solicitudes no cambia
+            self.cursor.execute("UPDATE mascotas SET id_mascota = 2 WHERE id_mascota = 1")
+        self.cursor.execute("DELETE FROM mascotas WHERE id_mascota = 1")
+        self.assertEqual(self._contar("solicitudes"), 0)
+        self.cursor.execute("DELETE FROM usuarios WHERE id_usuario = 1")
+        self.assertEqual(self._contar("otp_pendientes"), 0)
 
 
 if __name__ == "__main__":

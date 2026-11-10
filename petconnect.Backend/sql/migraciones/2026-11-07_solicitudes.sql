@@ -13,6 +13,10 @@
 -- No cambia ni borra ninguna tabla ni ningun dato. Usa CREATE TABLE
 -- IF NOT EXISTS, asi que se puede ejecutar varias veces sin danar nada.
 -- Necesita las tablas usuarios y mascotas (claves foraneas).
+-- 10/11/2026 (item 5.2): la clave foranea de id_mascota pasa a ON UPDATE
+-- RESTRICT, igual que en schema.sql, porque MariaDB 10.11 no acepta la
+-- regla CHECK con ON UPDATE CASCADE. Si ya habias aplicado esta
+-- migracion, aplica tambien 2026-11-10_llaves_sin_cascada_update.sql.
 -- Evitar el punto y coma dentro de los comentarios: las pruebas
 -- separan las sentencias por ese caracter.
 -- ================================================================
@@ -31,7 +35,7 @@ CREATE TABLE IF NOT EXISTS `solicitudes` (
   PRIMARY KEY (`id_solicitud`),
   KEY `fk_solicitud_usuario` (`id_usuario`),
   KEY `fk_solicitud_mascota` (`id_mascota`),
-  CONSTRAINT `fk_solicitud_mascota` FOREIGN KEY (`id_mascota`) REFERENCES `mascotas` (`id_mascota`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_solicitud_mascota` FOREIGN KEY (`id_mascota`) REFERENCES `mascotas` (`id_mascota`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_solicitud_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `chk_solicitud_tipo` CHECK (`tipo` = 'adopcion' AND `id_mascota` IS NOT NULL OR `tipo` = 'contacto' AND `id_mascota` IS NULL AND `telefono` IS NULL)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;

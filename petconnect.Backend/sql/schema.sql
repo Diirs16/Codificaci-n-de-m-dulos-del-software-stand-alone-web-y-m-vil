@@ -289,6 +289,11 @@ CREATE TABLE IF NOT EXISTS `adopciones` (
 -- se borran sus solicitudes (politica v1.1, A.11). La regla
 -- chk_solicitud_tipo exige la mascota solo en adopcion y deja el telefono
 -- solo para adopcion. Misma definicion en migraciones/2026-11-07_solicitudes.sql
+-- La clave de id_mascota usa ON UPDATE RESTRICT, no CASCADE: MariaDB 10.5
+-- en adelante (Docker usa 10.11) no acepta una regla CHECK sobre una
+-- columna que una clave foranea cambiaria sola (error 1901, item 5.2,
+-- 10/11/2026). Los id nunca cambian, asi que no se nota. Borrar la
+-- mascota sigue borrando sus solicitudes (ON DELETE CASCADE).
 CREATE TABLE IF NOT EXISTS `solicitudes` (
   `id_solicitud` int(11) NOT NULL AUTO_INCREMENT,
   `id_usuario` int(11) NOT NULL,
@@ -301,7 +306,7 @@ CREATE TABLE IF NOT EXISTS `solicitudes` (
   PRIMARY KEY (`id_solicitud`),
   KEY `fk_solicitud_usuario` (`id_usuario`),
   KEY `fk_solicitud_mascota` (`id_mascota`),
-  CONSTRAINT `fk_solicitud_mascota` FOREIGN KEY (`id_mascota`) REFERENCES `mascotas` (`id_mascota`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_solicitud_mascota` FOREIGN KEY (`id_mascota`) REFERENCES `mascotas` (`id_mascota`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_solicitud_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `chk_solicitud_tipo` CHECK (`tipo` = 'adopcion' AND `id_mascota` IS NOT NULL OR `tipo` = 'contacto' AND `id_mascota` IS NULL AND `telefono` IS NULL)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
@@ -317,6 +322,8 @@ CREATE TABLE IF NOT EXISTS `solicitudes` (
 -- crea un codigo y al arrancar). La regla chk_otp_proposito deja el nombre y
 -- el hash solo para el registro y el usuario solo para el inicio de sesion.
 -- Misma definicion en migraciones/2026-11-07_otp_pendientes.sql
+-- La clave de id_usuario usa ON UPDATE RESTRICT, no CASCADE, por la misma
+-- razon que en solicitudes (error 1901 de MariaDB 10.11, item 5.2).
 CREATE TABLE IF NOT EXISTS `otp_pendientes` (
   `correo` varchar(120) NOT NULL,
   `proposito` enum('registro','login') NOT NULL,
@@ -333,7 +340,7 @@ CREATE TABLE IF NOT EXISTS `otp_pendientes` (
   PRIMARY KEY (`correo`,`proposito`),
   KEY `idx_otp_vence` (`vence`),
   KEY `fk_otp_usuario` (`id_usuario`),
-  CONSTRAINT `fk_otp_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_otp_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `chk_otp_proposito` CHECK (`proposito` = 'registro' AND `nombre` IS NOT NULL AND `password_hash` IS NOT NULL AND `id_usuario` IS NULL OR `proposito` = 'login' AND `id_usuario` IS NOT NULL AND `nombre` IS NULL AND `password_hash` IS NULL)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
