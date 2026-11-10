@@ -1084,10 +1084,31 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
 - `src/services/api.js:9-14`: `10.0.2.2` (Android) o `localhost`, por HTTP. HTTP sin cifrar solo está permitido en
   los manifiestos *debug* (`usesCleartextTraffic`), así que el APK *release* no conectaría.
 - **Arreglo:** `EXPO_PUBLIC_API_URL` y HTTPS al desplegar.
+- **Estado: en curso (ítem 5.3 de PRIORIDADES, en 3 partes). Parte 1 de 3 hecha el 10/11/2026 (`7e963c5`, solo
+  móvil).** Decisiones del dueño: variable vacía para probar (todavía no hay API alojada, 5.5); `POLITICA_URL` también
+  configurable; el cierre de sesión solo ante 401 entra como parte 3; en el export web el token seguirá en AsyncStorage
+  (`localStorage`, como la web). `src/utils/configApi.js` (puro): la dirección sale de `EXPO_PUBLIC_API_URL` (se le
+  agrega `/api` si no lo trae) y la política de `EXPO_PUBLIC_WEB_URL` (+ `/politica-de-datos`); vacías = `10.0.2.2` en
+  Android o `localhost` (puertos 5000 y 5173, como antes). Fuera de desarrollo (`__DEV__` falso, también en
+  `npx expo export`) exige `https://`, salvo hacia `localhost`, `127.0.0.1`, `10.0.2.2` o `[::1]`; rechaza `usuario:clave@`,
+  `?consulta` y `#ancla`. Si la dirección no sirve, `API_BASE` queda en `null`, `apiFetch` no llama a `fetch` y falla
+  con un error **sin status** (como sin red: no cierra la sesión) y Metro muestra el motivo con `console.warn`.
+  `api.js` las lee como `process.env.EXPO_PUBLIC_…` con punto (Expo no reemplaza corchetes ni desestructuración);
+  plantilla `PetConnect.Mobile/.env.example` sin valores, con el aviso de que todo lo `EXPO_PUBLIC_` queda visible en la
+  app (el `.env` real lo ignora `*.env` de la raíz). Regresión: `tests/config-api.test.mjs` (13); `npm test` 68/68;
+  `expo export --platform web` bien (en el paquete no queda ningún `process.env.EXPO_PUBLIC_` sin reemplazar).
+  Contraprueba (`git stash` de `api.js` y la plantilla): fallan 3 (las 2 que leen `api.js` y la de la plantilla); pasan
+  a propósito las 10 de `configApi.js`, que es un archivo nuevo. Mutaciones (8, una a la vez), todas detectadas: sin
+  exigir https, host local por prefijo (`localhost.ejemplo.com`), siempre `localhost` o no quitar barras finales (2 cada
+  una); https también en desarrollo, aceptar `usuario:clave@`, `/api` dos veces o aceptar `?consulta` (1 cada una).
+  Pendiente: el APK *release* sigue necesitando una API con HTTPS (5.5).
 
 #### A-28 · ⚪ Baja · Token en AsyncStorage sin cifrar y cierre de sesión ante cualquier error
 - `src/services/api.js:87` (el plan ya propone `expo-secure-store`). `AuthContext.js:22-25` borra el token ante
   **cualquier** error (también sin internet), no solo ante 401.
+- **Estado: pendiente (ítem 5.3 de PRIORIDADES, partes 2 y 3).** Aprobado por el dueño el 10/11/2026: parte 2 =
+  `expo-secure-store` (~57.0.1, con `npx expo install`) y paso del token viejo de AsyncStorage; en web sigue
+  AsyncStorage (`localStorage`). Parte 3 = borrar la sesión al abrir la app solo ante 401 de `/auth/me`.
 
 ### 3.6 Dependencias
 

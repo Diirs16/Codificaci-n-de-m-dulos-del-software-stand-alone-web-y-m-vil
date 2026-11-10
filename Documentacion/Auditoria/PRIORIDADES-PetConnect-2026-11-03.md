@@ -107,7 +107,7 @@ se borra de aquí y se marca `[x]` en su fase.
 |---|---|---|---|---|
 | [x] | 5.1 | A-30 | `.dockerignore` en cada módulo (excluir `.env`, `node_modules`, `.venv`, `__pycache__`, `dist`) **antes** de construir cualquier imagen — *Hecho el 09/11/2026 (`a739076`; no toca código, esquema ni BD; no cierra NC). El dueño confirmó que **borró** los `Dockerfile` y el `docker-compose.yml` de A-30 (nunca tuvieron commit): se rehacen desde cero en el 5.2 (6.11 resuelto). Decisiones del dueño: hacerlo ahora (no junto con el 5.2), un solo commit con los 3 módulos y también el móvil. Tres `.dockerignore` (`petconnect.Backend/`, `PetConnect.Front/petconnect-app/`, `PetConnect.Mobile/`): secretos (`**/.env`, `**/.env.*`, `**/*.env` y claves `*.pem`, `*.key`, `*.p12`; en el móvil también `*.jks`, `*.keystore`, `*.p8`, `*.mobileprovision`), dependencias y compilaciones (`**/__pycache__`, `**/*.py[cod]`, `.venv`, `**/node_modules`, `dist`, `.expo`, `android`, `ios`…), Postman (puede traer tokens), `*.docx` y archivos de herramientas (`.git`, `CLAUDE.md`, `Dockerfile*`). Con `**/` porque en Docker `__pycache__` solo excluye la carpeta de la raíz. `tests/` se queda en las imágenes (lo decide el 5.2). Sin `.dockerignore` en la raíz: el compose usará cada módulo como contexto. Regresión: `tests/test_dockerignore.py` (8 pruebas: 5 del simulador de reglas de Docker y 3 por módulo con rutas inventadas que deben quedar fuera y dentro; no abre ningún `.env`). Aplicado a los nombres reales: fuera el `.env`, los 11 `__pycache__`, `postman/`, `node_modules/`, `dist/`, `android/`…; dentro 76, 59 y 44 archivos. Suite 476 (423 + 53 omitidas); web lint (2 avisos previos), `npm test` y build bien; móvil `expo export` bien. Contraprueba: sin los 3 archivos (`git stash -u`) fallan 3 (una por módulo) y pasan a propósito las 5 del simulador; rompiendo patrones: `__pycache__` sin `**/` → 2, `**/.env` y `**/*.env` sin `**/` → 1 (`config/.env`), sin `**/.env.*` → 2, `src` excluido en la web → 4; pasa a propósito quitar `**/` solo a `**/.env` (lo cubre `**/*.env`). Opcional del dueño (si tiene Docker): listar el contexto de construcción con una imagen de prueba* | 🟢 |
 | [x] | 5.2 | A-30 | `docker-compose.yml` en la raíz: BD con `schema.sql`, secretos por `env_file`, API con Gunicorn en `0.0.0.0`, web compilada (no `npm run dev`) — *Hecho el 10/11/2026 en 3 partes (`db57da7`, `73fff99` y `283c0b7`); **A-30 cerrado**. Decisiones del dueño (09/11/2026): tiene Docker Desktop; BD `mariadb:10.11` (no `mysql:8.0` de GA9: terminó su soporte en abril de 2026); `tests/` fuera de la imagen; `seed.py` manual con `docker compose exec api python seed.py`; Gunicorn aprobado. **Parte 1 (backend) hecha el 09/11/2026 (`db57da7`):** `Dockerfile` (`python:3.14-slim`, usuario sin root, `CMD gunicorn -c gunicorn.conf.py api:app`, sin secretos), `gunicorn.conf.py` (`0.0.0.0:5000`, 1 proceso `gthread` con 8 hilos porque el límite cuenta en memoria, sin registro de accesos por Ley 1581, `post_worker_init` sale con código 3 y apaga Gunicorn si falla el arranque), `gunicorn==26.2.0`. `api.py`: `preparar_arranque()` reúne las revisiones del bloque `__main__` (Gunicorn no lo ejecuta); `_host_api()` lee `API_HOST` (vacío = `127.0.0.1`); `_ip_cliente()`: el límite usa la última IP de `X-Forwarded-For` solo con `PROXY_CONFIABLE=1` (detrás de nginx; sin eso, todos contarían como la IP de nginx). `.env.example` con `API_HOST=` y `PROXY_CONFIABLE=`; `tests` en el `.dockerignore`. Regresión: `tests/test_docker_backend.py` (22). `test_dao_errores` admite `_verificar_bd()` solo dentro de `preparar_arranque()`. Suite 498 (445 + 53 omitidas). Contraprueba (código viejo con `git stash` y sin `Dockerfile` ni `gunicorn.conf.py`): fallan 19 de las 22 y `test_dockerignore` (2 rutas de `tests/`); pasan a propósito 3 del límite que el código viejo ya cumplía (ignoraba el encabezado). Mutaciones: tomar la primera IP del encabezado → 1 falla; creer siempre el encabezado → 3. **Parte 2 (web) hecha el 10/11/2026 (`73fff99`, solo web; `src/` no cambia):** `PetConnect.Front/petconnect-app/Dockerfile` en dos etapas (`node:24-alpine` con `npm ci` + `npm run build`; `nginx:1.30.6-alpine`, rama estable, sirve solo `dist/`; sin `npm run dev`, sin `ENV`/`ARG` ni secretos) y `nginx.conf` (`location /api/` → `proxy_pass http://api:5000` sin recortar la ruta, `X-Forwarded-For $proxy_add_x_forwarded_for` para el límite con `PROXY_CONFIABLE=1`, `try_files $uri $uri/ /index.html` para las rutas de React, `server_tokens off`, `client_max_body_size 1m`). Descartada `nginx-unprivileged` (otro puerto e imagen aparte; en la oficial los procesos que atienden ya corren con el usuario `nginx`). Regresión: `tests/docker.test.js` (11, `node --test`, sin Docker). Web: lint (2 avisos previos), `npm test` 82/82 y build bien; suite del backend 498 (445 + 53 omitidas), `test_dockerignore` 8/8. Contraprueba con `git stash -u` del `Dockerfile` y el `nginx.conf`: fallan 9 de 11; pasan a propósito 2 (ninguna `VITE_` con clave en `src/` y el `.dockerignore`, que no dependen de esos archivos). Mutaciones (11, una a la vez): Dockerfile viejo con `npm run dev` → 4; `nginx:latest`, `npm install`, `ENV VITE_…KEY`, copiar todo a la imagen final, `proxy_pass` con barra, proxy a `localhost`, `$http_x_forwarded_for`, sin `X-Forwarded-For`, sin `try_files` o sin `server_tokens off` → 1 cada una. Prueba del dueño: `docker build` de la web. **Parte 3 (compose) hecha el 10/11/2026 (`283c0b7`, raíz; sin cambios en el código):** `docker-compose.yml` (proyecto `petconnect`) con `db` (`mariadb:10.11`, volumen `datos_bd`, solo `sql/schema.sql` montado de solo lectura en `docker-entrypoint-initdb.d` —ya trae las migraciones de estructura del 03 al 09/11; la del 06/11 solo corregía datos viejos y `seed.py` ya viene bien—, `utf8mb4_spanish_ci`, `healthcheck.sh --connect --innodb_initialized`, la base `petconnect` y un usuario propio para la API, sin `root`), `api` (`env_file` `docker/api.env`; `DB_HOST=db`, `DB_PORT=3306`, `DB_NAME=petconnect` y `PROXY_CONFIABLE=1` en `environment`, que le gana al `env_file`; espera a `db` con `service_healthy`) y `web` (`8080:80`, espera a `api`). Solo la web publica un puerto. Secretos en `docker/bd.env` y `docker/api.env` (ya ignorados por `*.env`; el `.gitignore` no cambió) con sus plantillas `.env.example` vacías (la de la API sale del `.env.example` del backend, sin lo que pone el compose ni `FLASK_DEBUG`/`API_HOST`). Regresión: `tests/test_docker_compose.py` (22; lector de YAML mínimo, sin PyYAML). Suite 520 (467 + 53 omitidas), `test_dockerignore` 8/8 y `test_docker_backend` 22/22; web `npm test` 82/82 (la web no cambió). Contraprueba con `git stash -u` del compose y `docker/`: fallan 19 de 22; pasan a propósito 3 (las 2 del lector de YAML y la de `git check-ignore`, que solo dependen del `.gitignore`). Mutaciones (16, una a la vez), todas detectadas: `mysql:8.0`, montar toda `sql/`, BD en una carpeta del PC, publicar el puerto de la BD o de la API, sin `PROXY_CONFIABLE`, `DB_HOST` localhost, `api` renombrado (8), contraseña escrita (2), `service_started`, sin `env_file`, `FLASK_DEBUG`, sin `healthcheck.sh`, web en otro puerto, un valor o `DB_HOST` en la plantilla (1 cada una). GA9: `mariadb:10.11` en vez de `mysql:8.0`. Prueba del dueño: `docker compose up --build`, abrir http://localhost:8080 y `docker compose exec api python seed.py`* | 🔴 |
-| [ ] | 5.3 | A-27 | Móvil: `EXPO_PUBLIC_API_URL` y HTTPS; `expo-secure-store` para el token (A-28) | 🟡 |
+| [ ] | 5.3 | A-27 | Móvil: `EXPO_PUBLIC_API_URL` y HTTPS; `expo-secure-store` para el token (A-28) — *En 3 partes (solo móvil). Decisiones del dueño (10/11/2026): variable vacía para probar (no hay API alojada: 5.5); `POLITICA_URL` también configurable; el cierre de sesión solo ante 401 entra como parte 3; en el export web el token sigue en AsyncStorage (`localStorage`, como la web). **Parte 1 hecha el 10/11/2026 (`7e963c5`):** `src/utils/configApi.js` (puro) arma la dirección con `EXPO_PUBLIC_API_URL` (+ `/api` si falta) y la política con `EXPO_PUBLIC_WEB_URL` (+ `/politica-de-datos`); vacías = `10.0.2.2`/`localhost` como antes. Fuera de desarrollo (`__DEV__` falso, también en `expo export`) exige `https://` salvo hacia `localhost`, `127.0.0.1`, `10.0.2.2` o `[::1]`; rechaza `usuario:clave@`, `?` y `#`. Dirección insegura → `API_BASE` `null`, `apiFetch` no llama a `fetch` (error sin status, como sin red) y `console.warn` con el motivo. Plantilla `PetConnect.Mobile/.env.example` vacía con el aviso de que lo `EXPO_PUBLIC_` queda visible en la app. Regresión: `tests/config-api.test.mjs` (13); `npm test` 68/68; `expo export --platform web` bien (ningún `process.env.EXPO_PUBLIC_` sin reemplazar en el paquete). Contraprueba (`git stash` de `api.js` y la plantilla): fallan 3; pasan a propósito las 10 de `configApi.js` (archivo nuevo). 8 mutaciones detectadas. **Falta:** parte 2 (`expo-secure-store` ~57.0.1 y paso del token viejo; el dueño reconstruye con `npm run android`) y parte 3 (`/auth/me` borra solo ante 401)* | 🟡 |
 | [ ] | 5.4 | A-29 | `npm audit fix` en la web; planear actualización de Expo; `pip-audit` en CI | 🟡 |
 | [ ] | 5.5 | — | Antes de Vercel: la API debe estar alojada aparte (ver `CLAUDE.md`, “Sobre publicar en Vercel”) | — |
 
@@ -150,8 +150,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 10/11/2026, actualizada al cerrar el 5.2 (parte 3, `docker-compose.yml`, `283c0b7`; A-30 cerrado).
-Lo próximo es el 5.3 (móvil: `EXPO_PUBLIC_API_URL`, HTTPS y `expo-secure-store`; A-27 y A-28).
+*Versión del 10/11/2026, actualizada al terminar la parte 1 del 5.3 (`EXPO_PUBLIC_API_URL` y HTTPS, `7e963c5`).
+Lo próximo es la parte 2 del 5.3 (`expo-secure-store` para el token; A-28).
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -170,7 +170,7 @@ Lee primero:
   VEZ POR FASE, al terminar toda la fase (Fase 3 subida el 07/11/2026;
   Fase 4 subida el 09/11/2026 con el sí del dueño: 58 commits,
   9854464..9c386a4). Desde ahí los commits nuevos quedan en local (el
-  primero, 9d0d442, el que anota la CI; luego los del 5.1 y el 5.2). Fase 5: NO hagas push ni lo preguntes al
+  primero, 9d0d442, el que anota la CI; luego los del 5.1, el 5.2 y el 5.3). Fase 5: NO hagas push ni lo preguntes al
   cerrar cada ítem; solo al marcar el último [ ] de la fase, recuerda los
   commits pendientes y pregunta (push normal, nunca --force). Cada push
   hace correr la CI de GitHub (.github/workflows/ci.yml; la primera, el
@@ -178,6 +178,18 @@ Lee primero:
 
 Estado conocido (10/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - FASE 4 CERRADA el 09/11/2026 (4.1 a 4.21, incluidos 4.17 y 4.12).
+- 5.3 EN CURSO (3 partes, solo móvil). PARTE 1 HECHA (7e963c5; notas en
+  el commit siguiente): src/utils/configApi.js (puro: revisarUrl,
+  resolverUrlApi, resolverUrlPolitica, HOSTS_LOCALES). api.js lee
+  process.env.EXPO_PUBLIC_API_URL y EXPO_PUBLIC_WEB_URL (vacías =
+  10.0.2.2/localhost en 5000 y 5173); fuera de __DEV__ exige https://
+  salvo localhost, 127.0.0.1, 10.0.2.2 y [::1]; dirección insegura →
+  API_BASE null y apiFetch lanza errorDeApi SIN status antes de fetch.
+  Plantilla PetConnect.Mobile/.env.example (2 variables vacías).
+  tests/config-api.test.mjs (13); npm test 68/68; expo export web bien.
+  Decisiones del dueño (10/11/2026): variable vacía para probar;
+  POLITICA_URL configurable; parte 3 = /auth/me borra solo ante 401;
+  en web el token sigue en AsyncStorage (localStorage).
 - 5.2 CERRADO el 10/11/2026 y A-30 CERRADO. PARTE 3 HECHA (283c0b7, raíz;
   notas en el commit siguiente): docker-compose.yml (name: petconnect)
   con db (mariadb:10.11, volumen datos_bd, SOLO sql/schema.sql en
@@ -1388,33 +1400,34 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (5.3: móvil con EXPO_PUBLIC_API_URL, HTTPS y
-expo-secure-store; A-27 y A-28):
-- Leer A-27 y A-28 en la AUDITORÍA y PetConnect.Mobile/CLAUDE.md. Solo
-  el móvil: no mezclar con backend ni web.
-- Hoy (visto el 10/11/2026): src/services/api.js elige el host con
-  Platform (android: 10.0.2.2, default: localhost) por HTTP en el 5000;
-  el token va en AsyncStorage (@react-native-async-storage/async-storage
-  2.2.0: getItem/setItem/removeItem en api.js; src/utils/sesion.js lo
-  usa). usesCleartextTraffic solo está en los manifiestos debug y
-  debugOptimized de android/: un APK release no conectaría por HTTP.
-- A-28 también dice que src/context/AuthContext.js borra el token ante
-  CUALQUIER error de /auth/me (también sin internet): es el "hallazgo
-  sin ítem" que se iba a preguntar como 4.20. Proponer al dueño
-  resolverlo aquí (borrar solo ante 401) o dejarlo aparte.
-- Es grande (dependencia nueva y varios archivos): proponer plan por
-  partes y esperar el OK. Por ejemplo: (1) EXPO_PUBLIC_API_URL leída con
-  process.env (vacía = el host de desarrollo de hoy) y su plantilla
-  .env.example del móvil sin valores; avisar que todo lo EXPO_PUBLIC_
-  queda visible dentro de la app (nunca un secreto); exigir https://
-  fuera de desarrollo. (2) expo-secure-store para el token (la versión
-  que pida Expo 57, instalada con npx expo install y fijada; pasar el
-  token viejo de AsyncStorage y borrarlo de ahí; en el export web
-  SecureStore no existe: decidir el respaldo). (3) Si el dueño lo
-  aprueba, cerrar sesión solo ante 401.
-- Decisiones del dueño a pedir: ¿qué URL de API para probar? (todavía no
-  hay API alojada: eso es el 5.5); ¿se agrupa el arreglo de
-  AuthContext?; ¿qué hacer en el export web sin SecureStore?
+Contexto del próximo paso (5.3 parte 2: expo-secure-store para el token;
+A-28):
+- Leer A-28 en la AUDITORÍA y PetConnect.Mobile/CLAUDE.md. Solo el
+  móvil: no mezclar con backend ni web.
+- Plan ya aprobado por el dueño (10/11/2026); no hace falta volver a
+  pedir el plan, sí el PERMISO para instalar la dependencia:
+  expo-secure-store ~57.0.1 (la que pide Expo 57 en
+  node_modules/expo/bundledNativeModules.json) con npx expo install.
+  Documentación de Expo 57: solo Android e iOS (isAvailableAsync da true
+  solo ahí); en web NO existe → ahí el token sigue en AsyncStorage
+  (localStorage, como la web React; decisión del dueño). setItemAsync
+  puede rechazar: atrapar el error.
+- Hoy: el token va en AsyncStorage (getItem/setItem/removeItem con la
+  clave "petconnect_token" en src/services/api.js: apiFetch, saveToken,
+  clearToken, getToken; AuthContext y src/utils/sesion.js usan
+  getToken). Propuesta: src/utils/almacenToken.js puro (recibe el
+  almacén seguro y el viejo, para probarlo con Node): leer (si el token
+  está en AsyncStorage y no en SecureStore → copiarlo y borrarlo de
+  AsyncStorage), guardar y borrar (en los dos). api.js lo usa.
+- Es un módulo nativo: después de instalarlo el dueño reconstruye con
+  npm run android (Metro solo no basta); android/ no está en Git (se
+  genera).
+- Parte 3 (después): src/context/AuthContext.js borra el token ante
+  CUALQUIER error de /auth/me; debe borrarlo solo ante 401 (función pura
+  en src/utils/sesion.js). Sin red: el token se queda y la app abre sin
+  perfil; al reabrir con internet vuelve la sesión (opción simple,
+  aprobada; descartado un botón "Reintentar"). Ojo: el error de
+  dirección insegura de la parte 1 no trae status → no borra la sesión.
 - Pruebas: npm test del móvil (node --test) y npx expo export --platform
   web; el emulador y Metro los levanta el dueño (memoria: Pixel_7).
   Comandos de PowerShell 5.1, uno por bloque, diciendo la carpeta.
@@ -1470,4 +1483,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 5.3 (móvil: `EXPO_PUBLIC_API_URL`, HTTPS y `expo-secure-store`; A-27 y A-28)**: contexto en “Contexto del próximo paso” del prompt. **El 5.2 quedó cerrado el 10/11/2026 y A-30 también**: la parte 3 (`283c0b7`) agrega `docker-compose.yml` en la raíz con `db` (`mariadb:10.11`, solo `schema.sql`, healthcheck), `api` (Gunicorn, `env_file` `docker/api.env`, `DB_HOST=db`, `PROXY_CONFIABLE=1`) y `web` (nginx en http://localhost:8080); solo la web publica un puerto y los secretos van en `docker/*.env` (fuera de Git); `tests/test_docker_compose.py` (22). La parte 2 quedó hecha el 10/11/2026 (`73fff99`): la web tiene `Dockerfile` en dos etapas (`node:24-alpine` compila con `npm ci` + `npm run build`; `nginx:1.30.6-alpine` sirve solo `dist/`) y `nginx.conf` (`/api/` → `http://api:5000` con `X-Forwarded-For`, `try_files` para las rutas de React, `server_tokens off`); `tests/docker.test.js` (11). La parte 1 quedó hecha el 09/11/2026 (`db57da7`): la API tiene `Dockerfile` con Gunicorn (`0.0.0.0:5000`, 1 proceso con 8 hilos), `preparar_arranque()` (Gunicorn no ejecuta el `__main__`), `API_HOST` para `python api.py` y el límite por la IP real detrás de nginx con `PROXY_CONFIABLE=1`; `tests/test_docker_backend.py` (22). El 5.1 quedó hecho el 09/11/2026 (`a739076`): `.dockerignore` en backend, web y móvil (secretos, `node_modules`, `__pycache__`, `dist`… fuera de cualquier imagen), vigilados por `tests/test_dockerignore.py`; el dueño confirmó que borró los Dockerfile viejos (6.11 resuelto). **La Fase 4 quedó cerrada el 09/11/2026** con el 4.21: ningún DAO se traga ya los errores de la BD (`UsuarioDAO` y `ProveedorDAO` los dejan subir, las consolas avisan con `avisar_error_bd` sin el mensaje de MySQL) y `_verificar_bd()` solo se usa al arrancar la API (commits `96e007c` y `c7ecd55`). El 4.19 quedó hecho el 09/11/2026: “6. Actualizar usuario” de la consola revisa nombre, apellidos, correo, teléfono y estado con `security/datos_usuario.py` (el teléfono, con la regla de las solicitudes, que pasó de `api.py` a ese módulo) y avisa “Ese correo ya tiene una cuenta” antes del `UPDATE`, sin mostrar el correo. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. El móvil borra la sesión al abrir ante cualquier error de `/auth/me`: lo cubre A-28 (proponerlo dentro del 5.3). **Pendiente del dueño:** la decisión D.7 de la política. En la Fase 5 el push se pregunta solo al cerrar su último [ ].
+**Próximo ítem: 5.3, parte 2 (`expo-secure-store` para el token del móvil; A-28)**: contexto en “Contexto del próximo paso” del prompt; el plan ya está aprobado, falta el permiso para instalar `expo-secure-store` ~57.0.1. **La parte 1 del 5.3 quedó hecha el 10/11/2026 (`7e963c5`)**: el móvil toma la dirección de la API de `EXPO_PUBLIC_API_URL` y la de la política de `EXPO_PUBLIC_WEB_URL` (vacías = emulador o `localhost`, como antes), exige `https://` fuera de desarrollo salvo hacia el propio computador y, si la dirección no es segura, no manda nada; plantilla `PetConnect.Mobile/.env.example` sin valores; `tests/config-api.test.mjs` (13). **El 5.2 quedó cerrado el 10/11/2026 y A-30 también**: la parte 3 (`283c0b7`) agrega `docker-compose.yml` en la raíz con `db` (`mariadb:10.11`, solo `schema.sql`, healthcheck), `api` (Gunicorn, `env_file` `docker/api.env`, `DB_HOST=db`, `PROXY_CONFIABLE=1`) y `web` (nginx en http://localhost:8080); solo la web publica un puerto y los secretos van en `docker/*.env` (fuera de Git); `tests/test_docker_compose.py` (22). La parte 2 quedó hecha el 10/11/2026 (`73fff99`): la web tiene `Dockerfile` en dos etapas (`node:24-alpine` compila con `npm ci` + `npm run build`; `nginx:1.30.6-alpine` sirve solo `dist/`) y `nginx.conf` (`/api/` → `http://api:5000` con `X-Forwarded-For`, `try_files` para las rutas de React, `server_tokens off`); `tests/docker.test.js` (11). La parte 1 quedó hecha el 09/11/2026 (`db57da7`): la API tiene `Dockerfile` con Gunicorn (`0.0.0.0:5000`, 1 proceso con 8 hilos), `preparar_arranque()` (Gunicorn no ejecuta el `__main__`), `API_HOST` para `python api.py` y el límite por la IP real detrás de nginx con `PROXY_CONFIABLE=1`; `tests/test_docker_backend.py` (22). El 5.1 quedó hecho el 09/11/2026 (`a739076`): `.dockerignore` en backend, web y móvil (secretos, `node_modules`, `__pycache__`, `dist`… fuera de cualquier imagen), vigilados por `tests/test_dockerignore.py`; el dueño confirmó que borró los Dockerfile viejos (6.11 resuelto). **La Fase 4 quedó cerrada el 09/11/2026** con el 4.21: ningún DAO se traga ya los errores de la BD (`UsuarioDAO` y `ProveedorDAO` los dejan subir, las consolas avisan con `avisar_error_bd` sin el mensaje de MySQL) y `_verificar_bd()` solo se usa al arrancar la API (commits `96e007c` y `c7ecd55`). El 4.19 quedó hecho el 09/11/2026: “6. Actualizar usuario” de la consola revisa nombre, apellidos, correo, teléfono y estado con `security/datos_usuario.py` (el teléfono, con la regla de las solicitudes, que pasó de `api.py` a ese módulo) y avisa “Ese correo ya tiene una cuenta” antes del `UPDATE`, sin mostrar el correo. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. El móvil borra la sesión al abrir ante cualquier error de `/auth/me`: lo cubre A-28 y el dueño aprobó arreglarlo como parte 3 del 5.3 (borrar solo ante 401). **Pendiente del dueño:** la decisión D.7 de la política. En la Fase 5 el push se pregunta solo al cerrar su último [ ].
