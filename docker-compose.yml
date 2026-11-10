@@ -1,0 +1,95 @@
+# ================================================================
+# PETCONNECT — docker-compose (item 5.2 de la auditoria, parte 3, A-30)
+#
+# Levanta tres contenedores que se hablan por una red interna de Docker:
+#   db   MariaDB 10.11 con el esquema (sql/schema.sql) la primera vez
+#   api  la API Flask con Gunicorn (petconnect.Backend/Dockerfile)
+#   web  la pagina compilada con nginx (PetConnect.Front/petconnect-app/Dockerfile)
+#
+# Solo la web se ve desde tu computador: http://localhost:8080
+# La BD y la API NO publican puertos: solo nginx (web) llega a la API y solo
+# la API llega a la BD. nginx pasa /api/ a http://api:5000 (ver nginx.conf),
+# por eso el servicio de la API DEBE llamarse "api".
+#
+# Antes de la primera vez (desde la carpeta raiz Evidecia):
+#   1. Copia docker/bd.env.example como docker/bd.env y docker/api.env.example
+#      como docker/api.env, y llenalos (instrucciones dentro de cada archivo).
+#      Esos dos archivos NO se suben a Git (regla *.env del .gitignore).
+#   2. docker compose up --build
+#   3. (opcional) datos de ejemplo: docker compose exec api python seed.py
+#
+# Aqui NO va ninguna contrasena ni clave: todo eso entra por env_file.
+# El bloque "environment" solo lleva valores que no son secretos, y le gana
+# al env_file: aunque copies valores de tu .env local (localhost:3310),
+# dentro de Docker la API siempre usa db:3306.
+#
+# OJO: el esquema solo se carga cuando el volumen de la BD esta vacio (la
+# primera vez). Si despues cambia el esquema, aplica la migracion a mano o
+# borra el volumen (se pierden los datos): docker compose down -v
+#
+# La prueba petconnect.Backend/tests/test_docker_compose.py revisa este archivo.
+# ================================================================
+
+name: petconnect
+
+services:
+  # ---------- Base de datos ----------
+  db:
+    # MariaDB 10.11 (soporte largo). No mysql:8.0: termino su soporte en abril de 2026.
+    image: mariadb:10.11
+    # MARIADB_ROOT_PASSWORD, MARIADB_USER y MARIADB_PASSWORD
+    env_file:
+      - docker/bd.env
+    environment:
+      MARIADB_DATABASE: petconnect
+    # Mismo juego de caracteres que las tablas de schema.sql (tildes y ñ)
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_spanish_ci
+    volumes:
+      # Los datos viven en un volumen con nombre: sobreviven a "docker compose down"
+      - datos_bd:/var/lib/mysql
+      # SOLO schema.sql (ya trae las migraciones). Si se montara la carpeta sql/,
+      # MariaDB correria tambien cada archivo de migraciones/ en orden alfabetico.
+      - ./petconnect.Backend/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    # "Sana" cuando ya acepta conexiones y el motor InnoDB termino de arrancar.
+    # Mientras corre schema.sql la primera vez, todavia no lo esta.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------- API ----------
+  api:
+    build: ./petconnect.Backend
+    # DB_USER, DB_PASSWORD (los mismos MARIADB_USER y MARIADB_PASSWORD de
+    # docker/bd.env), JWT_SECRET, FERNET_KEY y el correo
+    env_file:
+      - docker/api.env
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: petconnect
+      # La API esta detras de nginx: el limite de intentos cuenta por la IP que
+      # nginx anota en X-Forwarded-For (sin esto, todos serian la IP de nginx)
+      PROXY_CONFIABLE: "1"
+    # No arranca hasta que la BD este sana (si no, preparar_arranque fallaria)
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------- Web ----------
+  web:
+    build: ./PetConnect.Front/petconnect-app
+    # Tu computador:8080 -> nginx:80 dentro del contenedor
+    ports:
+      - "8080:80"
+    # nginx busca "api" al arrancar: la API debe existir antes
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  datos_bd:
