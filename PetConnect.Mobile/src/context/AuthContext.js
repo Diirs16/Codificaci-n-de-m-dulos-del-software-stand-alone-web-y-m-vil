@@ -7,7 +7,7 @@ import {
   cerrarSesionEnServidor,
   verifyLoginCode as apiVerifyLoginCode,
 } from "../services/api";
-import { cerrarSesion } from "../utils/sesion";
+import { cerrarSesion, debeBorrarSesion } from "../utils/sesion";
 
 const AuthContext = createContext(null);
 
@@ -16,6 +16,10 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [pendingLoginEmail, setPendingLoginEmail] = useState(null);
 
+  // Al abrir la app: si hay token guardado, se pide el perfil a la API.
+  // Ítem 5.3, parte 3 (A-28): el token se borra SOLO si la API responde 401 (ya no
+  // vale). Sin red, 503, 500 o tiempo agotado se queda: la app abre sin perfil y, al
+  // reabrirla con internet, la sesión vuelve (ver debeBorrarSesion en utils/sesion.js).
   useEffect(() => {
     (async () => {
       const token = await getToken();
@@ -23,8 +27,8 @@ export function AuthProvider({ children }) {
         try {
           const me = await getPerfil();
           setUser(me);
-        } catch {
-          await clearToken();
+        } catch (error) {
+          if (debeBorrarSesion(error)) await clearToken();
         }
       }
       setLoading(false);

@@ -170,7 +170,7 @@ test("api.js: cerrarSesionEnServidor hace POST /auth/logout con el límite de ti
 
 test("AuthContext: logout llama a la API con cerrarSesion y existe un cierre solo local", () => {
   const contexto = leer("../src/context/AuthContext.js");
-  assert.match(contexto, /import \{ cerrarSesion \} from "\.\.\/utils\/sesion"/);
+  assert.match(contexto, /import \{[^}]*\bcerrarSesion\b[^}]*\} from "\.\.\/utils\/sesion"/);
   assert.match(contexto, /function logout\(\) \{\s*return cerrarSesion\(\{/);
   assert.match(contexto, /cerrarEnServidor: cerrarSesionEnServidor/);
   assert.match(contexto, /borrarLocal: cerrarSesionLocal/);

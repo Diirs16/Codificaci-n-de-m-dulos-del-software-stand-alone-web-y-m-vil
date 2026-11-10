@@ -24,6 +24,19 @@ export async function conLimiteDeTiempo(hacerPeticion, ms = TIEMPO_CIERRE_MS) {
 }
 
 /**
+ * Ítem 5.3, parte 3 (A-28): al ABRIR la app, AuthContext pide el perfil (GET /auth/me).
+ * Si falla, ¿se borra la sesión guardada? Solo con 401: la API dice que el token ya no
+ * vale (vencido, sesión cerrada en otro aparato o cuenta bloqueada).
+ * Sin red, tiempo agotado, dirección insegura (errores sin status), 503, 500 o
+ * cualquier otro código: el token SE QUEDA. La app abre sin perfil y, al reabrirla con
+ * internet, la sesión vuelve sola (decisión del dueño, 10/11/2026).
+ * Pruebas: tests/sesion-al-abrir.test.mjs.
+ */
+export function debeBorrarSesion(error) {
+  return error?.status === 401;
+}
+
+/**
  * Pide a la API que cierre la sesión (POST /auth/logout: deja de valer en TODOS los
  * aparatos de la cuenta) y SIEMPRE borra la sesión de este celular, responda lo que
  * responda: nadie queda "atrapado" con la sesión abierta.
