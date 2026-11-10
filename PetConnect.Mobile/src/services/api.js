@@ -3,30 +3,44 @@ import { Platform } from "react-native";
 import { errorDeApi, cuerpoLogin, cuerpoSolicitudAdopcion, cuerpoMensajeContacto } from "../utils/peticiones";
 import { conLimiteDeTiempo } from "../utils/sesion";
 import { rutaPaginada } from "../utils/paginacion";
+import { resolverUrlApi, resolverUrlPolitica } from "../utils/configApi";
+
+// Ítem 5.3, parte 1 (A-27): las direcciones salen de EXPO_PUBLIC_API_URL y
+// EXPO_PUBLIC_WEB_URL (plantilla: PetConnect.Mobile/.env.example). Vacías = el
+// computador de desarrollo de siempre (10.0.2.2 en el emulador de Android,
+// localhost en web). Fuera de desarrollo se exige https:// salvo hacia el propio
+// computador (reglas en src/utils/configApi.js). Expo copia estos valores dentro
+// de la app al compilar: se escriben como process.env.EXPO_PUBLIC_X (con punto),
+// si no, quedan vacíos. Nunca va un secreto en una variable EXPO_PUBLIC_.
+const PLATAFORMA = { plataforma: Platform.OS, esDesarrollo: __DEV__ };
+const CONFIG_API = resolverUrlApi(process.env.EXPO_PUBLIC_API_URL, PLATAFORMA);
+const CONFIG_POLITICA = resolverUrlPolitica(process.env.EXPO_PUBLIC_WEB_URL, PLATAFORMA);
+
+// El motivo se muestra solo a quien programa (consola de Metro); no lleva datos personales.
+if (CONFIG_API.error) console.warn(`Configuración de la API: ${CONFIG_API.error}`);
+if (CONFIG_POLITICA.error) console.warn(`Configuración de la web: ${CONFIG_POLITICA.error}`);
 
 /**
  * URL base de la API PetConnect (mismo backend Flask que usan el módulo
- * stand-alone y el módulo web). En Android emulator "localhost" apunta al
- * propio emulador, por eso se usa 10.0.2.2 para llegar al host.
+ * stand-alone y el módulo web). null si EXPO_PUBLIC_API_URL no es segura: entonces
+ * apiFetch no manda nada.
  */
-const HOST = Platform.select({
-  android: "10.0.2.2",
-  default: "localhost",
-});
-
-export const API_BASE = `http://${HOST}:5000/api`;
+export const API_BASE = CONFIG_API.url;
 
 /**
  * NC-005 (ítem 3.1): página de la Política de tratamiento de datos personales,
  * publicada por la web (/politica-de-datos). Se abre en el navegador del celular.
- * Solo vale en desarrollo (web en el puerto 5173 del computador); al desplegar
- * debe salir de una variable de entorno, como la API (A-27, ítem 5.3).
+ * null si EXPO_PUBLIC_WEB_URL no es segura: Linking.openURL falla y la pantalla
+ * muestra "No se pudo abrir la política en el navegador".
  */
-export const POLITICA_URL = `http://${HOST}:5173/politica-de-datos`;
+export const POLITICA_URL = CONFIG_POLITICA.url;
 
 const TOKEN_KEY = "petconnect_token";
 
 async function apiFetch(path, options = {}) {
+  // Sin status, como un error de red: no cierra la sesión ni se confunde con un 401.
+  if (!API_BASE) throw errorDeApi("la app no tiene configurada una dirección segura (https) del servidor", undefined, null);
+
   const token = await AsyncStorage.getItem(TOKEN_KEY);
   const headers = {
     "Content-Type": "application/json",
