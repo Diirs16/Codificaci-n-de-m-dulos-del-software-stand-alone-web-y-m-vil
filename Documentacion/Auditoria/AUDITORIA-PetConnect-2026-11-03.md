@@ -1112,8 +1112,8 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
 - **Arreglo:** `.dockerignore` por módulo, compose en la raíz, `host="0.0.0.0"` controlado por variable, MySQL/MariaDB
   con `schema.sql` en `docker-entrypoint-initdb.d`, secretos vía `env_file` (nunca en la imagen), Gunicorn.
 - **Estado: en parte. `.dockerignore` resuelto el 09/11/2026 (ítem 5.1 de PRIORIDADES, commit `a739076`); Dockerfile de
-  la API, Gunicorn y `0.0.0.0` resueltos el 09/11/2026 (ítem 5.2, parte 1, commit `db57da7`); el Dockerfile de la web y el
-  compose siguen pendientes (5.2, partes 2 y 3).** Los cuatro archivos que nombra este hallazgo
+  la API, Gunicorn y `0.0.0.0` resueltos el 09/11/2026 (ítem 5.2, parte 1, commit `db57da7`); Dockerfile de la web con
+  nginx resuelto el 10/11/2026 (ítem 5.2, parte 2, commit `73fff99`); el compose sigue pendiente (5.2, parte 3).** Los cuatro archivos que nombra este hallazgo
   ya no existen: el dueño los borró (nunca tuvieron commit) y se rehacen desde cero en el 5.2. Cada módulo
   (`petconnect.Backend/`, `PetConnect.Front/petconnect-app/`, `PetConnect.Mobile/`) tiene ahora su `.dockerignore`, porque
   Docker no lee el `.gitignore`: deja fuera de cualquier imagen los `.env` y sus variantes, las claves (`.pem`, `.key`,
@@ -1137,6 +1137,17 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   BD). Contraprueba: con el código viejo fallan 19 de 22; tomar la primera IP del encabezado o creerlo siempre también se
   detecta. Pendientes del 5.2: imagen de la web con nginx (parte 2) y `docker-compose.yml` en la raíz con `mariadb:10.11`
   (parte 3).
+- **Avance del 5.2, parte 2 (web), 10/11/2026, commit `73fff99`:** el Front ya no corre el servidor de desarrollo.
+  `PetConnect.Front/petconnect-app/Dockerfile` tiene dos etapas: `node:24-alpine` instala con `npm ci` y compila con
+  `npm run build`, y `nginx:1.30.6-alpine` (rama estable) sirve solo `dist/` (Node, `node_modules` y el código fuente no
+  entran en la imagen final; sin secretos ni variables `VITE_`). `nginx.conf` reemplaza el proxy de Vite: `/api/` va a
+  `http://api:5000` (el servicio del compose) sin recortar la ruta y con `X-Forwarded-For $proxy_add_x_forwarded_for`, la
+  IP que la API usa para el límite con `PROXY_CONFIABLE=1`; las rutas de React caen en `index.html` (`try_files`) y nginx
+  no muestra su versión (`server_tokens off`). `src/` no cambió (`api.js` ya usaba `/api` relativo). Regresión:
+  `tests/docker.test.js` (11, `node --test`, sin Docker, corre en la CI). Contraprueba: sin los dos archivos fallan 9 de
+  11 (pasan a propósito las 2 que revisan `src/` y el `.dockerignore`); 11 roturas a propósito (volver a `npm run dev`,
+  `nginx:latest`, `npm install`, una `VITE_…KEY`, `proxy_pass` con barra o a `localhost`, `$http_x_forwarded_for`, quitar
+  `try_files` o `server_tokens off`…) se detectan todas. Pendiente del 5.2: `docker-compose.yml` (parte 3).
 
 #### A-31 · 🟠 Alta · No hay integración continua y las pruebas cubren poco [A]
 - No existe `.github/workflows/`. Solo 13 pruebas (seguridad); **ninguna** prueba endpoints de mascotas, productos,

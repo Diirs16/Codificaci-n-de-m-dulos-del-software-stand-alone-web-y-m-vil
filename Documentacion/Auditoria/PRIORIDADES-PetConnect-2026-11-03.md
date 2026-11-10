@@ -106,7 +106,7 @@ se borra de aquí y se marca `[x]` en su fase.
 | ✔ | # | ID | Qué | Esfuerzo |
 |---|---|---|---|---|
 | [x] | 5.1 | A-30 | `.dockerignore` en cada módulo (excluir `.env`, `node_modules`, `.venv`, `__pycache__`, `dist`) **antes** de construir cualquier imagen — *Hecho el 09/11/2026 (`a739076`; no toca código, esquema ni BD; no cierra NC). El dueño confirmó que **borró** los `Dockerfile` y el `docker-compose.yml` de A-30 (nunca tuvieron commit): se rehacen desde cero en el 5.2 (6.11 resuelto). Decisiones del dueño: hacerlo ahora (no junto con el 5.2), un solo commit con los 3 módulos y también el móvil. Tres `.dockerignore` (`petconnect.Backend/`, `PetConnect.Front/petconnect-app/`, `PetConnect.Mobile/`): secretos (`**/.env`, `**/.env.*`, `**/*.env` y claves `*.pem`, `*.key`, `*.p12`; en el móvil también `*.jks`, `*.keystore`, `*.p8`, `*.mobileprovision`), dependencias y compilaciones (`**/__pycache__`, `**/*.py[cod]`, `.venv`, `**/node_modules`, `dist`, `.expo`, `android`, `ios`…), Postman (puede traer tokens), `*.docx` y archivos de herramientas (`.git`, `CLAUDE.md`, `Dockerfile*`). Con `**/` porque en Docker `__pycache__` solo excluye la carpeta de la raíz. `tests/` se queda en las imágenes (lo decide el 5.2). Sin `.dockerignore` en la raíz: el compose usará cada módulo como contexto. Regresión: `tests/test_dockerignore.py` (8 pruebas: 5 del simulador de reglas de Docker y 3 por módulo con rutas inventadas que deben quedar fuera y dentro; no abre ningún `.env`). Aplicado a los nombres reales: fuera el `.env`, los 11 `__pycache__`, `postman/`, `node_modules/`, `dist/`, `android/`…; dentro 76, 59 y 44 archivos. Suite 476 (423 + 53 omitidas); web lint (2 avisos previos), `npm test` y build bien; móvil `expo export` bien. Contraprueba: sin los 3 archivos (`git stash -u`) fallan 3 (una por módulo) y pasan a propósito las 5 del simulador; rompiendo patrones: `__pycache__` sin `**/` → 2, `**/.env` y `**/*.env` sin `**/` → 1 (`config/.env`), sin `**/.env.*` → 2, `src` excluido en la web → 4; pasa a propósito quitar `**/` solo a `**/.env` (lo cubre `**/*.env`). Opcional del dueño (si tiene Docker): listar el contexto de construcción con una imagen de prueba* | 🟢 |
-| [ ] | 5.2 | A-30 | `docker-compose.yml` en la raíz: BD con `schema.sql`, secretos por `env_file`, API con Gunicorn en `0.0.0.0`, web compilada (no `npm run dev`) — *En curso, 3 partes. Decisiones del dueño (09/11/2026): tiene Docker Desktop; BD `mariadb:10.11` (no `mysql:8.0` de GA9: terminó su soporte en abril de 2026); `tests/` fuera de la imagen; `seed.py` manual con `docker compose exec api python seed.py`; Gunicorn aprobado. **Parte 1 (backend) hecha el 09/11/2026 (`db57da7`):** `Dockerfile` (`python:3.14-slim`, usuario sin root, `CMD gunicorn -c gunicorn.conf.py api:app`, sin secretos), `gunicorn.conf.py` (`0.0.0.0:5000`, 1 proceso `gthread` con 8 hilos porque el límite cuenta en memoria, sin registro de accesos por Ley 1581, `post_worker_init` sale con código 3 y apaga Gunicorn si falla el arranque), `gunicorn==26.2.0`. `api.py`: `preparar_arranque()` reúne las revisiones del bloque `__main__` (Gunicorn no lo ejecuta); `_host_api()` lee `API_HOST` (vacío = `127.0.0.1`); `_ip_cliente()`: el límite usa la última IP de `X-Forwarded-For` solo con `PROXY_CONFIABLE=1` (detrás de nginx; sin eso, todos contarían como la IP de nginx). `.env.example` con `API_HOST=` y `PROXY_CONFIABLE=`; `tests` en el `.dockerignore`. Regresión: `tests/test_docker_backend.py` (22). `test_dao_errores` admite `_verificar_bd()` solo dentro de `preparar_arranque()`. Suite 498 (445 + 53 omitidas). Contraprueba (código viejo con `git stash` y sin `Dockerfile` ni `gunicorn.conf.py`): fallan 19 de las 22 y `test_dockerignore` (2 rutas de `tests/`); pasan a propósito 3 del límite que el código viejo ya cumplía (ignoraba el encabezado). Mutaciones: tomar la primera IP del encabezado → 1 falla; creer siempre el encabezado → 3. Pendientes: parte 2 (web con nginx) y parte 3 (compose)* | 🔴 |
+| [ ] | 5.2 | A-30 | `docker-compose.yml` en la raíz: BD con `schema.sql`, secretos por `env_file`, API con Gunicorn en `0.0.0.0`, web compilada (no `npm run dev`) — *En curso, 3 partes. Decisiones del dueño (09/11/2026): tiene Docker Desktop; BD `mariadb:10.11` (no `mysql:8.0` de GA9: terminó su soporte en abril de 2026); `tests/` fuera de la imagen; `seed.py` manual con `docker compose exec api python seed.py`; Gunicorn aprobado. **Parte 1 (backend) hecha el 09/11/2026 (`db57da7`):** `Dockerfile` (`python:3.14-slim`, usuario sin root, `CMD gunicorn -c gunicorn.conf.py api:app`, sin secretos), `gunicorn.conf.py` (`0.0.0.0:5000`, 1 proceso `gthread` con 8 hilos porque el límite cuenta en memoria, sin registro de accesos por Ley 1581, `post_worker_init` sale con código 3 y apaga Gunicorn si falla el arranque), `gunicorn==26.2.0`. `api.py`: `preparar_arranque()` reúne las revisiones del bloque `__main__` (Gunicorn no lo ejecuta); `_host_api()` lee `API_HOST` (vacío = `127.0.0.1`); `_ip_cliente()`: el límite usa la última IP de `X-Forwarded-For` solo con `PROXY_CONFIABLE=1` (detrás de nginx; sin eso, todos contarían como la IP de nginx). `.env.example` con `API_HOST=` y `PROXY_CONFIABLE=`; `tests` en el `.dockerignore`. Regresión: `tests/test_docker_backend.py` (22). `test_dao_errores` admite `_verificar_bd()` solo dentro de `preparar_arranque()`. Suite 498 (445 + 53 omitidas). Contraprueba (código viejo con `git stash` y sin `Dockerfile` ni `gunicorn.conf.py`): fallan 19 de las 22 y `test_dockerignore` (2 rutas de `tests/`); pasan a propósito 3 del límite que el código viejo ya cumplía (ignoraba el encabezado). Mutaciones: tomar la primera IP del encabezado → 1 falla; creer siempre el encabezado → 3. **Parte 2 (web) hecha el 10/11/2026 (`73fff99`, solo web; `src/` no cambia):** `PetConnect.Front/petconnect-app/Dockerfile` en dos etapas (`node:24-alpine` con `npm ci` + `npm run build`; `nginx:1.30.6-alpine`, rama estable, sirve solo `dist/`; sin `npm run dev`, sin `ENV`/`ARG` ni secretos) y `nginx.conf` (`location /api/` → `proxy_pass http://api:5000` sin recortar la ruta, `X-Forwarded-For $proxy_add_x_forwarded_for` para el límite con `PROXY_CONFIABLE=1`, `try_files $uri $uri/ /index.html` para las rutas de React, `server_tokens off`, `client_max_body_size 1m`). Descartada `nginx-unprivileged` (otro puerto e imagen aparte; en la oficial los procesos que atienden ya corren con el usuario `nginx`). Regresión: `tests/docker.test.js` (11, `node --test`, sin Docker). Web: lint (2 avisos previos), `npm test` 82/82 y build bien; suite del backend 498 (445 + 53 omitidas), `test_dockerignore` 8/8. Contraprueba con `git stash -u` del `Dockerfile` y el `nginx.conf`: fallan 9 de 11; pasan a propósito 2 (ninguna `VITE_` con clave en `src/` y el `.dockerignore`, que no dependen de esos archivos). Mutaciones (11, una a la vez): Dockerfile viejo con `npm run dev` → 4; `nginx:latest`, `npm install`, `ENV VITE_…KEY`, copiar todo a la imagen final, `proxy_pass` con barra, proxy a `localhost`, `$http_x_forwarded_for`, sin `X-Forwarded-For`, sin `try_files` o sin `server_tokens off` → 1 cada una. Prueba del dueño: `docker build` de la web. Pendiente: parte 3 (compose)* | 🔴 |
 | [ ] | 5.3 | A-27 | Móvil: `EXPO_PUBLIC_API_URL` y HTTPS; `expo-secure-store` para el token (A-28) | 🟡 |
 | [ ] | 5.4 | A-29 | `npm audit fix` en la web; planear actualización de Expo; `pip-audit` en CI | 🟡 |
 | [ ] | 5.5 | — | Antes de Vercel: la API debe estar alojada aparte (ver `CLAUDE.md`, “Sobre publicar en Vercel”) | — |
@@ -150,8 +150,8 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 09/11/2026, actualizada al cerrar la parte 1 del 5.2 (Dockerfile de la API con Gunicorn, `db57da7`).
-Lo próximo es la parte 2 del 5.2 (Dockerfile de la web con nginx), luego la parte 3 (`docker-compose.yml`).
+*Versión del 10/11/2026, actualizada al cerrar la parte 2 del 5.2 (Dockerfile de la web con nginx, `73fff99`).
+Lo próximo es la parte 3 del 5.2 (`docker-compose.yml` en la raíz), que cierra el 5.2.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -170,14 +170,28 @@ Lee primero:
   VEZ POR FASE, al terminar toda la fase (Fase 3 subida el 07/11/2026;
   Fase 4 subida el 09/11/2026 con el sí del dueño: 58 commits,
   9854464..9c386a4). Desde ahí los commits nuevos quedan en local (el
-  primero, 9d0d442, el que anota la CI; luego los del 5.1). Fase 5: NO hagas push ni lo preguntes al
+  primero, 9d0d442, el que anota la CI; luego los del 5.1 y el 5.2). Fase 5: NO hagas push ni lo preguntes al
   cerrar cada ítem; solo al marcar el último [ ] de la fase, recuerda los
   commits pendientes y pregunta (push normal, nunca --force). Cada push
   hace correr la CI de GitHub (.github/workflows/ci.yml; la primera, el
   09/11/2026, pasó en verde): mira su resultado.
 
-Estado conocido (9/11/2026; si el git log muestra más ítems hechos, manda el git log):
+Estado conocido (10/11/2026; si el git log muestra más ítems hechos, manda el git log):
 - FASE 4 CERRADA el 09/11/2026 (4.1 a 4.21, incluidos 4.17 y 4.12).
+- 5.2 PARTE 2 HECHA el 10/11/2026 (73fff99, solo web; src/ no cambia):
+  PetConnect.Front/petconnect-app/Dockerfile en dos etapas (node:24-alpine
+  AS compilacion con npm ci + npm run build; nginx:1.30.6-alpine sirve solo
+  dist/; sin ENV/ARG ni secretos; sin CMD propio) y nginx.conf (copiado a
+  /etc/nginx/conf.d/default.conf): location /api/ → proxy_pass
+  http://api:5000 (sin barra: la ruta llega completa), X-Forwarded-For
+  $proxy_add_x_forwarded_for, location / con try_files $uri $uri/
+  /index.html, server_tokens off, listen 80, client_max_body_size 1m.
+  Descartada nginx-unprivileged. tests/docker.test.js (11, node --test).
+  Web 82/82; backend 498 (445 + 53 omitidas). Contraprueba: sin los dos
+  archivos fallan 9 de 11 (pasan a propósito las de src/ y .dockerignore);
+  11 mutaciones detectadas. Ojo: nginx resuelve "api" al arrancar; si el
+  contenedor web se corre solo (sin el compose), nginx no arranca ("host
+  not found in upstream"): es lo esperado, en el compose web depende de api.
 - 5.2 EN CURSO (3 partes). Decisiones del dueño: tiene Docker Desktop;
   BD mariadb:10.11 (no mysql:8.0: sin soporte desde abril de 2026; anotar
   en GA9 al cerrar la parte 3); tests/ fuera de la imagen; seed.py manual
@@ -1350,28 +1364,36 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (5.2 PARTE 2: Dockerfile de la web, A-30;
-la parte 1, backend, ya está en db57da7):
-- PLAN APROBADO para la parte 2 (solo web, un commit):
-  PetConnect.Front/petconnect-app/Dockerfile en dos etapas
-  (node:24-alpine con npm ci + npm run build; luego nginx sirviendo
-  dist) y nginx.conf: location /api/ → proxy_pass http://api:5000 con
-  X-Forwarded-For $proxy_add_x_forwarded_for (la API ya lo lee con
-  PROXY_CONFIABLE=1: el compose de la parte 3 debe ponerlo), try_files
-  $uri /index.html para las rutas de React, server_tokens off. src/ NO
-  cambia (api.js ya usa "/api" relativo). Elegir versión exacta de nginx
-  (alpine estable) y decir al dueño la opción descartada
-  (nginx-unprivileged). Prueba en la web: tests/docker.test.js con
-  node --test (dos etapas, npm ci, npm run build, sin npm run dev, proxy
-  a api:5000, try_files, sin VITE_ con secretos). Correr lint, npm test
-  y build; contraprueba. Prueba del dueño: docker build de la web.
-- Parte 3 (después): docker-compose.yml en la raíz con db
-  (mariadb:10.11, volumen, solo schema.sql en docker-entrypoint-initdb.d,
-  healthcheck, sin publicar el puerto), api (env_file docker/api.env,
-  DB_HOST=db, DB_PORT=3306, PROXY_CONFIABLE=1, sin publicar) y web
-  (8080:80). Secretos en docker/bd.env y docker/api.env (ya ignorados por
-  la regla *.env del .gitignore: no tocar el .gitignore) con sus
-  *.env.example vacíos. Anotar en GA9 MariaDB 10.11 en vez de mysql:8.0.
+Contexto del próximo paso (5.2 PARTE 3: docker-compose.yml, A-30; la
+parte 1, backend, está en db57da7 y la parte 2, web, en 73fff99):
+- Plan ya acordado (recordarlo al dueño en dos líneas y esperar su OK
+  antes de escribir): docker-compose.yml en la raíz con 3 servicios:
+  db (mariadb:10.11, volumen con nombre, solo sql/schema.sql montado en
+  /docker-entrypoint-initdb.d, healthcheck, sin publicar el puerto),
+  api (build petconnect.Backend, env_file docker/api.env, DB_HOST=db,
+  DB_PORT=3306, PROXY_CONFIABLE=1, depends_on db con condition
+  service_healthy, sin publicar el puerto) y web (build
+  PetConnect.Front/petconnect-app, ports 8080:80, depends_on api).
+  El servicio DEBE llamarse "api": nginx.conf hace proxy_pass a
+  http://api:5000. Secretos en docker/bd.env y docker/api.env (ya
+  ignorados por la regla *.env del .gitignore: no tocar el .gitignore)
+  con sus *.env.example vacíos (solo nombres de variables, sacados del
+  .env.example del backend; nunca leer el .env real). Anotar en GA9
+  MariaDB 10.11 en vez de mysql:8.0 al cerrar.
+- Comprobar antes que sql/schema.sql ya trae las migraciones (07, 08 y
+  09/11/2026) y no usa SQL propio de MySQL que MariaDB 10.11 rechace.
+- Ojo (de la parte 2): nginx resuelve "api" al arrancar; si la API se
+  recrea con otra IP, nginx sigue con la vieja y da 502 hasta reiniciar
+  web. Si en la prueba del dueño pasa, la salida es "resolver
+  127.0.0.11" + proxy_pass con variable (anotarlo; no hacerlo antes).
+- Prueba sin Docker: tests/test_docker_compose.py en el backend (lee el
+  YAML como texto o con un parser mínimo: env_file, nombres de servicio,
+  sin contraseñas escritas, sin puertos publicados de db y api, solo
+  schema.sql montado, PROXY_CONFIABLE=1, mariadb:10.11) + contraprueba.
+  Prueba del dueño: docker compose up --build y abrir
+  http://localhost:8080 (y seed.py manual con docker compose exec api
+  python seed.py). Al terminar la parte 3: marcar [x] el 5.2 y cerrar
+  A-30 en la AUDITORÍA.
 - Lo que sigue es el contexto original del 5.2. Leer la fila del 5.2 en
   PRIORIDADES y A-30 en la AUDITORÍA. Los Dockerfile viejos ya no existen:
   todo se escribe desde cero (backend, web y compose; el móvil NO va en
@@ -1460,4 +1482,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 5.2, parte 2 (Dockerfile de la web con nginx, A-30)**: plan ya aprobado (ver “Contexto del próximo paso” en el prompt); después, la parte 3 (`docker-compose.yml` con `mariadb:10.11`). La parte 1 quedó hecha el 09/11/2026 (`db57da7`): la API tiene `Dockerfile` con Gunicorn (`0.0.0.0:5000`, 1 proceso con 8 hilos), `preparar_arranque()` (Gunicorn no ejecuta el `__main__`), `API_HOST` para `python api.py` y el límite por la IP real detrás de nginx con `PROXY_CONFIABLE=1`; `tests/test_docker_backend.py` (22). El 5.1 quedó hecho el 09/11/2026 (`a739076`): `.dockerignore` en backend, web y móvil (secretos, `node_modules`, `__pycache__`, `dist`… fuera de cualquier imagen), vigilados por `tests/test_dockerignore.py`; el dueño confirmó que borró los Dockerfile viejos (6.11 resuelto). **La Fase 4 quedó cerrada el 09/11/2026** con el 4.21: ningún DAO se traga ya los errores de la BD (`UsuarioDAO` y `ProveedorDAO` los dejan subir, las consolas avisan con `avisar_error_bd` sin el mensaje de MySQL) y `_verificar_bd()` solo se usa al arrancar la API (commits `96e007c` y `c7ecd55`). El 4.19 quedó hecho el 09/11/2026: “6. Actualizar usuario” de la consola revisa nombre, apellidos, correo, teléfono y estado con `security/datos_usuario.py` (el teléfono, con la regla de las solicitudes, que pasó de `api.py` a ese módulo) y avisa “Ese correo ya tiene una cuenta” antes del `UPDATE`, sin mostrar el correo. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** la decisión D.7 de la política. En la Fase 5 el push se pregunta solo al cerrar su último [ ].
+**Próximo ítem: 5.2, parte 3 (`docker-compose.yml` en la raíz con `mariadb:10.11`, A-30)**: plan en “Contexto del próximo paso” del prompt; con ella se marca [x] el 5.2 y se cierra A-30. La parte 2 quedó hecha el 10/11/2026 (`73fff99`): la web tiene `Dockerfile` en dos etapas (`node:24-alpine` compila con `npm ci` + `npm run build`; `nginx:1.30.6-alpine` sirve solo `dist/`) y `nginx.conf` (`/api/` → `http://api:5000` con `X-Forwarded-For`, `try_files` para las rutas de React, `server_tokens off`); `tests/docker.test.js` (11). La parte 1 quedó hecha el 09/11/2026 (`db57da7`): la API tiene `Dockerfile` con Gunicorn (`0.0.0.0:5000`, 1 proceso con 8 hilos), `preparar_arranque()` (Gunicorn no ejecuta el `__main__`), `API_HOST` para `python api.py` y el límite por la IP real detrás de nginx con `PROXY_CONFIABLE=1`; `tests/test_docker_backend.py` (22). El 5.1 quedó hecho el 09/11/2026 (`a739076`): `.dockerignore` en backend, web y móvil (secretos, `node_modules`, `__pycache__`, `dist`… fuera de cualquier imagen), vigilados por `tests/test_dockerignore.py`; el dueño confirmó que borró los Dockerfile viejos (6.11 resuelto). **La Fase 4 quedó cerrada el 09/11/2026** con el 4.21: ningún DAO se traga ya los errores de la BD (`UsuarioDAO` y `ProveedorDAO` los dejan subir, las consolas avisan con `avisar_error_bd` sin el mensaje de MySQL) y `_verificar_bd()` solo se usa al arrancar la API (commits `96e007c` y `c7ecd55`). El 4.19 quedó hecho el 09/11/2026: “6. Actualizar usuario” de la consola revisa nombre, apellidos, correo, teléfono y estado con `security/datos_usuario.py` (el teléfono, con la regla de las solicitudes, que pasó de `api.py` a ese módulo) y avisa “Ese correo ya tiene una cuenta” antes del `UPDATE`, sin mostrar el correo. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. Hallazgo sin ítem: el móvil borra la sesión al abrir ante cualquier error de `/auth/me`; preguntar si se anota como 4.20. **Pendiente del dueño:** la decisión D.7 de la política. En la Fase 5 el push se pregunta solo al cerrar su último [ ].
