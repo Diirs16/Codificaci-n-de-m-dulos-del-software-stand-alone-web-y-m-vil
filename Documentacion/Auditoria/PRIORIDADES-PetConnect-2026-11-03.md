@@ -1469,9 +1469,8 @@ sesión solo ante 401; A-28):
 - El hook de Bash bloquea cualquier comando cuyo texto lleve ".env":
   usar archivos del scratchpad para mensajes de commit, listas de rutas
   y scripts (git commit -F).
-- Archivo vacío "=" sin seguimiento en la raíz (del 06/11, seguramente un
-  comando de PowerShell mal escrito): preguntar al dueño si lo borra; no
-  meterlo en ningún commit.
+- Archivo vacío "=" de la raíz (del 06/11, un comando de PowerShell mal
+  escrito): el dueño lo BORRÓ el 10/11/2026. Ya no hay que preguntarlo.
 - Pendientes sin ítem: el export web del móvil en el 8090 no está en el
   CORS de api.py (5173, 8081 y 19006); el aviso rojo de validación no se
   borra al corregir el campo. Decisión D.7 de la política: del dueño.
