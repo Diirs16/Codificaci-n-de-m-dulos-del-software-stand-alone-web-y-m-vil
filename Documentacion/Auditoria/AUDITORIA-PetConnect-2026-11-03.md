@@ -1122,8 +1122,12 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
   pasan a propósito las 15 de `almacenToken.js` (archivo nuevo). Mutaciones (9, una a la vez), todas detectadas:
   migrar sin borrar el viejo, borrarlo aunque no se copió, respaldo en texto plano, `borrar` sin limpiar la memoria,
   `guardar` sin borrar el sobrante, aviso con el token o SecureStore en web (1 cada una); no leer primero SecureStore o
-  `borrar` sin tocar AsyncStorage (3 cada una). Prueba del dueño: reconstruir con `npm run android`, iniciar sesión,
-  cerrar la app y volver a abrirla.
+  `borrar` sin tocar AsyncStorage (3 cada una). **Probado por el dueño en el emulador (Pixel_7) el
+  10/11/2026**, tras reconstruir con `npx expo prebuild --platform android` y `npm run android` (el prebuild regeneró
+  `android/` y borró `local.properties`: hubo que recrearlo con `sdk.dir`; mientras tanto la app vieja daba “Cannot find
+  native module 'ExpoSecureStore'”): Tienda y Adopción cargan (parte 1, sin variable); iniciar sesión → Perfil con su
+  nombre; cerrar la app del todo y reabrir → pantalla de carga y Perfil **sigue con la sesión** (token en SecureStore);
+  cerrar sesión, cerrar y reabrir → pide iniciar sesión.
 
 ### 3.6 Dependencias
 
