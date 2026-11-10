@@ -54,9 +54,13 @@ services:
       - ./petconnect.Backend/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     # "Sana" cuando ya acepta conexiones y el motor InnoDB termino de arrancar.
     # Mientras corre schema.sql la primera vez, todavia no lo esta.
+    # start_period: tiempo de gracia en que los fallos no cuentan. La primera vez
+    # (volumen vacio) MariaDB tardo mas de 80 s en el PC del dueno (10/11/2026) y la
+    # API no arranco. Con 120 s hay margen. No retrasa nada: queda "sana" apenas
+    # el chequeo pasa.
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      start_period: 30s
+      start_period: 120s
       interval: 10s
       timeout: 5s
       retries: 5

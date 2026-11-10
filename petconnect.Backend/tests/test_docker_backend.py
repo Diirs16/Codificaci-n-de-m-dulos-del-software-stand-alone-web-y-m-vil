@@ -222,6 +222,16 @@ class PruebasGunicornConf(unittest.TestCase):
         # Cada linea traeria la IP y la ruta de cada persona (Ley 1581)
         self.assertIsNone(self.conf.get("accesslog"))
 
+    def test_sin_socket_de_control(self):
+        # Gunicorn 25.1+ lo crea en la carpeta personal, que el usuario del Dockerfile no
+        # tiene ("Permission denied: '/home/petconnect'", prueba del dueno del 10/11/2026)
+        self.assertIs(self.conf.get("control_socket_disable"), True)
+        # El nombre existe en el Gunicorn instalado (gunicorn.config no se puede importar
+        # en Windows: se busca en su codigo)
+        import importlib.util
+        with open(importlib.util.find_spec("gunicorn.config").origin, encoding="utf-8") as archivo:
+            self.assertIn('name = "control_socket_disable"', archivo.read())
+
     def test_si_el_arranque_falla_gunicorn_se_apaga(self):
         api_falsa = types.SimpleNamespace(preparar_arranque=mock.Mock(return_value=False))
         with mock.patch.dict(sys.modules, {"api": api_falsa}):

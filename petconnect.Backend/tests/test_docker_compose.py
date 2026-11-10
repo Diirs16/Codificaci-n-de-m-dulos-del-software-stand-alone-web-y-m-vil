@@ -207,9 +207,13 @@ class PruebasCompose(unittest.TestCase):
         self.assertIn(nombre, self.compose["volumes"])
 
     def test_bd_tiene_healthcheck(self):
-        prueba = self.servicios["db"]["healthcheck"]["test"]
-        self.assertIn("healthcheck.sh", prueba)
-        self.assertIn("--connect", prueba)
+        chequeo = self.servicios["db"]["healthcheck"]
+        self.assertIn("healthcheck.sh", chequeo["test"])
+        self.assertIn("--connect", chequeo["test"])
+        # La primera carga del esquema tardo mas de 80 s en el PC del dueno (10/11/2026)
+        gracia = re.fullmatch(r"(\d+)s", chequeo["start_period"])
+        self.assertIsNotNone(gracia, "start_period en segundos, p. ej. 120s")
+        self.assertGreaterEqual(int(gracia.group(1)), 120)
 
     def test_bd_crea_la_base_petconnect_con_utf8mb4(self):
         self.assertEqual(self.servicios["db"]["environment"]["MARIADB_DATABASE"], "petconnect")

@@ -33,6 +33,12 @@ timeout = 30
 accesslog = None
 errorlog = "-"
 
+# Sin "socket de control" (Gunicorn 25.1+): es una puerta para manejar Gunicorn con
+# la herramienta gunicornc, que no usamos. Por defecto la crea en la carpeta personal
+# del usuario, y el usuario petconnect del Dockerfile no tiene una: daba
+# "Permission denied: '/home/petconnect'" al arrancar. Una puerta menos abierta.
+control_socket_disable = True
+
 # Codigo de salida que Gunicorn entiende como "el proceso no pudo arrancar":
 # el proceso principal se detiene en vez de reintentarlo sin fin.
 # Es Arbiter.WORKER_BOOT_ERROR; se copia el numero porque gunicorn.arbiter no se
