@@ -1111,8 +1111,9 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
 - El Móvil usa `--localhost`: no se ve desde fuera del contenedor.
 - **Arreglo:** `.dockerignore` por módulo, compose en la raíz, `host="0.0.0.0"` controlado por variable, MySQL/MariaDB
   con `schema.sql` en `docker-entrypoint-initdb.d`, secretos vía `env_file` (nunca en la imagen), Gunicorn.
-- **Estado: en parte. `.dockerignore` resuelto el 09/11/2026 (ítem 5.1 de PRIORIDADES, commit `a739076`); el compose,
-  los Dockerfile, Gunicorn y `0.0.0.0` siguen pendientes (ítem 5.2).** Los cuatro archivos que nombra este hallazgo
+- **Estado: en parte. `.dockerignore` resuelto el 09/11/2026 (ítem 5.1 de PRIORIDADES, commit `a739076`); Dockerfile de
+  la API, Gunicorn y `0.0.0.0` resueltos el 09/11/2026 (ítem 5.2, parte 1, commit `db57da7`); el Dockerfile de la web y el
+  compose siguen pendientes (5.2, partes 2 y 3).** Los cuatro archivos que nombra este hallazgo
   ya no existen: el dueño los borró (nunca tuvieron commit) y se rehacen desde cero en el 5.2. Cada módulo
   (`petconnect.Backend/`, `PetConnect.Front/petconnect-app/`, `PetConnect.Mobile/`) tiene ahora su `.dockerignore`, porque
   Docker no lee el `.gitignore`: deja fuera de cualquier imagen los `.env` y sus variantes, las claves (`.pem`, `.key`,
@@ -1123,6 +1124,19 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   `node_modules/…`, `android/…`) y dentro (`api.py`, `package.json`, `src/main.jsx`, `App.js`…); nunca abre un `.env`.
   Contraprueba: sin los archivos fallan 3; al romper un patrón a propósito (quitar `**/`, borrar `**/.env.*` o excluir
   `src`) la prueba lo detecta.
+- **Avance del 5.2, parte 1 (backend), 09/11/2026, commit `db57da7`:** `petconnect.Backend/Dockerfile` (`python:3.14-slim`,
+  usuario sin root, sin secretos: la configuración entra por variables de entorno) arranca la API con **Gunicorn**
+  (`gunicorn==26.2.0`) según `gunicorn.conf.py`: escucha en `0.0.0.0:5000` dentro del contenedor, 1 proceso con 8 hilos
+  (el límite de peticiones cuenta en memoria y con más procesos se multiplicaría), sin registro de accesos (Ley 1581) y,
+  si falla el arranque, Gunicorn se apaga. En `api.py`, las revisiones de arranque (BD, tabla de OTP, `version_sesion`)
+  pasaron del bloque `__main__`, que Gunicorn no ejecuta, a `preparar_arranque()`; `python api.py` escucha donde diga
+  `API_HOST` (vacío = `127.0.0.1`, como antes). Hallazgo nuevo resuelto: detrás de un proxy (nginx) todas las peticiones
+  llegan con la IP del proxy y el límite de 5 por minuto habría bloqueado a todos por los intentos de uno; con
+  `PROXY_CONFIABLE=1` se cuenta por la última IP de `X-Forwarded-For` (la que anota nginx) y sin esa variable el
+  encabezado se ignora. `tests/` ya no entra en la imagen. Regresión: `tests/test_docker_backend.py` (22, sin Docker ni
+  BD). Contraprueba: con el código viejo fallan 19 de 22; tomar la primera IP del encabezado o creerlo siempre también se
+  detecta. Pendientes del 5.2: imagen de la web con nginx (parte 2) y `docker-compose.yml` en la raíz con `mariadb:10.11`
+  (parte 3).
 
 #### A-31 · 🟠 Alta · No hay integración continua y las pruebas cubren poco [A]
 - No existe `.github/workflows/`. Solo 13 pruebas (seguridad); **ninguna** prueba endpoints de mascotas, productos,
