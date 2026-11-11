@@ -118,6 +118,14 @@ jobs:
       - name: Instalar dependencias (npm ci)
         run: npm ci
 
+      # Ítem 5.4 (A-29): falla con vulnerabilidades altas o críticas. Quedan 4
+      # moderadas en @expo/fingerprint (herramienta de compilación, no llega a la
+      # app) que ninguna versión de Expo arregla todavía: se muestran sin fallar.
+      # Se arregla con "npm audit fix"; nunca --force ni "npx expo install --fix"
+      # sin revisar (cambian versiones mayores).
+      - name: Auditar dependencias (npm audit)
+        run: npm audit --audit-level=high
+
       - name: Pruebas
         run: npm test
 
