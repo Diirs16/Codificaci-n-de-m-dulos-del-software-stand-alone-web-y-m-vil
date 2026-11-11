@@ -1,6 +1,13 @@
 import { rutaPaginada } from "../utils/paginacion.js";
+import { resolverBaseApi } from "../utils/configApi.js";
 
-const API_BASE = "/api";
+// Ítem 5.5: "/api" en desarrollo y Docker; en Vercel, la API de Railway
+// (VITE_API_URL, que Vite escribe en la página al compilar). Si la dirección no
+// sirve, API_BASE queda null y apiFetch no llama a nada (ver configApi.js).
+// `?.` porque en las pruebas (Node) import.meta.env no existe.
+const CONFIG_API = resolverBaseApi(import.meta.env?.VITE_API_URL);
+const API_BASE = CONFIG_API.base;
+if (CONFIG_API.error) console.warn(`[PetConnect] ${CONFIG_API.error}: la web no llamará a la API`);
 const TOKEN_KEY = "petconnect_token";
 
 // Ítem 3.3 (A-23): cada error lleva `status`, el número de respuesta HTTP
@@ -25,6 +32,9 @@ async function apiFetch(path, options = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
+
+  // Dirección mal configurada: se falla como "sin conexión" sin mandar nada
+  if (!API_BASE) throw errorDeApi("No se pudo conectar con el servidor", 0);
 
   let res;
   try {
