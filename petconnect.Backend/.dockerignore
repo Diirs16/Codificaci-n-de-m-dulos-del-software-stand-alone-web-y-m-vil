@@ -33,6 +33,8 @@ postman
 **/*.docx
 
 # Herramientas locales que no hacen falta para correr la API
+# (requirements-dev.txt: pip-audit y demas herramientas de la CI, item 5.4)
+requirements-dev.txt
 **/*.log
 .git
 .gitignore

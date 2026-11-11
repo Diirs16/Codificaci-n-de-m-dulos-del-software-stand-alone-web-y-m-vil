@@ -6,6 +6,7 @@ base de datos ni envian correos.
 Ejecutar desde petconnect.Backend, con el entorno virtual activo:
     python -m unittest discover -s tests -v
 """
+import base64
 import hashlib
 import os
 import subprocess
@@ -41,6 +42,15 @@ from security.crypto import decrypt, encrypt  # noqa: E402
 from cryptography.fernet import InvalidToken  # noqa: E402
 
 CONTRASENA = "Firulais2026!"
+
+
+def _token_con_cabecera_anidada(profundidad=200_000):
+    """Token inventado cuya cabecera trae una lista dentro de otra miles de veces.
+    No hace falta firmarlo: PyJWT lee la cabecera antes de revisar la firma."""
+    def b64(texto):
+        return base64.urlsafe_b64encode(texto.encode()).rstrip(b"=").decode()
+    cabecera = '{"alg":"HS256","typ":"JWT","x":' + "[" * profundidad + "]" * profundidad + "}"
+    return f'{b64(cabecera)}.{b64("{}")}.firma'
 
 
 class PruebasPasswords(unittest.TestCase):
@@ -96,6 +106,11 @@ class PruebasToken(unittest.TestCase):
         vencido = jwt.encode({"sub": "7", "iat": ahora - 100, "exp": ahora - 10}, jwt_helper._SECRET, algorithm="HS256")
         self.assertIsNone(verify_token(vencido))
 
+    def test_cabecera_muy_anidada_se_rechaza_sin_reventar(self):
+        # Item 5.4 (A-29, GHSA-8wjv-2p76-3863): PyJWT 2.13.0 lanzaba RecursionError
+        # (que verify_token no captura) con una cabecera de listas muy anidadas.
+        self.assertIsNone(verify_token(_token_con_cabecera_anidada()))
+
 
 # La ruta de prueba se registra al importar el archivo: unittest importa todas las
 # pruebas antes de correr la primera, y Flask prohibe registrar rutas despues de
@@ -127,6 +142,16 @@ class PruebasEndpointProtegido(unittest.TestCase):
     def test_rechaza_token_con_sub_no_numerico(self):
         token = jwt.encode({"sub": "abc", "exp": int(time.time()) + 60}, jwt_helper._SECRET, algorithm="HS256")
         r = self.cliente.get("/_prueba/protegida", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(r.status_code, 401)
+
+    def test_token_con_cabecera_muy_anidada_da_401_y_no_500(self):
+        # Item 5.4 (A-29): con PyJWT 2.13.0 este token hacia responder 500. Con
+        # Gunicorn no llega (corta encabezados de mas de 8 KB), pero con
+        # "python api.py" (hasta 64 KB) si: unos 53 KB bastaban en Windows.
+        token = _token_con_cabecera_anidada(20_000)   # unos 53 KB: cabe en 64 KB
+        with mock.patch.object(api, "UsuarioDAO") as usuarios:
+            r = self.cliente.get("/_prueba/protegida", headers={"Authorization": f"Bearer {token}"})
+            usuarios.assert_not_called()   # se rechaza antes de ir a la BD
         self.assertEqual(r.status_code, 401)
 
 

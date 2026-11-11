@@ -32,10 +32,24 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-          cache-dependency-path: petconnect.Backend/requirements.txt
+          cache-dependency-path: |
+            petconnect.Backend/requirements.txt
+            petconnect.Backend/requirements-dev.txt
 
       - name: Instalar dependencias
         run: python -m pip install -r requirements.txt
+
+      # Ítem 5.4 (A-29): pip-audit (versión fija en requirements-dev.txt, que
+      # no entra en la imagen de Docker) revisa las dependencias de la API y las
+      # que ellas traen. Falla con cualquier vulnerabilidad conocida; --strict
+      # también falla si un paquete no se puede revisar. Consulta los avisos del
+      # día: puede ponerse en rojo sin cambiar código; se arregla subiendo la
+      # versión en requirements.txt.
+      - name: Instalar herramientas de la CI (pip-audit)
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Auditar dependencias (pip-audit)
+        run: python -m pip_audit -r requirements.txt --strict --progress-spinner off
 
       # Sin MariaDB, las pruebas que piden PETCONNECT_PRUEBA_BD se omiten solas.
       - name: Pruebas (unittest)

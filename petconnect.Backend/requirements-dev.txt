@@ -1,0 +1,11 @@
+# Herramientas de desarrollo y de la CI (item 5.4 de la auditoria, A-29).
+# NO son de la API: el Dockerfile solo instala requirements.txt y el
+# .dockerignore deja este archivo fuera de la imagen.
+#
+# Instalar en tu PC (desde petconnect.Backend, con el .venv de la raiz):
+#   ..\.venv\Scripts\python -m pip install -r requirements-dev.txt
+# Auditar las dependencias de la API (consulta los avisos del dia en internet):
+#   ..\.venv\Scripts\python -m pip_audit -r requirements.txt
+#
+# La prueba tests/test_dependencias.py revisa este archivo.
+pip-audit==2.10.1
