@@ -47,6 +47,15 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Claude Code: se comparten CLAUDE.md, .claude/settings.json, hooks y skills;
+# lo personal o temporal de cada máquina NO se sube
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+CLAUDE.local.md
+.impeccable/config.local.json
+.vercel/
+
 # Claves y certificados sueltos
 *.pem
 *.key
