@@ -64,6 +64,14 @@ jobs:
       - name: Instalar dependencias (npm ci)
         run: npm ci
 
+      # Ítem 5.4 (A-29): falla si alguna dependencia (de la app o de las
+      # herramientas, como vite) tiene una vulnerabilidad conocida alta o
+      # crítica. Las moderadas y bajas solo se muestran. Consulta los avisos
+      # del registro de npm del día: puede ponerse en rojo sin cambiar código;
+      # se arregla con "npm audit fix" (nunca --force sin revisar).
+      - name: Auditar dependencias (npm audit)
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
