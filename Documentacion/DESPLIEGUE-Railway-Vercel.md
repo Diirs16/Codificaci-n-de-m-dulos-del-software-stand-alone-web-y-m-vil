@@ -125,3 +125,28 @@ clave ni valor de configuración).
 - **`JWT_SECRET` obligatorio**: falta la variable o tiene menos de 32 bytes.
 - **La prueba de 30 días se acaba**: la API se apaga hasta pasar a Hobby (US$5/mes, con tarjeta, lo hace el
   dueño). Tenlo en cuenta con la fecha de la evaluación.
+- **"Invalid service name"** al elegir el repositorio: el nombre del repositorio era demasiado largo. Se
+  renombró a `PETCONNECT-PROYECTO` (o crea un *Empty Service* y conecta el repositorio después).
+- **El despliegue falla sin construir nada** y en sus datos dice *"Your plan can only deploy to a single
+  region"*: el servicio quedó con dos regiones. Deja una sola (US East).
+- **No le des "Deploy" a cambios viejos** de la barra "Apply N changes" si no sabes qué traen: ábrelos con
+  **Details** y, si sobran, descártalos (⋮ → *Discard*).
+
+### Cómo se hizo de verdad (11/11/2026): con el CLI de Railway
+
+Los clics del panel resultaron confusos, así que se usó el CLI oficial (`npm install -g @railway/cli@5.71.0`).
+El dueño hizo `railway login` y generó las claves con comandos que las guardan **sin mostrarlas**. Desde
+`C:\Users\goku8\OneDrive\Escritorio\Evidecia`, uno por línea:
+
+```powershell
+$p = .\.venv\Scripts\python -c "import secrets; print(secrets.token_urlsafe(24))"; railway variable set "MARIADB_PASSWORD=$p" --service db --skip-deploys | Out-Null; $p = $null
+```
+
+(Igual para `MARIADB_ROOT_PASSWORD`; `JWT_SECRET` con `secrets.token_hex(32)` y `FERNET_KEY` con
+`Fernet.generate_key().decode()`, los dos con `--service api`.) Lo demás (nombres, carpeta, variables que no
+son secretas, volumen, región, dominio y despliegues) lo configuró Claude por CLI, revisando las variables
+solo por nombre.
+
+- Dirección de la API: `https://api-production-d8fdc68b.up.railway.app`
+- Ver los registros: `railway logs --service api` (o `--service db`)
+- Ver los despliegues: `railway deployment list --service api`
