@@ -24,6 +24,11 @@ from correo.plantillas import HTML_AVISO_REGISTRO, HTML_CODE, HTML_WELCOME
 ASUNTO_AVISO_REGISTRO = "PetConnect - Intento de registro con tu correo"
 CORREO_ATENCION = "proyectopetconnect+atencion@gmail.com"   # canal de A.8 de la politica
 
+# Item 5.5: segundos maximos para conectar y para cada respuesta del servidor de
+# correo. Sin limite, si el puerto esta bloqueado (Railway Hobby, Render gratis)
+# el hilo de Gunicorn se quedaba esperando hasta su propio limite de 30 s.
+TIEMPO_MAXIMO_SMTP = 10
+
 
 def enviar_correo(to_email: str, asunto: str, texto: str, html: str):
     modo = EMAIL_CONFIG["mode"]
@@ -45,7 +50,7 @@ def enviar_correo(to_email: str, asunto: str, texto: str, html: str):
         msg["Subject"] = asunto
         msg.attach(MIMEText(texto, "plain"))
         msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP(host, port) as s:
+        with smtplib.SMTP(host, port, timeout=TIEMPO_MAXIMO_SMTP) as s:
             s.ehlo()
             # Sin contexto, starttls() no revisa el certificado del servidor (A-06)
             s.starttls(context=ssl.create_default_context())

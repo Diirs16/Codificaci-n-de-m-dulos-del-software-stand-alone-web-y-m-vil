@@ -9,6 +9,7 @@ import os
 import re
 import json
 import hashlib
+import ipaddress
 import secrets
 import threading
 import time
@@ -49,11 +50,51 @@ from security.politica import validar_contrasena
 from security.datos_usuario import validar_formato_correo, validar_nombre, validar_telefono
 
 app = Flask(__name__)
-CORS(app, origins=[
-    "http://localhost:5173",   # PetConnect.Front (React web)
+
+# CORS: las paginas (origenes) a las que el navegador deja hablar con la API.
+# Sin CORS_ORIGENES (tu computador, Docker) quedan estas, las de desarrollo:
+ORIGENES_LOCALES = (
+    "http://localhost:5173",   # PetConnect.Front (React web, npm run dev)
     "http://localhost:8081",   # PetConnect.Mobile (Expo web)
     "http://localhost:19006",  # PetConnect.Mobile (Expo web, puerto legado)
-])
+    "http://localhost:8090",   # PetConnect.Mobile (export web servido en el 8090)
+)
+
+# Un origen valido: https://dominio[:puerto], o http:// solo hacia el propio
+# computador. Sin ruta, sin usuario:clave@, sin "*" (dejaria entrar a cualquiera).
+_ORIGEN_VALIDO = re.compile(
+    r"^(?:https://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?"
+    r"|http://(?:localhost|127\.0\.0\.1))(?::\d{1,5})?$"
+)
+
+
+def _origenes_cors(texto) -> list:
+    """
+    Item 5.5: lista de origenes permitidos a partir de CORS_ORIGENES.
+
+    Vacia o sin definir = ORIGENES_LOCALES (como antes). Con valores (separados
+    por comas) REEMPLAZA a los locales: en Railway solo entra la web de Vercel.
+    Un valor invalido se ignora con un aviso que dice su posicion, no su texto
+    (no se imprimen valores de configuracion). Si ninguno sirve, la lista queda
+    vacia: el navegador bloquea todo, que es lo seguro.
+    """
+    valores = [v.strip() for v in (texto or "").split(",") if v.strip()]
+    if not valores:
+        return list(ORIGENES_LOCALES)
+    origenes = []
+    for posicion, valor in enumerate(valores, start=1):
+        origen = valor.lower()
+        if origen.endswith("/"):           # "https://x.vercel.app/" pegado del navegador
+            origen = origen[:-1]
+        if _ORIGEN_VALIDO.match(origen):
+            origenes.append(origen)
+        else:
+            print(f"[AVISO] CORS_ORIGENES: se ignoro el valor n.o {posicion} "
+                  "(debe ser https://dominio, sin ruta ni '*')", file=sys.stderr)
+    return origenes
+
+
+CORS(app, origins=_origenes_cors(os.getenv("CORS_ORIGENES")))
 
 # NC-006 / A-04 y A-05: limite de peticiones por IP en las rutas de autenticacion.
 # Frena la fuerza bruta de contrasenas y codigos, y el envio de correos sin fin.
@@ -72,11 +113,23 @@ def _ip_cliente() -> str:
     anota nginx: las anteriores las puede escribir el cliente y no se creen.
     Sin PROXY_CONFIABLE=1 el encabezado se ignora (cualquiera podria inventarlo).
     Se lee en cada peticion para que las pruebas puedan cambiarlo.
+
+    Item 5.5: con PROXY_CONFIABLE=x-real-ip (Railway) se usa el encabezado
+    X-Real-IP, que el borde de Railway escribe con la IP de quien se conecta y
+    REEMPLAZA si el cliente manda uno. Si no trae una IP valida, cuenta la IP
+    que se conecta. Con cualquier otro valor, X-Real-IP se ignora.
     """
-    if os.getenv("PROXY_CONFIABLE", "").strip() == "1":
+    modo = os.getenv("PROXY_CONFIABLE", "").strip().lower()
+    if modo == "1":
         ultima = request.headers.get("X-Forwarded-For", "").split(",")[-1].strip()
         if ultima:
             return ultima
+    elif modo == "x-real-ip":
+        real = request.headers.get("X-Real-IP", "").strip()
+        try:
+            return str(ipaddress.ip_address(real))
+        except ValueError:
+            pass
     return get_remote_address()
 
 

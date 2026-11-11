@@ -1,0 +1,29 @@
+# ================================================================
+# PETCONNECT — imagen de la base de datos para Railway (item 5.5)
+#
+# Es la MISMA base del docker-compose.yml (mariadb:10.11, utf8mb4 y
+# utf8mb4_spanish_ci) con el esquema ya adentro. En Railway no se puede montar
+# un archivo como en el compose, y asi la BD queda con sus tablas sin abrirla a
+# internet para cargarlas a mano.
+#
+# En Railway: servicio "db" desde el repositorio, carpeta petconnect.Backend,
+# variable RAILWAY_DOCKERFILE_PATH=Dockerfile.bd y un volumen en /var/lib/mysql.
+# Pasos completos: Documentacion/DESPLIEGUE-Railway-Vercel.md
+#
+# NO lleva contrasenas: MARIADB_ROOT_PASSWORD, MARIADB_USER y MARIADB_PASSWORD
+# se ponen en el panel de Railway. El esquema solo se carga cuando el volumen
+# esta vacio (la primera vez), igual que en el compose.
+# La prueba tests/test_produccion.py revisa este archivo.
+# ================================================================
+
+FROM mariadb:10.11
+
+# Nombre de la base (no es secreto): la crea el arranque de la imagen y en ella
+# corre schema.sql
+ENV MARIADB_DATABASE=petconnect
+
+# SOLO schema.sql (ya trae las migraciones), como en el compose
+COPY sql/schema.sql /docker-entrypoint-initdb.d/01-schema.sql
+
+# Mismo juego de caracteres que las tablas de schema.sql (tildes y ñ)
+CMD ["mariadbd", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_spanish_ci"]
