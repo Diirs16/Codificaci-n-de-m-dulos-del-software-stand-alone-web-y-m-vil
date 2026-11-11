@@ -1155,6 +1155,40 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
 | Móvil | 30 (1 crítica `shell-quote`, 14 altas, 13 moderadas, 2 bajas) | Casi todas en herramientas de Expo/compilación, no en la app instalada; arreglo completo exige subir de versión mayor de Expo |
 | Backend | **No se pudo auditar** (`pip-audit` no está instalado; instalarlo requiere permiso) | Recomendado en CI |
 
+- **Estado: resuelto el 11/11/2026 (ítem 5.4 de PRIORIDADES, en 3 partes, una por módulo); en el móvil quedan 4 moderadas
+  de una herramienta de compilación, sin arreglo en ninguna versión de Expo, y la subida a Expo 58 queda como plan.**
+  Medición del 10/11/2026 (los números del 03/11 habían cambiado): web 6 altas, móvil 27 (1 crítica, 14 altas,
+  11 moderadas, 1 baja) y, en el backend, avisos en la base pública OSV para PyJWT 2.13.0, dnspython 2.8.0 y
+  cryptography 49.0.0 (y, solo en el `.venv` local, certifi, urllib3 y Werkzeug, que no están fijados y en la CI y Docker
+  se instalan ya corregidos).
+  - **Web (11/11/2026, commit `b374f27`):** `npm audit fix` sin `--force` cambió solo el `package-lock.json`
+    (`react-router`/`react-router-dom` 7.18.5, `vite` 8.3.8, `postcss` 8.5.32, `nanoid` 3.3.20, `source-map-js` 1.2.2):
+    de 6 altas a 0. Regresión: `tests/auditoria-dependencias.test.js` (3); contraprueba: fallan las 3 nuevas.
+  - **Backend (11/11/2026, commit `ac75c03`):** PyJWT 2.15.1, dnspython 2.9.2 y cryptography 50.0.2. Se reprodujo antes el
+    fallo que sí aplicaba: con PyJWT 2.13.0 un token con la cabecera muy anidada (unos 53 KB) lanzaba `RecursionError` sin
+    capturar y la API respondía 500 en vez de 401 (con Gunicorn no llega, porque corta encabezados de más de 8 KB; con
+    `python api.py` sí). `pip-audit==2.10.1` va en `petconnect.Backend/requirements-dev.txt` (el `Dockerfile` no lo
+    instala y el `.dockerignore` lo deja fuera). `pip-audit -r requirements.txt`: con el archivo viejo, 18 avisos en
+    3 paquetes; con el nuevo, 0. Regresión: `tests/test_dependencias.py` (8) y 2 en `tests/test_seguridad.py` (el token
+    anidado da `None` y 401); contraprueba: fallan 7.
+  - **Móvil (11/11/2026, commit `53784f0`):** sin subir de versión mayor, los parches que el SDK 57 espera
+    (`npx expo install --check`), puestos a mano: `expo ~57.0.32`, `@expo/metro-runtime ~57.0.18`, `react-native 0.86.3`
+    y `react-native-screens ~4.26.0`; luego `npm audit fix` sin `--force`. De 27 a **4 moderadas**, todas en
+    `@expo/fingerprint` (`glob` 13 y `minimatch` 10), herramienta de compilación que no llega a la app instalada.
+    Desaparecieron `query-string` y `decode-uri-component`, que sí llegaban a la app por React Navigation (ahora 7.24.0).
+    Regresión: `tests/auditoria-dependencias.test.mjs` (4); contraprueba: fallan las 4 nuevas.
+  - **CI:** `npm audit --audit-level=high` en los trabajos `web` y `movil` (falla con altas o críticas; las moderadas solo
+    se muestran) y `python -m pip_audit -r requirements.txt --strict` en el `backend` (falla con cualquier aviso). Las
+    tres consultan los avisos del día: pueden ponerse en rojo sin cambiar código, y eso es lo que se busca.
+  - **Plan para Expo 58 (no se hace sin aprobación):** hoy no arregla nada de lo que queda (`@expo/fingerprint` 0.21.9,
+    la de Expo 58, sigue con `glob` ^13 y `minimatch` ^10; el “arreglo” que sugiere `npm audit` es bajar a Expo 53).
+    Conviene cuando el SDK 57 deje de recibir parches, cuando aparezca un aviso alto que solo Expo 58 corrija o cuando
+    haga falta algo nuevo de esa versión. Pasos: leer el changelog del SDK 58 y la documentación de esa versión;
+    `npx expo install expo@^58`; `npx expo install --check` y luego `--fix`, revisando cada cambio de versión mayor;
+    `npx expo prebuild --platform android` (borra `android/local.properties`: recrearlo con `sdk.dir`); `npm test`,
+    `npx expo export --platform web` y prueba completa en el emulador Pixel_7 (login, sesión al reabrir, Tienda,
+    Adopción y formularios).
+
 ### 3.7 Docker, CI y pruebas
 
 #### A-30 · 🟠 Alta · Los archivos de Docker no funcionan y filtrarían secretos [N]
