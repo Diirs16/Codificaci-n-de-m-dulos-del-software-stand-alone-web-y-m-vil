@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Vercel (vercel link): datos del proyecto y claves locales; la plantilla sí se sube
+.vercel
+.env*
+!.env.example
