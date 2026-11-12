@@ -377,3 +377,16 @@ antiguas con SHA-256 se reconocen con `hashlib` y pasan a bcrypt en su siguiente
 | [`Documentacion/Auditoria/`](Documentacion/Auditoria/) | Auditoría del 03/11/2026 y lista de prioridades |
 | `Documentacion/` | Evidencias de las guías GA7, GA8 y GA9 |
 | [`CLAUDE.md`](CLAUDE.md) | Reglas del proyecto para trabajar con Claude Code |
+
+## 12. Licencia
+
+**Todos los derechos reservados.** PetConnect es un proyecto formativo del SENA (ficha 220501096) y su código no
+tiene una licencia abierta. Que se pueda ver (por ejemplo, en GitHub) no da permiso de copiarlo, modificarlo ni
+redistribuirlo sin autorización de sus autores.
+
+- Hasta el 12/11/2026, `PetConnect.Mobile/` traía el archivo `LICENSE` de la plantilla de Expo (una licencia MIT a
+  nombre de Expo), que no correspondía a este código. Se quitó (hallazgo A-34 de la auditoría).
+- Las librerías de terceros (React, Expo, Flask y las demás dependencias) conservan cada una su propia licencia, que
+  viene dentro del paquete (`node_modules/` o el entorno de Python).
+- Si más adelante se elige una licencia abierta (por ejemplo, MIT), se agrega un archivo `LICENSE` en la raíz y se
+  actualiza esta sección. Antes conviene consultarlo con el instructor.

@@ -1412,6 +1412,24 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   líneas, 3 textos prohibidos, la figura y la versión); la línea 342 vieja pasó a propósito porque ya tenía un "Antes
   decía" de `mysql:8.0` (límite conocido de la marca por línea). Mutación: volver a "Reporte de pytest" en Evidencias →
   falla 1.
+- **Estado de A-34: resuelto el 12/11/2026 (ítem 6.5 de PRIORIDADES; solo documentación y una prueba, no toca código,
+  dependencias, CI ni BD; no cierra NC).** Decisión del dueño: opción A (sin licencia abierta = todos los derechos
+  reservados; se descartaron B, una MIT propia en la raíz, y C, otra licencia como Apache-2.0 o GPL-3.0: de "todos los
+  derechos reservados" se puede pasar a una abierta más adelante cambiando un archivo, pero un permiso ya dado no se
+  retira). Antes de una abierta, el dueño consultará con su instructor quién es el titular de un proyecto formativo, si
+  el SENA pide algún aviso y si deben figurar otros autores. Se borró `PetConnect.Mobile/LICENSE` (la MIT de la
+  plantilla de Expo, “650 Industries”, entrada en el primer commit `7af855e`; era el único LICENSE del repo) y el
+  `README.md` de la raíz tiene la sección **12. Licencia** (todos los derechos reservados, proyecto formativo SENA; las
+  librerías de terceros conservan su licencia dentro de `node_modules/` o del entorno de Python; cómo cambiarla). Los
+  `package.json` siguen con `"private": true` y sin campo `"license"` (no se tocaron). Regresión (en el backend, por
+  decisión del dueño): `tests/test_licencia.py` (3: ningún `LICENSE`/`LICENCE`/`COPYING` del repo dice “650
+  Industries” ni “aka Expo”, saltando `node_modules`, `dist`, `build`, `__pycache__` y carpetas con punto —en
+  `.claude/worktrees/` hay una copia vieja del repo con el LICENSE de Expo—; el README tiene la sección “Licencia” y,
+  sin LICENSE en la raíz, dice “Todos los derechos reservados” o, con él, lo enlaza; la búsqueda probada con una
+  carpeta temporal; las dos primeras se omiten si el README no está, como en la imagen de Docker). Suite 580 (525 + 55
+  omitidas). Contraprueba (LICENSE y README del último commit puestos a mano: `git stash` no acepta un archivo ya
+  borrado en el índice): fallan 2 (el LICENSE de Expo y la sección que falta); pasa a propósito 1 (la de la búsqueda,
+  que no depende del repo).
 
 ### 3.9 Configuración de Claude Code (instalada hoy)
 
