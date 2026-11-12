@@ -354,7 +354,7 @@ Se definen tres entornos para separar el trabajo diario de la validación final.
 | Jest o Vitest con Testing Library | Unitario | Componentes y utilidades del módulo web |
 | `unittest` (biblioteca estándar de Python) y el cliente de pruebas de Flask | Unitario e integración | Lógica y endpoints de la API en Python, con `unittest.mock` para simular la base de datos; la medición de cobertura (`coverage.py`) está por adoptar |
 | Cliente de pruebas de Flask | Integración | Solicitudes HTTP contra la API sin servidor (rol de Supertest) |
-| Postman y Newman | Integración y regresión | Colecciones existentes en `PetConnect.Mobile/postman` y `petconnect.Backend/postman`, ejecutadas en la integración continua |
+| Postman y Newman | Integración y regresión | Colección única `petconnect.Backend/postman/PetConnect.postman_collection.json` (9 endpoints, con el inicio de sesión en dos pasos), que hoy se ejecuta a mano en Postman; correrla con Newman en la integración continua está por adoptar |
 | Maestro | E2E | Flujos del APK y de la app de iOS en emulador, simulador y dispositivo físico |
 | Cypress | E2E | Flujos del módulo web |
 | Apache JMeter 5.6 | No funcional | Carga, estrés y capacidad |

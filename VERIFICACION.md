@@ -153,7 +153,7 @@ Con el backend corriendo (sección 3), sigue estos pasos en orden:
    ```
    petconnect.Backend/postman/PetConnect.postman_collection.json
    ```
-2. **Si quedó duplicada**, borra la copia extra: clic derecho sobre una de las dos "PetConnect API" → Delete.
+2. **Si ya la tenías importada**, borra antes la vieja (clic derecho sobre "PetConnect API" → Delete) para no quedar con dos copias. Esta es la **única** colección del proyecto: las dos del móvil (desactualizadas y duplicadas) se quitaron el 12/11/2026 (hallazgo A-35).
 3. **Prueba primero lo que no pide login** — carpeta Productos → *Listar productos* → Send. Debe responder `200 OK`. Repite con Mascotas.
 4. **Revisa el Body antes de enviar peticiones POST** — en *Registrar usuario*, *Verificar código* e *Iniciar sesión*, la pestaña Body debe tener marcado **raw** y el dropdown en **JSON** (no "form-data", no "Text"). Si aparece en form-data, la API responde que faltan datos aunque los veas llenos.
 

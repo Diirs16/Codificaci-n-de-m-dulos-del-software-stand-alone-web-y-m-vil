@@ -1430,6 +1430,27 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   omitidas). Contraprueba (LICENSE y README del último commit puestos a mano: `git stash` no acepta un archivo ya
   borrado en el índice): fallan 2 (el LICENSE de Expo y la sección que falta); pasa a propósito 1 (la de la búsqueda,
   que no depende del repo).
+- **Estado de A-35: resuelto el 12/11/2026 (ítem 6.6 de PRIORIDADES; solo documentación, borrado de archivos y una
+  prueba; no toca código, dependencias, CI ni BD; no cierra NC).** Había tres colecciones con lo mismo: la JSON del
+  backend (`petconnect.Backend/postman/PetConnect.postman_collection.json`, 9 peticiones, con `/auth/login/verify`) y,
+  en el formato YAML de la app de Postman, “PetConnect API” y “PetConnect API Copy” en
+  `PetConnect.Mobile/postman/postman/collections/` (idénticas salvo una petición suelta de registro con la URL escrita
+  a mano; del primer commit `7af855e`, sin el paso 2 del inicio de sesión), con los id de Postman Cloud del workspace y
+  de las dos colecciones en `postman/.postman/resources.yaml`. Revisión de datos: ningún token real (`{{token}}` y la
+  variable `token` vacía), correos solo `@example.com` y una misma contraseña de ejemplo en todos los body. Decisión
+  del dueño: opción A (quedarse solo con la JSON del backend; descartadas B, dejar la YAML del móvil, y C, convertir a
+  YAML en la raíz); el dueño no usa la sincronización de la app de Postman con esa carpeta. Se quitaron los 29 archivos
+  de `PetConnect.Mobile/postman/` y `PetConnect.Mobile/.postman/` (y localmente sus carpetas vacías); las colecciones
+  siguen en la nube de Postman del dueño, que puede borrar la “Copy” a mano. `VERIFICACION.md` (sección 5, paso 2) y
+  GA9 (fila “Postman y Newman” de la tabla de herramientas) citan solo la del backend; de paso, GA9 ya no dice que la
+  colección se ejecuta en la CI (no corre Newman: queda “por adoptar”). Las `.dockerignore` siguen dejando `postman`
+  fuera, por si vuelve. Regresión: `petconnect.Backend/tests/test_postman.py` (5: una sola colección en el repo, sin
+  `*.request.yaml`, `*.globals.yaml`, carpetas `.postman` ni `postman/postman`; sin datos reales; cada petición existe
+  en `api.py` con su método —leído como texto, sin importarlo—; las guías citan rutas que existen y el número de
+  endpoints coincide; la búsqueda probada con una carpeta temporal). Suite 585 (530 + 55 omitidas);
+  `test_dockerignore.py` sin cambios, en verde. Contraprueba (archivos del último commit puestos con `git archive`):
+  con los 29 archivos de vuelta falla 1 (una sola colección) y pasan 4; con la GA9 vieja y sin la carpeta falla 1 (las
+  guías) y pasan 4. Pasan a propósito las de datos, rutas de la API y búsqueda, que no dependen de lo borrado.
 
 ### 3.9 Configuración de Claude Code (instalada hoy)
 
