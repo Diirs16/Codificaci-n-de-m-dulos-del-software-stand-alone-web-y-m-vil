@@ -115,7 +115,7 @@ se borra de aquí y se marca `[x]` en su fase.
 
 ## Fase 6 — Orden y documentación
 
-- [ ] **6.1** README: MariaDB 10.4, `autocommit`, versión del conector y cómo levantar API, web y móvil (A-32) · 🟡
+- [x] **6.1** README: MariaDB 10.4, `autocommit`, versión del conector y cómo levantar API, web y móvil (A-32) · 🟡 — *Hecho el 11/11/2026 (solo documentación + prueba; no toca código, esquema ni BD; no cierra NC). `README.md` de la raíz reescrito con el índice aprobado por el dueño (11 secciones): versiones reales (MariaDB 10.4.32 en el PC y 10.11 en Docker/Railway, `mysql-connector-python` 9.1.0), cómo levantar API, consola, web, móvil y Docker (PowerShell 5.1, un comando por bloque), variables solo por nombre por plantilla, despliegue y móvil por enlace (no duplica `EJECUCION.md` ni `CLAUDE.md`), pruebas y CI, backend por dentro y 34 tablas. `autocommit` ya era `False` desde el 4.9 (A-32 estaba desactualizado en eso): no se cambió. Otros errores corregidos: ruta de la consola, `pip install -r requirements.txt`, conexión por `DB_*` del `.env`, 34 tablas con `utf8mb4_spanish_ci`, Python 3.14. Regresión pedida por el dueño: `tests/test_readme.py` (6); suite 562 (507 + 55 omitidas). Contraprueba (`git stash` del README): fallan 3; pasan 3 a propósito (`autocommit`, enlaces y variables ya estaban bien). Grep: `9.7.0` solo en la auditoría/PRIORIDADES; “MySQL 8” en GA9 se queda (objetivo del plan de entonces). Fuera del ítem: el `README.md` de la web sigue siendo la plantilla de Vite*
 - [ ] **6.2** Plan GA9: `unittest` vs `pytest`/`.env.test` (A-33); actualizar la bitácora con cada NC cerrada · 🟢
 - [ ] **6.3** `generate_keys.py` no debe sobrescribir un `.env` existente (A-16) · 🟢
 - [ ] **6.4** `addToCartToast.js`: `textContent` en lugar de `innerHTML` (A-25) · 🟢
@@ -150,9 +150,9 @@ Pega esto en Claude Code, dentro de la carpeta del proyecto. Sirve para **cada s
 ítem pendiente, en orden de prioridad (fase 0 → 6), y lo tacha con `[x]` al terminar. Un ítem por vez, no "todo de
 una": así cada commit tiene su prueba y, si algo falla, se sabe qué lo causó.
 
-*Versión del 11/11/2026 (noche), al cerrar el 5.5 y con él la FASE 5: API y BD en Railway con HTTPS, web en un
-preview protegido de Vercel y móvil apuntando a los dos. Lo próximo es el 6.1 (README, A-32), el primero de la
-Fase 6: contexto en “Contexto del próximo paso”.
+*Versión del 11/11/2026 (noche), al cerrar el 6.1 (README, A-32), el primero de la Fase 6. La Fase 5 quedó
+cerrada antes ese mismo día (API y BD en Railway, web en un preview protegido de Vercel). Lo próximo es el 6.2
+(plan GA9: `unittest` vs `pytest`/`.env.test`, A-33): contexto en “Contexto del próximo paso”.
 Salta los ítems de “Por actualizar” y pide actualizar este prompt al terminar cada ítem o cada parte.*
 
 ```text
@@ -180,6 +180,17 @@ Lee primero:
   09/11/2026, pasó en verde): mira su resultado.
 
 Estado conocido (11/11/2026; si el git log muestra más ítems hechos, manda el git log):
+- 6.1 CERRADO el 11/11/2026; A-32 RESUELTO (sin NC). README.md de la raíz
+  reescrito (11 secciones: tecnologías y versiones reales, estructura,
+  requisitos, BD por enlace a sql/README.md, cómo levantar API, consola,
+  web, móvil y Docker, variables solo por nombre, despliegue por enlace,
+  pruebas y CI, backend por dentro, 34 tablas, más documentación).
+  autocommit ya era False (4.9): no se tocó. Regresión:
+  petconnect.Backend/tests/test_readme.py (6; compara las versiones del
+  README con requirements.txt y las tablas con schema.sql: si se sube una
+  versión en requirements.txt, hay que subirla también en el README).
+  Suite 562 (507 + 55 omitidas) con el .venv del dueño, que ya está al
+  día (pasan test_dependencias). Sin push (Fase 6: solo al final).
 - 5.5 CERRADO el 11/11/2026 = FASE 5 CERRADA (sin A-xx propio; 5 partes;
   detalle en su fila). API y BD en Railway (proyecto "adequate-charisma",
   entorno production, servicios "db" y "api", US East, una réplica):
@@ -1496,33 +1507,45 @@ por el dueño: API + BD, web, móvil):
   FormularioSolicitud.jsx y FormularioSolicitud.js a la vez. Preguntar al
   dueño antes.
 
-Contexto del próximo paso (6.1: README, A-32; el primero de la Fase 6):
-- A-32 (AUDITORÍA, tabla de hallazgos): el README.md de la raíz dice
-  MySQL 8.x / 9.x (hoy es MariaDB 10.4 de XAMPP en el 3310 en el PC y
-  mariadb:10.11 en Docker y en Railway), mysql-connector-python 9.7.0
-  (requirements.txt fija 9.1.0) y solo explica la consola (stand-alone).
-  OJO: A-32 decía que autocommit era True; desde el 4.9 (A-15)
-  config/db_config.py usa "autocommit": False, así que esa parte del
-  README (líneas ~116 y ~128) ya es correcta: revisarla, no cambiarla.
-- Qué debería explicar (proponer el índice y esperar OK): cómo levantar
-  la API (.venv, python api.py, puerto 5000), la web (npm run dev, 5173),
-  el móvil (npm start / npm run android con el Pixel_7 y JAVA_HOME del jbr)
-  y Docker (docker compose del 5.2); variables solo por nombre (los
-  .env.example de cada módulo, nunca valores); despliegue (enlace a
-  Documentacion/DESPLIEGUE-Railway-Vercel.md); pruebas (unittest, npm
-  test) y la CI. No duplicar EJECUCION.md (6.7) ni CLAUDE.md: enlazarlos.
+Contexto del próximo paso (6.2: plan GA9, unittest vs pytest/.env.test,
+A-33; y bitácora al día):
+- A-33 (AUDITORÍA, tabla 3.8): el plan GA9
+  (Documentacion/GA9-220501096-AA1-EV02-PetConnect.md) dice que las
+  pruebas de la API se corren con pytest y .env.test; el repositorio usa
+  unittest (python -m unittest discover -s tests; 562 pruebas, 55
+  omitidas sin MariaDB; 21 archivos usan el cliente de pruebas de Flask,
+  app.test_client) y NO hay .env.test: las pruebas ponen sus propias
+  claves y apagan load_dotenv (tests/test_sin_env_real.py); las que
+  necesitan BD usan PETCONNECT_PRUEBA_BD=1 con bases temporales.
+- Dónde lo dice GA9 (revisar con grep "pytest\|\.env\.test"): tabla de
+  arquitectura (~l. 77), tabla de funcionalidades (~187-194), niveles de
+  prueba (~253), herramientas (~355, "pytest y pytest-cov"), ejemplo de
+  CP-012 con @pytest.fixture (~513-543, nota con "pytest -q" y .env.test)
+  y evidencias (~644).
+- Opciones (explicar y esperar OK): (A) corregir el plan para que diga
+  unittest + cliente de pruebas de Flask y PETCONNECT_PRUEBA_BD, y
+  reescribir el ejemplo de CP-012 con unittest (sin dependencias nuevas;
+  recomendada); (B) adoptar pytest (corre también las pruebas unittest)
+  y crear .env.test: es dependencia nueva (pytest, pytest-cov) y pide
+  permiso. El GA9 es evidencia ya entregada: decidir con el dueño si se
+  corrige el texto o se agrega una nota de cambio (versión 2.4).
+- Bitácora: NC-001 a NC-009 y NC-011 dicen "Cerrada el ..."; NC-010
+  sigue "En corrección desde el 3/11/2026" (restricción
+  chk_aplicacion_fechas): revisar si ya se puede cerrar o qué falta.
 - Es documentación: prueba de regresión solo si el dueño la quiere (por
-  ejemplo, que la versión del conector del README coincida con
-  requirements.txt). Verificar con grep que no queden "MySQL 8" ni
-  "9.7.0" donde no corresponda.
+  ejemplo, que GA9 no diga "pytest -q" ni ".env.test" si se elige A).
 - Cerca: 6.7 (rutas genéricas en EJECUCION.md) y 6.10 (renombrar el
   repositorio: ya se hizo en el 5.5, Diirs16/PETCONNECT-PROYECTO; marcarlo
   cuando toque, comprobando que no queden enlaces al nombre viejo).
+- README nuevo (6.1): si cambia una versión en requirements.txt o una
+  tabla en schema.sql, tests/test_readme.py falla hasta actualizar el
+  README. El README de la web (PetConnect.Front/petconnect-app/README.md)
+  sigue siendo la plantilla de Vite (sin ítem; preguntar al dueño).
 - Dependencias: npm audit fix --force y npx expo install --fix cambian
   versiones mayores: NO sin permiso. Ninguna dependencia nueva sin
   permiso. Plan de Expo 58 escrito en A-29. Pendientes del dueño del 5.4:
-  actualizar el .venv (comando en "Estado conocido") y npm ci en web y
-  móvil.
+  npm ci en web y móvil (el .venv ya está al día: el 11/11/2026 pasó la
+  suite completa en él).
 - Ojo: otras sesiones pueden trabajar en paralelo en el mismo repo.
   Antes de anotar en los .md, mira git log y git diff.
 - El hook de Bash bloquea cualquier comando cuyo texto lleve ".env":
@@ -1580,4 +1603,4 @@ Luego:
    prompt listo para el siguiente ítem, pegado completo en el chat.
 ```
 
-**Próximo ítem: 6.1 (README, A-32), el primero de la Fase 6**: contexto en “Contexto del próximo paso” del prompt. **El 5.5 quedó cerrado el 11/11/2026 y con él la FASE 5**: API y BD en Railway con HTTPS (`https://api-production-d8fdc68b.up.railway.app`), web en un preview protegido de Vercel (`https://petconnect-m7oynt3d3-daniel-cc4c.vercel.app`; el CORS de Railway solo la deja entrar a ella) y móvil con `EXPO_PUBLIC_API_URL` y `EXPO_PUBLIC_WEB_URL`; GA9 A04 completa. Datos de ejemplo cargados en Railway con `seed.py` (12 productos y 6 mascotas). Pendientes sin ítem: correo real y la decisión D.3/A.9 de la política (propuesta en su Parte D). **El 5.4 quedó cerrado el 11/11/2026 y A-29 resuelto**: web de 6 altas a 0 con `npm audit fix` sin `--force` (`b374f27`); backend con PyJWT 2.15.1, dnspython 2.9.2 y cryptography 50.0.2 y `pip-audit==2.10.1` en `requirements-dev.txt`, fuera de la imagen (`ac75c03`; PyJWT 2.13.0 respondía 500 con un token de cabecera muy anidada); móvil con los parches del SDK 57 y `npm audit fix`, de 27 a 4 moderadas en una herramienta de compilación (`53784f0`); la CI corre `npm audit --audit-level=high` en web y móvil y `pip-audit --strict` en el backend; Expo 58 queda como plan escrito en A-29. Pendientes del dueño: actualizar su `.venv`, `npm ci` en web y móvil y `npm run android` con prueba en el Pixel_7. **El 5.3 quedó cerrado el 10/11/2026 y A-27 y A-28 también**: la parte 3 (`fd2a2cc`) hace que, al abrir la app, la sesión del móvil se borre solo si `/auth/me` responde 401 (`debeBorrarSesion` en `src/utils/sesion.js`); sin red, 503 o 500 el token se queda y la sesión vuelve al reabrir con internet; `tests/sesion-al-abrir.test.mjs` (6). **La parte 2 del 5.3 quedó hecha el 10/11/2026 (`eeda879`)**: el token del móvil va cifrado en `expo-secure-store` (~57.0.4) en Android e iOS; el que quedó en AsyncStorage se pasa ahí y se borra; si SecureStore falla, la sesión dura en memoria (nunca en texto plano); en web sigue en `localStorage`; `tests/almacen-token.test.mjs` (17). Probado por el dueño en el emulador el 10/11/2026: la sesión sigue al cerrar y reabrir la app. **La parte 1 del 5.3 quedó hecha el 10/11/2026 (`7e963c5`)**: el móvil toma la dirección de la API de `EXPO_PUBLIC_API_URL` y la de la política de `EXPO_PUBLIC_WEB_URL` (vacías = emulador o `localhost`, como antes), exige `https://` fuera de desarrollo salvo hacia el propio computador y, si la dirección no es segura, no manda nada; plantilla `PetConnect.Mobile/.env.example` sin valores; `tests/config-api.test.mjs` (13). **El 5.2 quedó cerrado el 10/11/2026 y A-30 también**: la parte 3 (`283c0b7`) agrega `docker-compose.yml` en la raíz con `db` (`mariadb:10.11`, solo `schema.sql`, healthcheck), `api` (Gunicorn, `env_file` `docker/api.env`, `DB_HOST=db`, `PROXY_CONFIABLE=1`) y `web` (nginx en http://localhost:8080); solo la web publica un puerto y los secretos van en `docker/*.env` (fuera de Git); `tests/test_docker_compose.py` (22). La parte 2 quedó hecha el 10/11/2026 (`73fff99`): la web tiene `Dockerfile` en dos etapas (`node:24-alpine` compila con `npm ci` + `npm run build`; `nginx:1.30.6-alpine` sirve solo `dist/`) y `nginx.conf` (`/api/` → `http://api:5000` con `X-Forwarded-For`, `try_files` para las rutas de React, `server_tokens off`); `tests/docker.test.js` (11). La parte 1 quedó hecha el 09/11/2026 (`db57da7`): la API tiene `Dockerfile` con Gunicorn (`0.0.0.0:5000`, 1 proceso con 8 hilos), `preparar_arranque()` (Gunicorn no ejecuta el `__main__`), `API_HOST` para `python api.py` y el límite por la IP real detrás de nginx con `PROXY_CONFIABLE=1`; `tests/test_docker_backend.py` (22). El 5.1 quedó hecho el 09/11/2026 (`a739076`): `.dockerignore` en backend, web y móvil (secretos, `node_modules`, `__pycache__`, `dist`… fuera de cualquier imagen), vigilados por `tests/test_dockerignore.py`; el dueño confirmó que borró los Dockerfile viejos (6.11 resuelto). **La Fase 4 quedó cerrada el 09/11/2026** con el 4.21: ningún DAO se traga ya los errores de la BD (`UsuarioDAO` y `ProveedorDAO` los dejan subir, las consolas avisan con `avisar_error_bd` sin el mensaje de MySQL) y `_verificar_bd()` solo se usa al arrancar la API (commits `96e007c` y `c7ecd55`). El 4.19 quedó hecho el 09/11/2026: “6. Actualizar usuario” de la consola revisa nombre, apellidos, correo, teléfono y estado con `security/datos_usuario.py` (el teléfono, con la regla de las solicitudes, que pasó de `api.py` a ese módulo) y avisa “Ese correo ya tiene una cuenta” antes del `UPDATE`, sin mostrar el correo. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. El móvil ya no borra la sesión al abrir ante cualquier error de `/auth/me`: solo ante 401 (5.3 parte 3, A-28). **Pendiente del dueño:** la decisión D.7 de la política. En la Fase 5 el push se pregunta solo al cerrar su último [ ].
+**Próximo ítem: 6.2 (plan GA9: `unittest` vs `pytest`/`.env.test`, A-33; bitácora al día)**: contexto en “Contexto del próximo paso” del prompt. **El 6.1 quedó cerrado el 11/11/2026 y A-32 resuelto**: `README.md` de la raíz reescrito con las versiones reales (MariaDB, conector 9.1.0, 34 tablas) y cómo levantar API, consola, web, móvil y Docker; `autocommit` ya era `False` (4.9); `tests/test_readme.py` (6) lo compara con `requirements.txt` y `schema.sql`. Fase 6: push solo al cerrar su último [ ]. **El 5.5 quedó cerrado el 11/11/2026 y con él la FASE 5**: API y BD en Railway con HTTPS (`https://api-production-d8fdc68b.up.railway.app`), web en un preview protegido de Vercel (`https://petconnect-m7oynt3d3-daniel-cc4c.vercel.app`; el CORS de Railway solo la deja entrar a ella) y móvil con `EXPO_PUBLIC_API_URL` y `EXPO_PUBLIC_WEB_URL`; GA9 A04 completa. Datos de ejemplo cargados en Railway con `seed.py` (12 productos y 6 mascotas). Pendientes sin ítem: correo real y la decisión D.3/A.9 de la política (propuesta en su Parte D). **El 5.4 quedó cerrado el 11/11/2026 y A-29 resuelto**: web de 6 altas a 0 con `npm audit fix` sin `--force` (`b374f27`); backend con PyJWT 2.15.1, dnspython 2.9.2 y cryptography 50.0.2 y `pip-audit==2.10.1` en `requirements-dev.txt`, fuera de la imagen (`ac75c03`; PyJWT 2.13.0 respondía 500 con un token de cabecera muy anidada); móvil con los parches del SDK 57 y `npm audit fix`, de 27 a 4 moderadas en una herramienta de compilación (`53784f0`); la CI corre `npm audit --audit-level=high` en web y móvil y `pip-audit --strict` en el backend; Expo 58 queda como plan escrito en A-29. Pendientes del dueño: actualizar su `.venv`, `npm ci` en web y móvil y `npm run android` con prueba en el Pixel_7. **El 5.3 quedó cerrado el 10/11/2026 y A-27 y A-28 también**: la parte 3 (`fd2a2cc`) hace que, al abrir la app, la sesión del móvil se borre solo si `/auth/me` responde 401 (`debeBorrarSesion` en `src/utils/sesion.js`); sin red, 503 o 500 el token se queda y la sesión vuelve al reabrir con internet; `tests/sesion-al-abrir.test.mjs` (6). **La parte 2 del 5.3 quedó hecha el 10/11/2026 (`eeda879`)**: el token del móvil va cifrado en `expo-secure-store` (~57.0.4) en Android e iOS; el que quedó en AsyncStorage se pasa ahí y se borra; si SecureStore falla, la sesión dura en memoria (nunca en texto plano); en web sigue en `localStorage`; `tests/almacen-token.test.mjs` (17). Probado por el dueño en el emulador el 10/11/2026: la sesión sigue al cerrar y reabrir la app. **La parte 1 del 5.3 quedó hecha el 10/11/2026 (`7e963c5`)**: el móvil toma la dirección de la API de `EXPO_PUBLIC_API_URL` y la de la política de `EXPO_PUBLIC_WEB_URL` (vacías = emulador o `localhost`, como antes), exige `https://` fuera de desarrollo salvo hacia el propio computador y, si la dirección no es segura, no manda nada; plantilla `PetConnect.Mobile/.env.example` sin valores; `tests/config-api.test.mjs` (13). **El 5.2 quedó cerrado el 10/11/2026 y A-30 también**: la parte 3 (`283c0b7`) agrega `docker-compose.yml` en la raíz con `db` (`mariadb:10.11`, solo `schema.sql`, healthcheck), `api` (Gunicorn, `env_file` `docker/api.env`, `DB_HOST=db`, `PROXY_CONFIABLE=1`) y `web` (nginx en http://localhost:8080); solo la web publica un puerto y los secretos van en `docker/*.env` (fuera de Git); `tests/test_docker_compose.py` (22). La parte 2 quedó hecha el 10/11/2026 (`73fff99`): la web tiene `Dockerfile` en dos etapas (`node:24-alpine` compila con `npm ci` + `npm run build`; `nginx:1.30.6-alpine` sirve solo `dist/`) y `nginx.conf` (`/api/` → `http://api:5000` con `X-Forwarded-For`, `try_files` para las rutas de React, `server_tokens off`); `tests/docker.test.js` (11). La parte 1 quedó hecha el 09/11/2026 (`db57da7`): la API tiene `Dockerfile` con Gunicorn (`0.0.0.0:5000`, 1 proceso con 8 hilos), `preparar_arranque()` (Gunicorn no ejecuta el `__main__`), `API_HOST` para `python api.py` y el límite por la IP real detrás de nginx con `PROXY_CONFIABLE=1`; `tests/test_docker_backend.py` (22). El 5.1 quedó hecho el 09/11/2026 (`a739076`): `.dockerignore` en backend, web y móvil (secretos, `node_modules`, `__pycache__`, `dist`… fuera de cualquier imagen), vigilados por `tests/test_dockerignore.py`; el dueño confirmó que borró los Dockerfile viejos (6.11 resuelto). **La Fase 4 quedó cerrada el 09/11/2026** con el 4.21: ningún DAO se traga ya los errores de la BD (`UsuarioDAO` y `ProveedorDAO` los dejan subir, las consolas avisan con `avisar_error_bd` sin el mensaje de MySQL) y `_verificar_bd()` solo se usa al arrancar la API (commits `96e007c` y `c7ecd55`). El 4.19 quedó hecho el 09/11/2026: “6. Actualizar usuario” de la consola revisa nombre, apellidos, correo, teléfono y estado con `security/datos_usuario.py` (el teléfono, con la regla de las solicitudes, que pasó de `api.py` a ese módulo) y avisa “Ese correo ya tiene una cuenta” antes del `UPDATE`, sin mostrar el correo. El 4.18 quedó hecho el 09/11/2026: `/api/auth/login` calcula bcrypt también sin cuenta (hash de relleno) y con hash heredado, y responde el mismo 401 en el mismo tiempo (antes 1 ms contra 237 ms; ahora 235 contra 236 ms). El 4.12 quedó hecho el 09/11/2026: con el pool (4.5), los OTP en la BD (4.6) y la paginación con índices (4.17), la prueba de carga dio 0 % de error con 500, 1000 y 1500 usuarios (p95 de 0,02 s; el 5/10/2026: 56 % y 30 s) y **NC-003 quedó cerrada**. CP-017 formal (JMeter en staging, 1000 usuarios simultáneos) y Gunicorn (5.2) quedan para la Fase 5. El móvil ya no borra la sesión al abrir ante cualquier error de `/auth/me`: solo ante 401 (5.3 parte 3, A-28). **Pendiente del dueño:** la decisión D.7 de la política. En la Fase 5 el push se pregunta solo al cerrar su último [ ].

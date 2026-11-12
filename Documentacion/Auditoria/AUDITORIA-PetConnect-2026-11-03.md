@@ -1321,6 +1321,28 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
 | A-38 | ⚪ | Se llegó a subir un archivo temporal de Word (`~$9-220501096-AA3-EV02-PetConnect.docx`); falta `~$*` en `.gitignore` | historial de `Documentacion/GA9/` [N] |
 | A-39 | ⚪ | Carpeta local `.github/modernize/java-upgrade/` (restos de una extensión de Java, sin seguimiento): no aplica a este proyecto | raíz [N] |
 
+- **Estado de A-32: resuelto el 11/11/2026 (ítem 6.1 de PRIORIDADES; solo documentación y una prueba, no toca código,
+  esquema ni BD; no cierra NC).** Precisión: la parte de `autocommit` del hallazgo ya no aplicaba, porque desde el 4.9
+  (A-15) `config/db_config.py` usa `"autocommit": False` y el README ya lo decía; se dejó como estaba. El `README.md`
+  de la raíz se reescribió con el índice aprobado por el dueño (11 secciones): tecnologías con las versiones reales
+  (MariaDB 10.4.32 en el PC y 10.11 en Docker y Railway; `mysql-connector-python` 9.1.0 y el resto según
+  `requirements.txt`), estructura, requisitos, base de datos (enlace a `sql/README.md`), cómo levantar API, consola,
+  web, móvil y Docker (PowerShell 5.1, un comando por bloque y con la carpeta), variables **solo por nombre** por
+  plantilla `.env.example` (con el aviso de que `VITE_*` y `EXPO_PUBLIC_*` son visibles), despliegue (enlace a
+  `Documentacion/DESPLIEGUE-Railway-Vercel.md`), pruebas y CI, el backend por dentro (capas, pool, `autocommit False`,
+  SQL parametrizado, DAO, bcrypt, PEP 8), las 34 tablas y más documentación. Se corrigieron además errores que el
+  hallazgo no listaba: la consola es `petconnect.Backend\main.py` (decía `petconnect\main.py`), se instala con
+  `pip install -r requirements.txt` (decía solo el conector), la conexión sale de las variables `DB_*` del `.env`
+  (decía editar `db_config.py`), 34 tablas con `utf8mb4_spanish_ci` (decía 32 con `unicode_ci`) y Python 3.14 (decía
+  3.10+). No duplica `EJECUCION.md` (6.7) ni `CLAUDE.md`: los enlaza. Grep: `9.7.0` ya no aparece fuera de la
+  auditoría y PRIORIDADES; “MySQL 8” en el README solo como “no se ha probado en MySQL 8” (cierto); en GA9 se deja
+  porque describe el objetivo del plan de entonces. Regresión (pedida por el dueño): `tests/test_readme.py` (6:
+  versiones del README = `requirements.txt`, sin “MySQL 8.x/Server/Workbench” ni `9.7.0`, tablas = `CREATE TABLE`
+  de `schema.sql`, `autocommit False` en README y `db_config.py`, enlaces relativos existentes, variables sin valor;
+  se omiten si el README no está, como dentro de la imagen de Docker). Suite 562 (507 + 55 omitidas). Contraprueba
+  (`git stash` del README): fallan 3 (versión, motor, tablas); pasan a propósito 3 (`autocommit`, enlaces y
+  variables, que el README viejo ya tenía bien).
+
 ### 3.9 Configuración de Claude Code (instalada hoy)
 
 #### A-40 · ⚪ Baja · El hook de secretos bloquea búsquedas legítimas [N]

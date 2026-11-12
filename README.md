@@ -1,220 +1,306 @@
 # PetConnect
 
-Sistema de gestión integral para mascotas desarrollado en Python con conexión a base de datos MySQL. Este documento describe el módulo **stand-alone** (consola) del proyecto: arquitectura, dependencias, modelo de datos y guía de ejecución.
+Plataforma para mascotas (adopción, tienda de productos y directorio de proveedores de servicios) hecha como
+proyecto formativo del SENA (ficha 220501096). Tiene **cuatro formas de usarse** que comparten la misma base de
+datos y la misma API REST:
 
-## 1. Introducción
-
-PetConnect permite administrar usuarios, mascotas, productos y proveedores de servicios mediante operaciones CRUD (Crear, Consultar, Actualizar y Eliminar).
-
-El proyecto sigue una arquitectura por capas utilizando el patrón DAO (Data Access Object) para separar la lógica de acceso a datos de la lógica de presentación, cumpliendo con los estándares de codificación y buenas prácticas de ingeniería de software.
-
-## 2. Tecnologías utilizadas
-
-| Tecnología | Versión | Propósito |
+| Módulo | Carpeta | Para qué |
 |---|---|---|
-| Python | 3.14.x | Lenguaje de programación principal |
-| MySQL Server | 8.x / 9.x | Sistema gestor de base de datos relacional |
-| mysql-connector-python | 9.7.0 | Driver de conexión Python-MySQL (DB-API 2.0) |
-| MySQL Workbench | 8.x | Herramienta visual de administración de BD |
-| Visual Studio Code | Actual | Entorno de desarrollo integrado (IDE) |
+| API (backend) | `petconnect.Backend/` | Servicio REST en Flask que usan la web y el móvil |
+| Consola (stand-alone) | `petconnect.Backend/` (`main.py`) | Menús de texto para administrar usuarios, mascotas, productos y proveedores |
+| Web | `PetConnect.Front/petconnect-app/` | Página en React para el navegador |
+| Móvil | `PetConnect.Mobile/` | App en React Native + Expo (Android) |
 
-## 3. Dependencias y librerías
+Este README es la **puerta de entrada**: explica cómo levantar cada parte y enlaza las guías largas.
 
-### 3.1 mysql-connector-python (driver de conexión)
+## 1. Tecnologías y versiones
 
-Es la librería oficial de Oracle para conectar aplicaciones Python con bases de datos MySQL. Cumple con la especificación DB-API 2.0 (PEP 249), que es el estándar de Python equivalente a JDBC en Java.
-
-Instalación:
-
-```bash
-pip install mysql-connector-python
-```
-
-Comparación con JDBC (Java):
-
-| Concepto | JDBC (Java) | mysql-connector (Python) |
+| Tecnología | Versión | Dónde se fija |
 |---|---|---|
-| Conexión | `DriverManager.getConnection()` | `mysql.connector.connect()` |
-| Consulta preparada | `PreparedStatement` | `cursor.execute(sql, params)` |
-| Resultado | `ResultSet` | `cursor.fetchall()` / `fetchone()` |
-| Cerrar conexión | `connection.close()` | `conexion.close()` |
-| Transacciones | `commit()` / `rollback()` | `commit()` / `rollback()` |
-| Parámetros | `setString(1, valor)` | Tupla: `(valor1, valor2)` |
+| Python | 3.14 | `.venv` de la raíz, la CI y el `Dockerfile` de la API |
+| Flask | 3.1.3 | `petconnect.Backend/requirements.txt` |
+| mysql-connector-python | 9.1.0 | `petconnect.Backend/requirements.txt` |
+| bcrypt / PyJWT / cryptography | 5.0.0 / 2.15.1 / 50.0.2 | `petconnect.Backend/requirements.txt` |
+| Gunicorn (servidor de la API en Docker y Railway) | 26.2.0 | `petconnect.Backend/requirements.txt` |
+| MariaDB (base de datos) | 10.4.32 en el PC (XAMPP, puerto 3310); 10.11 en Docker y Railway | `docker-compose.yml`, `petconnect.Backend/Dockerfile.bd` |
+| Node.js | 24 | la CI y el `Dockerfile` de la web |
+| React + Vite + Tailwind | 19 / 8 / 4 | `PetConnect.Front/petconnect-app/package.json` |
+| Expo + React Native | 57 / 0.86 | `PetConnect.Mobile/package.json` |
 
-### 3.2 Librerías estándar de Python
+**MariaDB** es una base de datos "prima" de MySQL: usa el mismo lenguaje SQL y el mismo conector
+(`mysql-connector-python`). Por eso en el código y en algunos comandos se lee "MySQL", pero el motor real es
+MariaDB. El esquema **no** se ha probado en MySQL 8 (ver `petconnect.Backend/sql/README.md`).
 
-| Librería | Módulo | Uso en el proyecto |
-|---|---|---|
-| hashlib | `hashlib.sha256()` | Solo para reconocer y migrar los hashes SHA-256 antiguos de contraseñas |
-| sys | `sys.path`, `sys.exit()` | Configuración de rutas y salida del programa |
-| os | `os.path.dirname()` | Obtener ruta absoluta del proyecto |
-
-Las contraseñas se guardan con la librería externa **bcrypt** (sal aleatoria y factor de costo 12), en `security/passwords.py`. Las cuentas creadas antes con SHA-256 se migran a bcrypt automáticamente en su siguiente inicio de sesión.
-
-## 4. Arquitectura del proyecto
-
-### 4.1 Patrón de diseño: arquitectura por capas
-
-El proyecto implementa una arquitectura de tres capas que separa responsabilidades:
-
-| Capa | Paquete | Responsabilidad | Archivos |
-|---|---|---|---|
-| Vista (Presentación) | `vista/` | Interfaz de consola, menús interactivos, entrada/salida de datos | `menu_principal.py`, `menu_usuarios.py`, `menu_mascotas.py`, `menu_productos.py`, `menu_proveedores.py` |
-| DAO (Acceso a Datos) | `dao/` | Operaciones CRUD, consultas SQL parametrizadas, mapeo de resultados | `usuario_dao.py`, `mascota_dao.py`, `producto_dao.py`, `proveedor_dao.py` |
-| Modelo (Entidades) | `modelo/` | Clases que representan las tablas de la BD | `usuario.py`, `mascota.py`, `producto.py`, `proveedor_servicio.py` |
-| Conexión | `conexion/` | Gestión de conexión a MySQL (Singleton) | `conexion_bd.py` |
-| Configuración | `config/` | Parámetros de conexión a la BD | `db_config.py` |
-
-### 4.2 Estructura de directorios
+## 2. Estructura del repositorio
 
 ```
-petconnect/
-├── main.py                    # Punto de entrada
-├── requirements.txt           # Dependencias
-├── config/
-│   ├── __init__.py
-│   └── db_config.py           # Configuración MySQL
-├── conexion/
-│   ├── __init__.py
-│   └── conexion_bd.py         # Clase ConexionBD (Singleton)
-├── modelo/
-│   ├── __init__.py
-│   ├── usuario.py             # Entidad Usuario
-│   ├── mascota.py             # Entidad Mascota
-│   ├── producto.py            # Entidad Producto
-│   └── proveedor_servicio.py  # Entidad ProveedorServicio
-├── dao/
-│   ├── __init__.py
-│   ├── usuario_dao.py         # CRUD Usuarios
-│   ├── mascota_dao.py         # CRUD Mascotas
-│   ├── producto_dao.py        # CRUD Productos
-│   └── proveedor_dao.py       # CRUD Proveedores
-└── vista/
-    ├── __init__.py
-    ├── menu_principal.py      # Menú principal
-    ├── menu_usuarios.py       # Submenú usuarios
-    ├── menu_mascotas.py       # Submenú mascotas
-    ├── menu_productos.py      # Submenú productos
-    └── menu_proveedores.py    # Submenú proveedores
+Evidecia/
+├── petconnect.Backend/        # API Flask + consola (Python)
+│   ├── api.py                 # API REST (puerto 5000)
+│   ├── main.py                # Consola stand-alone
+│   ├── seed.py                # Datos de ejemplo
+│   ├── config/  conexion/  modelo/  dao/  vista/   # Capas (ver sección 9)
+│   ├── security/  otp/  correo/                    # Contraseñas, JWT, cifrado, códigos y correo
+│   ├── sql/                   # schema.sql, migraciones y su README
+│   ├── tests/                 # Pruebas (unittest)
+│   ├── Dockerfile  Dockerfile.bd  gunicorn.conf.py
+│   └── .env.example           # Plantilla de variables (sin valores reales)
+├── PetConnect.Front/petconnect-app/   # Web React + Vite
+├── PetConnect.Mobile/                 # App Expo (con EJECUCION.md)
+├── docker/                    # Plantillas de variables para docker compose
+├── docker-compose.yml         # BD + API + web en contenedores
+├── .github/workflows/ci.yml   # Integración continua (GitHub Actions)
+├── Documentacion/             # Evidencias GA7/GA8/GA9, auditoría y guía de despliegue
+├── VERIFICACION.md            # Guía de verificación del sistema
+└── CLAUDE.md                  # Reglas para trabajar con Claude Code
 ```
 
-## 5. Módulo de conexión a base de datos
+## 3. Requisitos previos
 
-### 5.1 Configuración (`db_config.py`)
+- **Python 3.14** y un entorno virtual en la raíz (`Evidecia\.venv`).
+- **MariaDB** escuchando en el puerto **3310** (XAMPP en el PC).
+- **Node.js 24** (con `npm`) para la web y el móvil.
+- **Android Studio** con el emulador (solo para el móvil; detalles en `PetConnect.Mobile/EJECUCION.md`).
+- **Docker Desktop** (opcional, solo para la sección 5.5).
 
-El archivo `db_config.py` contiene un diccionario con los parámetros de conexión a MySQL:
+Los comandos de este README son para **Windows PowerShell 5.1**: van uno por bloque (ahí `&&` no existe) y cada
+bloque dice desde qué carpeta se corre.
 
-```python
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 3310,
-    "database": "petconnect",
-    "user": "root",
-    "password": "",
-    "charset": "utf8mb4",
-    "collation": "utf8mb4_unicode_ci",
-    "autocommit": False
-}
+## 4. Crear la base de datos
+
+Los pasos completos (crear la base, cargar `sql/schema.sql`, correr `seed.py` y comprobar) están en
+[`petconnect.Backend/sql/README.md`](petconnect.Backend/sql/README.md), junto con las migraciones para quien ya
+tenía la base creada. En resumen: primero `schema.sql` (34 tablas, sin datos personales) y luego `seed.py` (datos
+de ejemplo inventados).
+
+## 5. Cómo levantar cada módulo
+
+### 5.1 API (backend)
+
+La primera vez, crea el entorno virtual. Desde la raíz `Evidecia`:
+
+```powershell
+python -m venv .venv
 ```
 
-| Parámetro | Valor | Descripción |
+Instala las dependencias. Desde `Evidecia\petconnect.Backend`:
+
+```powershell
+..\.venv\Scripts\python -m pip install -r requirements.txt
+```
+
+Crea tu `.env` a partir de `.env.example` y llena los valores (sección 6). Nunca subas el `.env` a Git.
+
+Arranca la API. Desde `Evidecia\petconnect.Backend`:
+
+```powershell
+..\.venv\Scripts\python api.py
+```
+
+Debe mostrar `[OK] Conexion a la base de datos establecida.` y `[OK] API PetConnect corriendo en
+http://127.0.0.1:5000`. Prueba en el navegador: <http://localhost:5000/api/productos>.
+
+> La API no se recarga sola: si cambias código del backend, deténla con `Ctrl + C` y vuelve a arrancarla.
+
+### 5.2 Consola (stand-alone)
+
+Usa la misma base de datos y el mismo `.env` que la API. Desde `Evidecia\petconnect.Backend`:
+
+```powershell
+..\.venv\Scripts\python main.py
+```
+
+Abre el menú principal (usuarios, mascotas, productos y proveedores) con las opciones de registrar, consultar,
+buscar, actualizar y eliminar.
+
+### 5.3 Web
+
+La primera vez, instala las dependencias. Desde `Evidecia\PetConnect.Front\petconnect-app`:
+
+```powershell
+npm ci
+```
+
+Arranca el servidor de desarrollo (con la API de la sección 5.1 encendida). Desde la misma carpeta:
+
+```powershell
+npm run dev
+```
+
+Abre <http://localhost:5173>. En desarrollo, Vite manda las llamadas a `/api` hacia `http://localhost:5000`
+(ver `vite.config.js`), así que no hace falta configurar nada más.
+
+### 5.4 Móvil
+
+La primera vez, instala las dependencias. Desde `Evidecia\PetConnect.Mobile`:
+
+```powershell
+npm ci
+```
+
+Arranca Metro (el servidor que entrega el JavaScript a la app). Desde la misma carpeta:
+
+```powershell
+npm start
+```
+
+O compila e instala la app en el emulador de Android. Desde la misma carpeta:
+
+```powershell
+npm run android
+```
+
+En el emulador, la app llega a la API de tu PC por `10.0.2.2:5000`. El emulador, el APK, `JAVA_HOME` y los
+problemas comunes están en [`PetConnect.Mobile/EJECUCION.md`](PetConnect.Mobile/EJECUCION.md).
+
+### 5.5 Todo con Docker
+
+Levanta la base de datos (MariaDB 10.11), la API (con Gunicorn) y la web (con nginx) en contenedores.
+
+1. Copia `docker/bd.env.example` como `docker/bd.env` y `docker/api.env.example` como `docker/api.env`, y
+   llénalos siguiendo las instrucciones de cada archivo (no se suben a Git).
+2. Desde la raíz `Evidecia`:
+
+   ```powershell
+   docker compose up --build
+   ```
+
+3. Abre <http://localhost:8080>. Solo la web publica un puerto: la API y la BD quedan dentro de la red de Docker.
+4. (Opcional) Datos de ejemplo. Desde la raíz `Evidecia`, con los contenedores encendidos:
+
+   ```powershell
+   docker compose exec api python seed.py
+   ```
+
+El esquema solo se carga la primera vez (con el volumen vacío). Más detalle en los comentarios de
+`docker-compose.yml`.
+
+## 6. Variables de entorno
+
+Aquí van **solo los nombres**. Cada plantilla `.env.example` explica qué poner y cómo generar las claves; los
+archivos `.env` reales nunca se suben a Git ni se pegan en un chat.
+
+| Plantilla | Variables | Para qué |
 |---|---|---|
-| host | localhost | Servidor donde se ejecuta MySQL |
-| port | 3310 | Puerto TCP donde escucha MySQL |
-| database | petconnect | Nombre de la base de datos |
-| user | root | Usuario de MySQL |
-| password | (vacío) | Contraseña del usuario |
-| charset | utf8mb4 | Codificación de caracteres (soporta emojis) |
-| autocommit | False | Nada queda guardado hasta llamar `commit()`; si algo falla, `rollback()` deshace la operación completa ("todo o nada") |
+| `petconnect.Backend/.env.example` | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_POOL_SIZE` | Conexión a la base de datos y tamaño del pool |
+| | `JWT_SECRET`, `FERNET_KEY` | Firmar las sesiones (JWT) y cifrar datos. `JWT_SECRET` es obligatorio |
+| | `EMAIL_MODE`, `MAILTRAP_API_TOKEN`, `MAILTRAP_SENDER`, `GMAIL_USER`, `GMAIL_APP_PASSWORD` | Envío del código de verificación por correo |
+| | `APP_ENV`, `FLASK_DEBUG`, `API_HOST` | Modo de desarrollo, depurador y dirección donde escucha `python api.py` |
+| | `PROXY_CONFIABLE`, `CORS_ORIGENES` | Proxy de confianza (límite de intentos por IP real) y páginas que pueden llamar a la API |
+| `docker/api.env.example` | `DB_USER`, `DB_PASSWORD`, `DB_POOL_SIZE`, `JWT_SECRET`, `FERNET_KEY`, `APP_ENV`, `CORS_ORIGENES` y las de correo | API dentro de Docker (la dirección de la BD y el proxy los pone el compose) |
+| `docker/bd.env.example` | `MARIADB_ROOT_PASSWORD`, `MARIADB_USER`, `MARIADB_PASSWORD` | Usuarios de la BD dentro de Docker |
+| `PetConnect.Front/petconnect-app/.env.example` | `VITE_API_URL` | Dirección de la API publicada. Vacía = `/api` (desarrollo) |
+| `PetConnect.Mobile/.env.example` | `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_WEB_URL` | Direcciones de la API y de la web. Vacías = emulador o `localhost` |
 
-### 5.2 Clase ConexionBD (`conexion_bd.py`)
+> **Ojo:** todo lo que empieza por `VITE_` o `EXPO_PUBLIC_` queda **dentro de la página o de la app** y
+> cualquiera puede leerlo. Ahí solo van direcciones públicas, nunca contraseñas ni claves.
 
-Implementa el patrón Singleton (un solo objeto por proceso). Desde el ítem 4.5 ese objeto no guarda una única conexión: administra un **pool** (un "estante" de conexiones abiertas, 10 por defecto con `DB_POOL_SIZE`) y presta una conexión distinta a cada operación. Equivale a un `DataSource` con pool en Java.
+> `generate_keys.py` crea las claves, pero **sobrescribe el `.env` completo**. Si ya tienes uno, genera solo la
+> clave que falte con el comando que trae `.env.example`.
 
-Métodos y funciones disponibles:
+## 7. Despliegue
+
+- **API y base de datos:** en Railway, con HTTPS. La BD no tiene dirección pública: solo la API llega a ella.
+- **Web:** en un *preview* protegido de Vercel, que llama directo a la API de Railway con `VITE_API_URL`.
+- **Móvil:** apunta a los dos con `EXPO_PUBLIC_API_URL` y `EXPO_PUBLIC_WEB_URL`.
+
+El paso a paso, las variables de cada servicio y los problemas encontrados están en
+[`Documentacion/DESPLIEGUE-Railway-Vercel.md`](Documentacion/DESPLIEGUE-Railway-Vercel.md). Las claves del servidor
+se ponen en el panel de Railway, nunca en el repositorio.
+
+## 8. Pruebas e integración continua
+
+Backend (no necesita base de datos). Desde `Evidecia\petconnect.Backend`:
+
+```powershell
+..\.venv\Scripts\python -m unittest discover -s tests -v
+```
+
+Las pruebas que sí necesitan MariaDB se omiten solas; para correrlas, pon `PETCONNECT_PRUEBA_BD=1` (crean y borran
+bases temporales, nunca tocan `petconnect`).
+
+Web. Desde `Evidecia\PetConnect.Front\petconnect-app`, uno por uno (si el lint falla, no sigas):
+
+```powershell
+npm run lint
+```
+
+```powershell
+npm test
+```
+
+```powershell
+npm run build
+```
+
+Móvil. Desde `Evidecia\PetConnect.Mobile`:
+
+```powershell
+npm test
+```
+
+**Integración continua (CI):** en cada `git push`, GitHub Actions (`.github/workflows/ci.yml`) corre tres trabajos
+en un computador limpio con Linux, sin secretos:
+
+| Trabajo | Qué revisa |
+|---|---|
+| Backend | `pip-audit` (dependencias con fallas conocidas) y `unittest` |
+| Web | `npm audit`, lint, `npm test` y `npm run build` |
+| Móvil | `npm audit`, `npm test` y `npx expo export --platform web` (que la app se arme) |
+
+## 9. El backend por dentro
+
+### 9.1 Arquitectura por capas
+
+La consola y la API comparten las capas de acceso a datos. El patrón **DAO** (*Data Access Object*) separa las
+consultas SQL de los menús y de los endpoints.
+
+| Capa | Carpeta | Responsabilidad |
+|---|---|---|
+| Vista (consola) | `vista/` | Menús de texto (`menu_principal.py`, `menu_usuarios.py`, `menu_mascotas.py`, `menu_productos.py`, `menu_proveedores.py`) |
+| API | `api.py` | Endpoints REST, validación de datos, JWT y límite de intentos |
+| DAO | `dao/` | Consultas SQL parametrizadas (`usuario_dao.py`, `mascota_dao.py`, `producto_dao.py`, `proveedor_dao.py`, `solicitud_dao.py`, `otp_dao.py`) |
+| Modelo | `modelo/` | Clases que representan las tablas (`usuario.py`, `mascota.py`, `producto.py`, `proveedor_servicio.py`) |
+| Conexión | `conexion/` | `ConexionBD` (Singleton con pool de conexiones) |
+| Configuración | `config/` | Lee las variables `DB_*` del `.env` (`db_config.py`) |
+| Seguridad | `security/` | Contraseñas con bcrypt, JWT, cifrado, validación de datos y versión de la política |
+
+### 9.2 Conexión a la base de datos
+
+`config/db_config.py` arma la configuración con `os.getenv` (los valores salen del `.env`, nunca del código):
+
+| Parámetro | Origen | Notas |
+|---|---|---|
+| host, port, database, user, password | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Por defecto `localhost`, `3310`, `petconnect` |
+| charset | fijo | `utf8mb4` (soporta tildes, ñ y emojis) |
+| sql_mode | fijo | Modo estricto: un dato inválido da error en vez de guardarse vacío |
+| autocommit | fijo, `False` | Nada queda guardado hasta llamar `commit()`; si algo falla, `rollback()` deshace la operación completa ("todo o nada") |
+
+`ConexionBD` (`conexion/conexion_bd.py`) es un **Singleton** (un solo objeto por proceso) que administra un
+**pool**: un "estante" de conexiones abiertas (10 por defecto, `DB_POOL_SIZE`) que presta una conexión distinta a
+cada operación. Equivale a un `DataSource` con pool en Java.
 
 | Método | Descripción |
 |---|---|
 | `obtener_conexion()` | Presta una conexión del pool. Si están todas ocupadas espera hasta 5 s; si la BD no responde devuelve `None` (la API contesta 503). |
 | `cerrar_conexion()` | Cierra las conexiones libres del pool (la consola lo llama al salir). |
 | `conexion_y_cursor(bd)` | Bloque `with` que presta conexión y cursor y los devuelve al terminar, aunque haya error. |
-| `conexion.commit()` | Confirma los cambios de esa operación. Se llama sobre la conexión prestada, no sobre `ConexionBD`. |
-| `conexion.rollback()` | Deshace los cambios de esa operación que no se confirmaron. |
+| `conexion.commit()` / `conexion.rollback()` | Confirman o deshacen los cambios de esa operación (sobre la conexión prestada). |
 
-### 5.3 Flujo de conexión
+Al volver al pool, la conexión se limpia (`pool_reset_session=True`): lo que haya quedado sin `commit()` se
+descarta y nunca le llega a otra petición.
 
-1. La aplicación (API, consola o `seed.py`) crea `ConexionBD`; la primera vez que se pide una conexión se crea el pool con `DB_CONFIG`.
-2. Cada método de un DAO abre `with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):` y ejecuta su consulta parametrizada.
-3. Si la operación escribe (INSERT, UPDATE, DELETE), termina con `conexion.commit()`; si la BD da error, llama `conexion.rollback()` y deja subir el error.
-4. Al salir del bloque `with`, el cursor se cierra y la conexión vuelve al pool. El pool limpia la sesión (`pool_reset_session=True`): lo que haya quedado sin `commit()` se descarta y nunca le llega a otra petición.
-5. Al salir de la consola se llama a `cerrar_conexion()` para liberar las conexiones.
+### 9.3 Consultas parametrizadas
 
-## 6. Capa Modelo (Entidades)
-
-Las clases del modelo representan las tablas de la base de datos. Cada atributo corresponde a una columna de la tabla. Incluyen métodos `__str__` para representación legible y `__repr__` para depuración.
-
-### 6.1 Clase Usuario
-
-| Atributo | Tipo | Descripción |
-|---|---|---|
-| id_usuario | int | Clave primaria autoincremental |
-| nombres | str | Nombres del usuario |
-| apellidos | str | Apellidos del usuario |
-| correo | str | Correo electrónico (único) |
-| telefono | str | Número de teléfono |
-| password_hash | str | Hash bcrypt de la contraseña (60 caracteres, costo 12) |
-| estado | str | activo / inactivo / bloqueado |
-| verificado | bool | Si el correo fue verificado |
-
-### 6.2 Clase Mascota
-
-| Atributo | Tipo | Descripción |
-|---|---|---|
-| id_mascota | int | Clave primaria autoincremental |
-| id_usuario | int | FK - Dueño de la mascota |
-| nombre | str | Nombre de la mascota |
-| especie | str | Especie (perro, gato, ave, etc.) |
-| raza | str | Raza de la mascota |
-| sexo | str | macho / hembra / no_definido |
-| peso | float | Peso en kilogramos |
-| estado | str | activa / perdida / adoptada / fallecida |
-
-### 6.3 Clase Producto
-
-| Atributo | Tipo | Descripción |
-|---|---|---|
-| id_producto | int | Clave primaria autoincremental |
-| id_categoria_producto | int | FK - Categoría del producto |
-| nombre | str | Nombre del producto |
-| precio | float | Precio en pesos colombianos |
-| stock | int | Unidades disponibles |
-| activo | bool | Si el producto está disponible |
-
-## 7. Capa DAO (Operaciones CRUD)
-
-El patrón DAO (Data Access Object) encapsula toda la lógica de acceso a la base de datos. Cada DAO utiliza consultas SQL parametrizadas con marcadores `%s` para prevenir inyección SQL, equivalente a `PreparedStatement` en JDBC.
-
-### 7.1 Operaciones por DAO
-
-| DAO | Insertar | Consultar | Buscar | Actualizar | Eliminar |
-|---|---|---|---|---|---|
-| UsuarioDAO | `insertar()` | `consultar_todos()`, `consultar_por_id()` | `consultar_por_correo()`, `buscar_por_nombre()` | `actualizar()` | `eliminar()` |
-| MascotaDAO | `insertar()` | `consultar_todos()`, `consultar_por_id()` | `consultar_por_usuario()`, `buscar_por_nombre()` | `actualizar()` | `eliminar()` |
-| ProductoDAO | `insertar()` | `consultar_todos()`, `consultar_por_id()` | `consultar_por_categoria()`, `buscar_por_nombre()` | `actualizar()` | `eliminar()` |
-| ProveedorDAO | `insertar()` | `consultar_todos()`, `consultar_por_id()` | `consultar_por_ciudad()`, `buscar_por_nombre()` | `actualizar()` | `eliminar()` |
-
-### 7.2 Ejemplo de consulta SQL parametrizada
-
-Todas las consultas usan parámetros `%s` en lugar de concatenar valores directamente, previniendo ataques de inyección SQL:
+Todas las consultas usan marcadores `%s` en lugar de pegar los valores en el texto del SQL. Así se evita la
+**inyección SQL** (que alguien meta comandos SQL dentro de un dato). Equivale a `PreparedStatement` en JDBC.
 
 ```python
-# Consulta parametrizada (segura)
 _INSERTAR = """
     INSERT INTO usuarios (nombres, apellidos, correo, telefono, password_hash)
     VALUES (%s, %s, %s, %s, %s)
 """
 
-# Ejecución con tupla de valores, en una conexión prestada por el pool
 with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
     try:
         cursor.execute(self._INSERTAR, (usuario.nombres, usuario.apellidos,
@@ -225,120 +311,68 @@ with conexion_y_cursor(self._conexion_bd) as (conexion, cursor):
         raise
 ```
 
-## 8. Capa Vista (Interfaz de consola)
-
-La capa de presentación implementa menús interactivos de consola. Cada módulo tiene su propio submenú con las opciones CRUD.
-
-### 8.1 Menú principal
-
-```
-=========================================================
-        Sistema de Gestion - PetConnect v1.0
-=========================================================
-  1. Gestion de Usuarios
-  2. Gestion de Mascotas
-  3. Gestion de Productos (Tienda)
-  4. Gestion de Proveedores de Servicio
-  0. Salir del sistema
----------------------------------------------------------
-  Seleccione un modulo: _
-```
-
-### 8.2 Submenú de cada módulo
-
-Cada submenú ofrece 7 opciones estándar:
-
-| Opción | Acción | Operación SQL |
+| Concepto | JDBC (Java) | mysql-connector (Python) |
 |---|---|---|
-| 1 | Registrar | `INSERT INTO tabla (...) VALUES (%s, ...)` |
-| 2 | Consultar todos | `SELECT * FROM tabla ORDER BY id` |
-| 3 | Buscar por ID | `SELECT * FROM tabla WHERE id = %s` |
-| 4 | Buscar específico | `SELECT * FROM tabla WHERE campo = %s` |
-| 5 | Buscar por nombre | `SELECT * FROM tabla WHERE nombre LIKE %s` |
-| 6 | Actualizar | `UPDATE tabla SET ... WHERE id = %s` |
-| 7 | Eliminar | `DELETE FROM tabla WHERE id = %s` |
+| Conexión | `DriverManager.getConnection()` | `mysql.connector.connect()` / pool |
+| Consulta preparada | `PreparedStatement` | `cursor.execute(sql, params)` |
+| Resultado | `ResultSet` | `cursor.fetchall()` / `fetchone()` |
+| Transacciones | `commit()` / `rollback()` | `commit()` / `rollback()` |
 
-## 9. Estándares de codificación
+### 9.4 Operaciones de los DAO de la consola
 
-El proyecto sigue las convenciones de Python (PEP 8) adaptadas al contexto del desarrollo:
+| DAO | Insertar | Consultar | Buscar | Actualizar | Eliminar |
+|---|---|---|---|---|---|
+| UsuarioDAO | `insertar()` | `consultar_todos()`, `consultar_por_id()` | `consultar_por_correo()`, `buscar_por_nombre()` | `actualizar()` | `eliminar()` |
+| MascotaDAO | `insertar()` | `consultar_todos()`, `consultar_por_id()` | `consultar_por_usuario()`, `buscar_por_nombre()` | `actualizar()` | `eliminar()` |
+| ProductoDAO | `insertar()` | `consultar_todos()`, `consultar_por_id()` | `consultar_por_categoria()`, `buscar_por_nombre()` | `actualizar()` | `eliminar()` |
+| ProveedorDAO | `insertar()` | `consultar_todos()`, `consultar_por_id()` | `consultar_por_ciudad()`, `buscar_por_nombre()` | `actualizar()` | `eliminar()` |
+
+Cada submenú de la consola ofrece 7 opciones: registrar, consultar todos, buscar por ID, búsqueda específica,
+buscar por nombre, actualizar y eliminar.
+
+### 9.5 Contraseñas
+
+Se guardan solo con **bcrypt** (sal aleatoria y factor de costo 12) en `security/passwords.py`. Las cuentas
+antiguas con SHA-256 se reconocen con `hashlib` y pasan a bcrypt en su siguiente inicio de sesión.
+
+### 9.6 Convenciones de código (PEP 8)
 
 | Elemento | Convención | Ejemplos |
 |---|---|---|
-| Variables | snake_case | `id_usuario`, `fecha_creacion`, `password_hash` |
-| Métodos | snake_case con verbos | `insertar()`, `consultar_por_id()`, `buscar_por_nombre()` |
-| Clases | PascalCase | `Usuario`, `MascotaDAO`, `ConexionBD`, `MenuPrincipal` |
-| Paquetes | snake_case minúsculas | `config`, `conexion`, `modelo`, `dao`, `vista` |
-| Constantes | UPPER_SNAKE_CASE | `DB_CONFIG`, `_INSERTAR`, `_CONSULTAR_TODOS` |
-| Métodos privados | `_prefijo_guion_bajo` | `_mapear_usuario()`, `_registrar_mascota()` |
+| Variables y métodos | snake_case (métodos con verbo) | `id_usuario`, `consultar_por_id()` |
+| Clases | PascalCase | `Usuario`, `MascotaDAO`, `ConexionBD` |
+| Paquetes | minúsculas | `config`, `conexion`, `modelo`, `dao`, `vista` |
+| Constantes | UPPER_SNAKE_CASE | `DB_CONFIG`, `_INSERTAR` |
+| Métodos privados | prefijo `_` | `_mapear_usuario()` |
 
-## 10. Base de datos PetConnect
-
-### 10.1 Información general
+## 10. Base de datos
 
 | Propiedad | Valor |
 |---|---|
-| Nombre | petconnect |
-| Motor | MySQL (InnoDB) |
-| Charset | utf8mb4 / utf8mb4_unicode_ci |
-| Total de tablas | 32 |
-| Archivo SQL | `petconnect.Backend/sql/schema.sql` (ver `petconnect.Backend/sql/README.md`) |
+| Nombre | `petconnect` |
+| Motor | MariaDB (InnoDB), compatible con MySQL |
+| Charset / collation de las tablas | `utf8mb4` / `utf8mb4_spanish_ci` |
+| Tablas | 34 (`petconnect.Backend/sql/schema.sql`) |
 
-### 10.2 Módulos de la base de datos
+| Módulo | Tablas |
+|---|---|
+| Seguridad | usuarios, roles, usuarios_roles, direcciones, metodos_pago, planes, suscripciones, otp_pendientes (códigos de verificación) |
+| Mascotas | mascotas, carnets_vacunacion, vacunas, aplicaciones_vacuna, historial_salud, citas, recordatorios |
+| Servicios | categorias_servicio, proveedores_servicio, servicios, resenas_servicio |
+| Comunidad | publicaciones_comunidad, comentarios_publicacion, reportes_publicacion |
+| Adopciones | adopciones, solicitudes |
+| Tienda | categorias_producto, productos, carritos, carrito_detalle, pedidos, pedido_detalle, pagos |
+| GPS | gps_dispositivos, gps_ubicaciones |
+| Notificaciones | notificaciones |
 
-| Módulo | Tablas | Descripción |
-|---|---|---|
-| Seguridad | usuarios, roles, usuarios_roles, direcciones, metodos_pago, planes, suscripciones | Gestión de usuarios, autenticación, roles y suscripciones |
-| Mascotas | mascotas, carnets_vacunacion, vacunas, aplicaciones_vacuna, historial_salud, citas, recordatorios | Registro de mascotas, salud, vacunas y citas |
-| Servicios | categorias_servicio, proveedores_servicio, servicios, resenas_servicio | Directorio de proveedores y servicios |
-| Comunidad | publicaciones_comunidad, comentarios_publicacion, reportes_publicacion | Red social de la plataforma |
-| Adopciones | adopciones | Publicación de mascotas en adopción |
-| Tienda | categorias_producto, productos, carritos, carrito_detalle, pedidos, pedido_detalle, pagos | Marketplace de productos para mascotas |
-| GPS | gps_dispositivos, gps_ubicaciones | Rastreo de mascotas por GPS |
-| Notificaciones | notificaciones | Sistema de alertas y notificaciones |
+## 11. Más documentación
 
-## 11. Guía de ejecución
-
-### 11.1 Prerrequisitos
-
-- Python 3.10 o superior instalado
-- MySQL Server ejecutándose en el puerto configurado (3310)
-- Base de datos `petconnect` creada con `petconnect.Backend/sql/schema.sql`
-- Librería `mysql-connector-python` instalada
-
-### 11.2 Pasos de instalación
-
-**Paso 1: Crear entorno virtual**
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-```
-
-**Paso 2: Instalar dependencias**
-
-```bash
-pip install mysql-connector-python
-```
-
-**Paso 3: Crear la base de datos en MySQL**
-
-Primero `sql/schema.sql` (tablas) y después `seed.py` (datos de ejemplo). Los comandos exactos están en
-[`petconnect.Backend/sql/README.md`](petconnect.Backend/sql/README.md).
-
-**Paso 4: Configurar conexión en `config/db_config.py`**
-
-Modificar `host`, `port`, `user` y `password` según su entorno.
-
-**Paso 5: Ejecutar la aplicación**
-
-```bash
-.venv\Scripts\python.exe petconnect\main.py
-```
-
-## Otros módulos del proyecto
-
-Este README documenta el módulo stand-alone. El proyecto también incluye un módulo **web** (`petconnect.Backend` + `PetConnect.Front`) y un módulo **móvil** (`PetConnect.Mobile`, React Native + Expo), ambos consumiendo la misma API REST y base de datos. Ver:
-
-- [PetConnect.Mobile/EJECUCION.md](PetConnect.Mobile/EJECUCION.md) — guía de ejecución del módulo móvil y generación del APK.
-- [VERIFICACION.md](VERIFICACION.md) — guía de verificación general del sistema.
-- `Documentacion/` — evidencias técnicas del proyecto (GA7/GA8).
+| Documento | Qué tiene |
+|---|---|
+| [`PetConnect.Mobile/EJECUCION.md`](PetConnect.Mobile/EJECUCION.md) | Emulador, APK y problemas comunes del móvil |
+| [`VERIFICACION.md`](VERIFICACION.md) | Guía para verificar el sistema completo, endpoints y Postman |
+| [`petconnect.Backend/sql/README.md`](petconnect.Backend/sql/README.md) | Crear la base, migraciones y reglas de la BD |
+| [`Documentacion/DESPLIEGUE-Railway-Vercel.md`](Documentacion/DESPLIEGUE-Railway-Vercel.md) | Publicar la API en Railway y la web en Vercel |
+| [`Documentacion/Auditoria/`](Documentacion/Auditoria/) | Auditoría del 03/11/2026 y lista de prioridades |
+| `Documentacion/` | Evidencias de las guías GA7, GA8 y GA9 |
+| [`CLAUDE.md`](CLAUDE.md) | Reglas del proyecto para trabajar con Claude Code |
