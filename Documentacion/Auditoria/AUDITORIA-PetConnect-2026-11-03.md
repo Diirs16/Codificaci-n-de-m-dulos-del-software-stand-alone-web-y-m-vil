@@ -1473,6 +1473,30 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   último commit con `git show HEAD:` en una carpeta temporal): con las dos viejas o solo `EJECUCION.md` vieja fallan 2
   (rutas en los `.md` y comandos sin la variable); con solo DESPLIEGUE vieja falla 1 (línea 139); pasan a propósito las
   2 de búsqueda y patrón, que no dependen del repo; con las dos nuevas, 0.
+- **Estado de A-38: resuelto el 12/11/2026 (ítem 6.8 de PRIORIDADES; solo `.gitignore` y una prueba; no toca código,
+  dependencias, CI ni BD; no cierra NC).** Revisión: ningún `~$*` en el árbol actual (`git ls-files`) ni en el disco;
+  en el historial, el temporal `Documentacion/GA9/~$9-220501096-AA3-EV02-PetConnect.docx` (162 bytes; Word guarda ahí
+  el nombre de quien abrió el documento) solo está en el commit `e48068c` del 31/10/2026, que un `reset` del 03/11/2026
+  dejó fuera: hoy no lo contiene ninguna rama, ni local ni remota, solo el *reflog* local, que git limpia con el tiempo.
+  No se reescribe el historial (haría falta `push --force`, prohibido). Antes, `git check-ignore` no ignoraba ese
+  nombre. Cambio: sección “Temporales de Office” con la regla `~$*` en el `.gitignore` de la raíz (cubre Word, Excel y
+  PowerPoint); `git ls-files -ci --exclude-standard` sigue vacío (la regla no tapa archivos reales). El bloque “Claude
+  Code” que ya estaba sin commit en el `.gitignore` se dejó fuera del commit por decisión del dueño (opción B: parche
+  con solo estas líneas aplicado con `git apply --cached`). Regresión: `tests/test_gitignore.py` (4: la línea `~$*`
+  activa y sin `!~$…` que la anule; `git check-ignore --no-index` ignora 3 temporales de ejemplo y **no** ignora
+  `GA9-220501096-AA1-EV02-PetConnect.docx`; `git ls-files -ci --exclude-standard` vacío; se omiten sin `.gitignore` en
+  la raíz, como en Docker, o sin git). Suite 593 (538 + 55 omitidas). Contraprueba (repositorio temporal con
+  `git show HEAD:.gitignore`): fallan 2 (la regla y `check-ignore`, con sus 3 subcasos); pasan a propósito 2 (el
+  documento real y `ls-files`, que ya eran ciertas); con el `.gitignore` nuevo, 0. Mutaciones detectadas: `*.docx` y
+  `Documentacion/` (tapan el documento real) y `!~$9-*` (anula la regla).
+- **Estado de A-39: resuelto el 12/11/2026 (ítem 6.8 de PRIORIDADES).** `.github/modernize/java-upgrade/` tenía 3
+  archivos: un `.gitignore` con `**/*` (por eso git ya la ignoraba y nunca pudo subirse) y `hooks/scripts/recordToolUse`
+  en `.ps1` y `.sh`, que anotan en un `.json` los comandos de terminal del asistente de Copilot para la extensión de VS
+  Code de actualización de Java. Nada del proyecto la usaba y PetConnect no tiene Java. Se borró con la confirmación del
+  dueño; `.github/workflows/ci.yml` no se tocó. Los scripts tenían fecha del mismo 12/11/2026: la extensión sigue
+  instalada y puede volver a crearla; se recomendó al dueño desactivarla para este espacio de trabajo
+  (*Disable (Workspace)*). No se agregó `.github/modernize/` al `.gitignore` de la raíz (su propio `.gitignore` ya la
+  cubría).
 
 ### 3.9 Configuración de Claude Code (instalada hoy)
 

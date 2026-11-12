@@ -41,6 +41,10 @@ npm-debug.log*
 *.sqlite3
 *.db
 
+# Temporales de Office (Word, Excel, PowerPoint): "~$nombre.docx" existe solo
+# mientras el documento está abierto y guarda el nombre de quien lo abrió
+~$*
+
 # Editores y sistema operativo
 .vscode/
 .idea/
