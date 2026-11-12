@@ -1104,6 +1104,21 @@ dueño: `PruebasEsquemaEnBD` + `PruebasMigracionEjemploEnBD`, 12 de 12 OK. Contr
 
 #### A-25 · ⚪ Baja · `innerHTML` con el nombre del producto [A]
 - `assets/js/addToCartToast.js:23-28`. Hoy el nombre viene de la BD, pero es XSS en potencia. Usar `textContent`.
+- **Estado: resuelto el 12/11/2026 (ítem 6.4 de PRIORIDADES, una parte, solo web; no toca la API, el esquema ni la BD;
+  no cierra NC).** Decisión del dueño: opción B (cero `innerHTML`; descartadas A, dejar el SVG fijo con `innerHTML`, y
+  C, pasar el aviso a un componente de React por ser un cambio grande) con la prueba 1 (un `document` falso mínimo,
+  sin `jsdom`, que sería dependencia nueva) más una guardia sobre el código. `addToCartToast.js` crea el `<span>` con
+  `createElement` y pone `"${nombre} agregado al carrito"` con `textContent`; el ícono ✓ se arma con `createElementNS`
+  (SVG + `path`, `aria-hidden="true"`). Se agregó `role="status"` al aviso (los lectores de pantalla lo anuncian, como
+  el aviso de cierre de sesión del Header). Posición, estilos, animaciones y los 2,5 s no cambian; `ProductCard.jsx` y
+  `ProductDetail.jsx` tampoco. Regresión: `tests/aviso-carrito.test.js` (6): `"<img src=x onerror=alert(1)>"` queda
+  como texto sin crear `<img>` ni escribir HTML crudo; nombre normal sin `innerHTML`; ícono SVG + `role="status"`;
+  quita el aviso anterior; salida a los 2,5 s (relojes falsos de `node:test`); y una guardia que falla si cualquier
+  archivo de `src/` vuelve a usar `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `dangerouslySetInnerHTML` o
+  `document.write(`. `npm test` 98/98, lint sin errores, build bien. Contraprueba (`git stash` solo de
+  `addToCartToast.js`): fallan 4; pasan a propósito 2 (quitar el aviso anterior y la salida a los 2,5 s, que el código
+  viejo ya hacía bien). En el navegador real (Vite, 375 px): con ese nombre, 0 `<img>`, 0 alertas, el texto se ve
+  literal y la caja queda entre 35 y 355 px, sin desplazamiento horizontal.
 
 #### A-26 · ⚪ Baja · Precio calculado en el navegador [A]
 - `CartContext.jsx:37`. Aceptable mientras el checkout sea demo; si se implementa, el servidor recalcula precio y stock.
