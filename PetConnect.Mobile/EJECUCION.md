@@ -57,21 +57,26 @@ Debe mostrar: `Waiting on http://localhost:8081`
 **Terminal 3 — Emulador y conexión**:
 
 ```powershell
-& "C:\Users\goku8\AppData\Local\Android\Sdk\emulator\emulator.exe" -avd Pixel_7
+& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Pixel_7
 ```
+
+> `$env:LOCALAPPDATA` es una variable que Windows ya trae: vale
+> `C:\Users\<tu-usuario>\AppData\Local`, así que el comando sirve en cualquier
+> cuenta sin escribir tu nombre. Si instalaste el SDK en otra carpeta, ver la
+> sección 5.
 
 Esperar a que encienda por completo, luego:
 
 ```powershell
-& "C:\Users\goku8\AppData\Local\Android\Sdk\platform-tools\adb.exe" reverse tcp:8081 tcp:8081
-& "C:\Users\goku8\AppData\Local\Android\Sdk\platform-tools\adb.exe" install -r "PetConnect.Mobile\android\app\build\outputs\apk\debug\app-debug.apk"
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" reverse tcp:8081 tcp:8081
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r "PetConnect.Mobile\android\app\build\outputs\apk\debug\app-debug.apk"
 ```
 
 Abrir la app en el emulador (o si ya estaba abierta con error, forzar recarga):
 
 ```powershell
-& "C:\Users\goku8\AppData\Local\Android\Sdk\platform-tools\adb.exe" shell am force-stop com.petconnect.mobile
-& "C:\Users\goku8\AppData\Local\Android\Sdk\platform-tools\adb.exe" shell monkey -p com.petconnect.mobile -c android.intent.category.LAUNCHER 1
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am force-stop com.petconnect.mobile
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell monkey -p com.petconnect.mobile -c android.intent.category.LAUNCHER 1
 ```
 
 ## 4. Comandos de diagnóstico
@@ -85,7 +90,7 @@ curl http://127.0.0.1:5000/api/productos
 Verificar que el emulador está conectado:
 
 ```powershell
-& "C:\Users\goku8\AppData\Local\Android\Sdk\platform-tools\adb.exe" devices
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
 ```
 
 Verificar que Metro está vivo y sirviendo el proyecto correcto (sin necesidad
@@ -107,5 +112,6 @@ curl "http://127.0.0.1:8081/index.bundle?platform=android&dev=true" -o bundle.js
 | Pantalla roja **"Unable to load script"** en la app | El APK debug no trae el JavaScript empacado: necesita Metro corriendo y el puerto reenviado | Levantar `npx expo start` y ejecutar `adb reverse tcp:8081 tcp:8081`, luego recargar la app |
 | `adb: no devices/emulators found` | El emulador no está encendido, se cerró o aún no termina de arrancar | Encender el AVD desde Android Studio o `emulator -avd Pixel_7`, esperar a que cargue por completo y confirmar con `adb devices` |
 | `adb` no se reconoce como comando | `platform-tools` no está en el PATH de la terminal actual | Usar la ruta completa a `adb.exe`, o agregar `platform-tools` al `PATH` de la sesión |
+| `& "$env:LOCALAPPDATA\Android\Sdk\...\adb.exe"` dice que no se reconoce el término | El SDK de Android quedó instalado en otra carpeta | Buscar la carpeta en Android Studio → *Settings* → *Android SDK* (“Android SDK Location”) y escribirla en lugar de `$env:LOCALAPPDATA\Android\Sdk` |
 | `./gradlew assembleRelease` falla con `Filename longer than 260 characters` | Límite de rutas de Windows, agravado por la ruta larga dentro de OneDrive | Usar la variante `assembleDebug` + Metro (ver sección 2); la solución de fondo (rutas largas de Windows o mover el proyecto) queda fuera del alcance de esta evidencia |
 | `Port 8081 is being used by another process` al correr `npx expo start` | Ya había un Metro corriendo de un intento anterior | Verificar con `curl http://127.0.0.1:8081/status` antes de abrir uno nuevo; si ya responde `running`, no hace falta otro |

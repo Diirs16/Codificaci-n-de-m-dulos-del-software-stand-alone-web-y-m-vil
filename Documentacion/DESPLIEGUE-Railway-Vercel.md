@@ -136,7 +136,7 @@ clave ni valor de configuración).
 
 Los clics del panel resultaron confusos, así que se usó el CLI oficial (`npm install -g @railway/cli@5.71.0`).
 El dueño hizo `railway login` y generó las claves con comandos que las guardan **sin mostrarlas**. Desde
-`C:\Users\goku8\OneDrive\Escritorio\Evidecia`, uno por línea:
+la carpeta raíz del proyecto (`Evidecia`, la que tiene la carpeta `.venv`), uno por línea:
 
 ```powershell
 $p = .\.venv\Scripts\python -c "import secrets; print(secrets.token_urlsafe(24))"; railway variable set "MARIADB_PASSWORD=$p" --service db --skip-deploys | Out-Null; $p = $null

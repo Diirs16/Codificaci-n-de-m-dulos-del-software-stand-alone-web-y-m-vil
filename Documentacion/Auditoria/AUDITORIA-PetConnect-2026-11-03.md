@@ -1451,6 +1451,28 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   `test_dockerignore.py` sin cambios, en verde. Contraprueba (archivos del último commit puestos con `git archive`):
   con los 29 archivos de vuelta falla 1 (una sola colección) y pasan 4; con la GA9 vieja y sin la carpeta falla 1 (las
   guías) y pasan 4. Pasan a propósito las de datos, rutas de la API y búsqueda, que no dependen de lo borrado.
+- **Estado de A-36: resuelto el 12/11/2026 (ítem 6.7 de PRIORIDADES; solo documentación y una prueba; no toca código,
+  dependencias, CI ni BD; no cierra NC).** Grep en todos los `.md` y en todo lo que sigue git (saltando `node_modules`,
+  `.git`, `.claude` y este registro): la ruta con el usuario de Windows del dueño estaba en 7 líneas de 2 archivos,
+  `PetConnect.Mobile/EJECUCION.md` (60, 66, 67, 73, 74 y 88: `emulator.exe` y `adb.exe` dentro de
+  `AppData\Local\Android\Sdk`) y, fuera de la tabla, `Documentacion/DESPLIEGUE-Railway-Vercel.md:139` (la carpeta del
+  proyecto en el Escritorio, dentro de OneDrive); ningún archivo de código la tenía. Decisión del dueño: opción A
+  (`$env:LOCALAPPDATA`, que Windows ya trae y vale `C:\Users\<usuario>\AppData\Local`; descartadas B,
+  `$env:ANDROID_HOME`, vacía en el PC del dueño, y C, poner `adb`/`emulator` en el PATH, un paso de configuración más
+  para cada persona) y DESPLIEGUE dentro del ítem. `EJECUCION.md`: los 6 comandos empiezan con
+  `& "$env:LOCALAPPDATA\Android\Sdk\..."`, nota que explica la variable y fila nueva en la tabla de problemas para un SDK
+  en otra carpeta (Android Studio → *Android SDK Location*); la línea 12 (`<usuario>`) ya era genérica. DESPLIEGUE dice
+  “la carpeta raíz del proyecto (`Evidecia`)”. Comprobado por el dueño en PowerShell 5.1: `Test-Path` de `adb.exe` y
+  de `emulator.exe` → `True` y `& "$env:LOCALAPPDATA\...\adb.exe" version` → Android Debug Bridge 1.0.41. Regresión
+  (en el backend, por decisión del dueño): `tests/test_rutas_personales.py` (4: ningún `.md` del repo tiene
+  `C:\Users\<nombre-real>\`, ni con `/` ni al estilo Git Bash `/c/Users/…`, salvo rellenos entre `< >` y las cuentas
+  `Public`/`Default`, saltando AUDITORÍA, PRIORIDADES, `node_modules`, `dist`, `build` y carpetas con punto —el
+  mensaje dice archivo y línea, sin repetir el nombre—; cada `adb.exe`/`emulator.exe` de `EJECUCION.md` empieza con
+  `$env:LOCALAPPDATA\Android\Sdk\`; la búsqueda y el patrón probados con carpeta y textos inventados; las dos del repo
+  se omiten si las guías no están, como en la imagen de Docker). Suite 589 (534 + 55 omitidas). Contraprueba (guías del
+  último commit con `git show HEAD:` en una carpeta temporal): con las dos viejas o solo `EJECUCION.md` vieja fallan 2
+  (rutas en los `.md` y comandos sin la variable); con solo DESPLIEGUE vieja falla 1 (línea 139); pasan a propósito las
+  2 de búsqueda y patrón, que no dependen del repo; con las dos nuevas, 0.
 
 ### 3.9 Configuración de Claude Code (instalada hoy)
 
