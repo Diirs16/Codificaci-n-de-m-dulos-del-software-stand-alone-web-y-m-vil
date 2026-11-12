@@ -548,7 +548,9 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
   teléfono sigue en texto plano y se corrige el comentario. Se descartó la opción B (cifrarlo): las columnas
   `varchar(20)` no alcanzan (un teléfono cifrado ocupa unos 120 caracteres), habría que migrar las filas existentes y,
   mientras `generate_keys.py` pueda sobrescribir el `.env` (A-16), cambiar la `FERNET_KEY` dejaría ilegibles todos los
-  teléfonos; además, hoy ninguna pantalla los lee. Retomarla cuando A-16 esté corregido y exista una vista que los use.
+  teléfonos; además, hoy ninguna pantalla los lee. Retomarla cuando A-16 esté corregido y exista una vista que los use
+  (A-16 quedó corregido el 12/11/2026, ítem 6.3: `generate_keys.py` ya no cambia una `FERNET_KEY` con valor; falta la
+  vista).
   Cambios: `decrypt()` lanza `InvalidToken` si no puede descifrar (vacío o `None` se devuelven igual);
   `decrypt_estricto` se fusionó con ella y `otp/servicio.py` usa `decrypt`; `api.py` ya no importa
   `encrypt/decrypt` (no los usaba) y su comentario dice la verdad: el registro no pide teléfono y el de las solicitudes
@@ -649,6 +651,37 @@ auditoría del compañero; **[N]** = hallazgo nuevo de esta auditoría.
 - `generate_keys.py:41` abre el archivo de entorno en modo `"w"`: si se corre dos veces, **borra** la contraseña de la
   BD y las credenciales de Gmail, y cambia `JWT_SECRET` (cierra todas las sesiones).
 - **Arreglo:** si el archivo existe, solo agregar las claves que falten o pedir confirmación.
+- **Estado: resuelto el 12/11/2026 (ítem 6.3 de PRIORIDADES, en una parte; solo backend + documentación; no toca
+  código de la API, el esquema ni la BD; no cierra NC).** Decisión del dueño: **opciones A + C** (descartada la B,
+  preguntar con `input()`: un "s" por error borraba igual y sin teclado se cuelga). `generate_keys.py` ahora tiene
+  `generar(ruta_env, ruta_plantilla)` y `main()`, y solo actúa bajo `if __name__ == "__main__"` (antes escribía apenas
+  se importaba). Si el archivo de entorno no existe, lo crea copiando `.env.example` (C: una sola plantilla; antes
+  traía una propia sin `APP_ENV`, `DB_POOL_SIZE`, `FLASK_DEBUG`, `API_HOST`, `PROXY_CONFIABLE` ni `CORS_ORIGENES`) y
+  llena las dos claves en su línea. Si existe (A), solo llena `JWT_SECRET`/`FERNET_KEY` vacías (`=`, `=""`, o solo un
+  comentario, que se conserva) o las agrega al final si no tienen línea (una clave comentada no cuenta); si ya
+  tienen valor no las cambia y **no reescribe el archivo**. Las demás líneas quedan igual byte a byte (fin de línea
+  de Windows, BOM, comillas). Escribe en un temporal de la misma carpeta y lo pone con `os.replace`: un corte a mitad
+  no deja el archivo vacío. Las rutas salen de la carpeta del script (antes, de la carpeta desde donde se corría:
+  desde la raíz creaba un archivo suelto que la API no lee). Ya **no imprime** los primeros 12 caracteres de las
+  claves: solo "creada" o "ya tenía valor". `secrets.token_hex(32)` en vez de `os.urandom(32).hex()` (equivalente;
+  es lo que recomienda `.env.example`). Sin dependencias nuevas. **Hallazgo:** `VERIFICACION.md` (paso 5) ya decía
+  "copia `.env.example`, pon tu contraseña y luego corre `generate_keys.py`, que completa las claves": con el código
+  viejo eso borraba la contraseña recién escrita; ahora es cierto (no se tocó). Textos: `README.md` (sección 6),
+  comentario de claves en `.env.example` y la skill `levantar-proyecto` (sin seguimiento en git: no entra al commit);
+  `security/crypto.py` no cambia (su mensaje sigue siendo correcto). Regresión: `tests/test_generate_keys.py` (11,
+  solo en carpetas temporales; importa el script dentro de una carpeta temporal, sin salida y con `tempfile.mkstemp`
+  bloqueado, así ni el código viejo ni uno sin el `if __name__` pueden tocar el archivo real; los valores nunca se
+  imprimen): importar no crea archivos; rutas de la carpeta del script; archivo nuevo desde la plantilla, desde la
+  plantilla real (trae todas sus variables) y sin plantilla; conserva las demás variables byte a byte; claves con
+  valor no cambian ni se reescribe; dos veces seguidas no cambia nada; vacías se llenan y las comentadas no cuentan;
+  si falla la escritura el original queda entero; la salida no muestra los valores. Suite 577 (522 + 55 omitidas).
+  Contraprueba con `git stash` de `generate_keys.py`: **fallan las 11** (10 con error porque `generar`, `main` y
+  `RUTA_ENV` no existen, y 1 falla: importarlo creó el archivo en la carpeta temporal); ninguna pasa a propósito. La
+  fecha y el tamaño del archivo de entorno real (sin abrirlo) quedaron iguales antes y después. Como el código viejo
+  falla "por no existir", se hizo además una contraprueba por sabotaje en copias fuera del repositorio, uno a la vez
+  sobre el código nuevo, y los 7 se detectan: regenerar claves con valor → 2; pisar con la plantilla → 4; escribir
+  directo (no atómico) → 1; imprimir parte de la clave → 1; sin `if __name__` → la importación falla (error en
+  `setUpClass`, toda la clase); contar las claves comentadas → 1; borrar el comentario al llenar → 1.
 
 #### A-17 · 🟡 Media · Política de contraseña sin minúscula — NC-004 [A]
 - `api.py:66-77` y `RegisterModal.jsx:8-11`. **Evidencia:** `PETCONNECT1!` es aceptada.

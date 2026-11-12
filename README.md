@@ -195,8 +195,9 @@ archivos `.env` reales nunca se suben a Git ni se pegan en un chat.
 > **Ojo:** todo lo que empieza por `VITE_` o `EXPO_PUBLIC_` queda **dentro de la página o de la app** y
 > cualquiera puede leerlo. Ahí solo van direcciones públicas, nunca contraseñas ni claves.
 
-> `generate_keys.py` crea las claves, pero **sobrescribe el `.env` completo**. Si ya tienes uno, genera solo la
-> clave que falte con el comando que trae `.env.example`.
+> `python generate_keys.py` (desde cualquier carpeta) crea `JWT_SECRET` y `FERNET_KEY` en `petconnect.Backend/.env`
+> **sin borrar nada**: si el archivo no existe, lo crea copiando `.env.example`; si existe, solo llena las claves que
+> falten y deja igual todo lo demás. No muestra el valor de las claves.
 
 ## 7. Despliegue
 
