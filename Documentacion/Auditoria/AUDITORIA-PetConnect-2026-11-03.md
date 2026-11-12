@@ -1342,6 +1342,28 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   se omiten si el README no está, como dentro de la imagen de Docker). Suite 562 (507 + 55 omitidas). Contraprueba
   (`git stash` del README): fallan 3 (versión, motor, tablas); pasan a propósito 3 (`autocommit`, enlaces y
   variables, que el README viejo ya tenía bien).
+- **Estado de A-33: resuelto el 12/11/2026 (ítem 6.2 de PRIORIDADES; solo documentación y una prueba, no toca código,
+  dependencias, CI ni BD; no cierra NC).** Decisión del dueño: opción A (corregir el plan a lo que usa el repositorio,
+  sin dependencias nuevas; se descartó B, adoptar `pytest`, `pytest-cov` y un `.env.test`: dos dependencias nuevas y un
+  archivo de secretos que las pruebas hoy no necesitan) y subir GA9 a la **versión 2.4** (Tabla 1; la 2.3 pasa a
+  "Versiones anteriores"). En `Documentacion/GA9-220501096-AA1-EV02-PetConnect.md`, las 9 zonas que nombraban pytest o
+  `.env.test` (arquitectura, 7 filas de funcionalidades, niveles unitario e integración, cobertura, entorno Docker,
+  herramientas, Figura 4, evidencias y conclusiones) dicen ahora `unittest`, el cliente de pruebas de Flask,
+  `unittest.mock` y `PETCONNECT_PRUEBA_BD=1` con bases temporales; la cobertura se medirá con `coverage.py`, que queda
+  **por adoptar** (dependencia nueva: pide permiso; hoy la API no mide cobertura). La Figura 4 (CP-012) se reescribió
+  como `unittest.TestCase` con `_importar_api()` y `generate_token(id, versión)` (la vieja pasaba un correo) y su nota ya
+  no cita NC-008 (cerrada el 15/10) sino que el carné aún no existe (TDD). De paso, la celda de integración decía
+  "MySQL 8 en Docker": pasa a MariaDB 10.11 (5.2). Queda sin tocar la fila IN-02 (línea 79, "MySQL 8 en Docker y
+  staging"), fuera de A-33. Bitácora: NC-010 sigue "En corrección" por decisión del dueño, con una nota del 12/11/2026
+  (la regla `chk_aplicacion_fechas` ya bloquea el dato por cualquier camino; falta la validación en el servicio cuando
+  exista el carné, RF03/CP-010). Grep: `pytest` y `.env.test` solo quedan en frases de historial (Tabla 1, entorno
+  Docker y nota de la Figura 4). Regresión (pedida por el dueño): `tests/test_ga9_plan.py` (4: sin `import pytest`,
+  `@pytest.fixture` ni `pytest-cov`; toda línea con pytest o `.env.test` lleva una marca de historial; la Figura 4 usa
+  `unittest.TestCase`, `test_client()` y `_importar_api`; versión ≥ 2.4; se omiten si GA9 no está, como en la imagen de
+  Docker). Suite 566 (511 + 55 omitidas). Contraprueba (`git stash` solo de GA9): fallan las 4 (24 subcasos: 19
+  líneas, 3 textos prohibidos, la figura y la versión); la línea 342 vieja pasó a propósito porque ya tenía un "Antes
+  decía" de `mysql:8.0` (límite conocido de la marca por línea). Mutación: volver a "Reporte de pytest" en Evidencias →
+  falla 1.
 
 ### 3.9 Configuración de Claude Code (instalada hoy)
 
