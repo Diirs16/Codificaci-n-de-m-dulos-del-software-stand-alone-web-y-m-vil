@@ -380,7 +380,7 @@ antiguas con SHA-256 se reconocen con `hashlib` y pasan a bcrypt en su siguiente
 
 ## 12. Licencia
 
-**Todos los derechos reservados.** PetConnect es un proyecto formativo del SENA (ficha 220501096) y su código no
+**Todos los derechos reservados.** PetConnect es un proyecto formativo del SENA (ficha 3235905) y su código no
 tiene una licencia abierta. Que se pueda ver (por ejemplo, en GitHub) no da permiso de copiarlo, modificarlo ni
 redistribuirlo sin autorización de sus autores.
 
