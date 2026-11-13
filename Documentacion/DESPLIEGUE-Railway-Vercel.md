@@ -87,15 +87,16 @@ Celular ──HTTPS──┘
    | `JWT_SECRET` | clave **nueva** (sellada) | `.\.venv\Scripts\python -c "import secrets; print(secrets.token_hex(32))"` |
    | `FERNET_KEY` | clave **nueva** (sellada) | `.\.venv\Scripts\python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
    | `PROXY_CONFIABLE` | `x-real-ip` | El límite de 5 intentos cuenta por la IP real de cada persona |
-   | `APP_ENV` | `desarrollo` | **Temporal**: si el correo falla, el código sale en los registros de Railway (solo el código, nunca el correo). Se quita al terminar el ítem 6.12, cuando el correo con Brevo ya llega |
    | `EMAIL_MODE` | `brevo` | Railway Hobby bloquea SMTP; Brevo envía por HTTPS (ver [Correo con Brevo](#correo-con-brevo-ítem-612)) |
-   | `BREVO_API_KEY` | clave **nueva** (sellada) | Se genera en Brevo y la pone el dueño **por el panel web** (nunca en el chat ni con `Read-Host`) |
+   | `BREVO_API_KEY` | clave **nueva** (sellada) | Se genera en Brevo y la pone el dueño (nunca en el chat ni con `Read-Host`; ver [Correo con Brevo](#correo-con-brevo-ítem-612)) |
    | `BREVO_SENDER` | remitente validado en Brevo | El Gmail del proyecto, el mismo que aparece como verificado en Brevo → *Remitentes* |
    | `PORT` | `5000` | Gunicorn escucha en el 5000 (`gunicorn.conf.py`) |
    | `CORS_ORIGENES` | *(vacía por ahora)* | Se llena en la parte 3 con la dirección de Vercel |
 
    **No** pongas `FLASK_DEBUG`, `API_HOST`, `GMAIL_*` ni `MAILTRAP_*`. No copies las claves de tu `.env`
-   local: claves nuevas para un servidor nuevo.
+   local: claves nuevas para un servidor nuevo. Tampoco `APP_ENV`: se usó con `desarrollo` mientras el
+   correo no llegaba (el código salía en los registros) y se quitó el 13/11/2026 al cerrar el ítem 6.12.
+   Sin ella, si el correo falla la API responde 503 y el código no queda en ningún registro.
 4. **Settings → Networking → Generate Domain** → puerto **5000**. Te da algo como
    `https://api-production-xxxx.up.railway.app` (con HTTPS automático).
 5. **Deploy**. En los registros debe salir que Gunicorn arrancó. Si la API arrancó antes que la BD y se
@@ -165,13 +166,29 @@ una API por HTTPS (puerto 443), así que la API manda el código de verificació
 3. **Clave de API restringida**: Brevo → *SMTP y API* → *Claves de API* → *Generar una nueva clave*, con
    permisos **restringidos** y solo *Emails transaccionales → Todos*. Si alguien la roba, solo puede enviar
    correos, no leer contactos ni cambiar la cuenta. Brevo la muestra **una sola vez**.
-4. **Ponerla en Railway por el panel web**: servicio `api` → **Variables** → `BREVO_API_KEY` → ⋮ →
-   **Edit** → pegar → ✓ → **Deploy**. No uses `Read-Host` en PowerShell: dos veces la clave terminó
-   pegada dentro del texto del comando y quedó visible en capturas. No tomes capturas donde se vea la clave;
-   si se ve, bórrala en Brevo y genera otra.
-5. **Las variables que no son secretas** (`EMAIL_MODE=brevo` y `BREVO_SENDER`) también se ponen en el panel.
-6. **Probar**: pedir un código desde la web de Vercel y revisar la bandeja **y la carpeta de spam**.
-7. **Al terminar**: quitar `APP_ENV`. Sin esa variable, si el correo falla la API responde 503
+4. **Ponerla en Railway** (la pone el dueño, nunca Claude). Dos formas:
+   - **Panel web**: servicio `api` → **Variables** → `BREVO_API_KEY` → ⋮ → **Edit** → pegar → ✓ y luego
+     **Deploy** en la barra *"Apply N changes"*. Antes de desplegar abre **Details**: el 13/11/2026 había
+     2 cambios en espera en `db` (quitarle el repositorio y la rama) que nadie pidió; se descartaron
+     solo esos. Ojo: si descartas todo, también se pierde la clave.
+   - **CLI con el portapapeles** (lo que funcionó el 13/11/2026): un script que **espera** a que copies el
+     valor en Brevo y lo pasa con `| railway variable set BREVO_API_KEY --stdin --service api --skip-deploys`
+     (Railway quita el salto de línea final). El valor no se ve en pantalla ni queda en el historial.
+     `Get-Clipboard | railway ...` a secas **no** sirve si copias el comando desde el chat: el portapapeles
+     queda con el comando y eso es lo que se guarda.
+   - **Nunca** `Read-Host "..."`: tres veces la clave terminó pegada dentro del texto entre comillas y quedó
+     visible en capturas (y en el historial de PowerShell, `ConsoleHost_history.txt`). Si una clave se ve
+     en una captura, bórrala en Brevo y genera otra.
+5. **Las variables que no son secretas** (`EMAIL_MODE=brevo` y `BREVO_SENDER`) se ponen igual. Comprueba
+   después solo con sí/no (que el remitente tenga forma de correo, que la clave empiece por `xkeysib-`),
+   nunca mostrando el valor. **No** copies el "Iniciar sesión" de la pestaña SMTP de Brevo: tiene forma de
+   correo, pero es el usuario SMTP, no el remitente.
+6. **Desplegar**: una variable puesta con `--skip-deploys` o borrada no redespliega sola:
+   `railway redeploy --service api --yes`.
+7. **Probar** con un registro **nuevo** desde la web de Vercel y revisar la bandeja **y la carpeta de spam**.
+   "Reenviar código" no sirve para probar si el registro ya venció (10 min): la API responde 200 igual,
+   a propósito (A-14), pero no envía nada.
+8. **Al terminar**: quitar `APP_ENV` y redesplegar. Sin esa variable, si el correo falla la API responde 503
    ("No pudimos enviar el código…") y el código se descarta; no queda en ningún registro.
 
 **Avisos:**
@@ -179,11 +196,15 @@ una API por HTTPS (puerto 443), así que la API manda el código de verificació
 - **Spam**: Brevo no puede autenticar un remitente de Gmail (es un dominio gratuito), así que lo cambia por
   una dirección `@brevosend.com`. Por eso el correo puede caer en spam. Con un dominio propio verificado
   en Brevo esto se arregla.
-- **La clave vence**: Brevo desactiva una clave de API que pasa **90 días sin usarse**. Si la demo queda
-  quieta mucho tiempo, genera otra y cámbiala en el panel.
-- **Error 401 por "IP autorizadas"**: si en Brevo → *Configuración* → *Seguridad* está activa la lista de
-  IP autorizadas, rechaza a Railway (su IP cambia con cada despliegue). Desactiva esa lista para las claves
-  de API o el correo nunca saldrá.
+- **La clave vence**: Brevo desactiva una clave de API que pasa **90 días sin usarse**, y además cada clave
+  trae fecha de vencimiento (la del 13/11/2026 vence el 13/11/2027; se ve en *SMTP y API* → *Claves API*).
+  Si la demo queda quieta mucho tiempo, genera otra y cámbiala en Railway.
+- **Error 401 por "IP autorizadas"** (pasó el 13/11/2026): Brevo bloquea por defecto las llamadas desde IP
+  que no conoce y manda al correo de la cuenta un aviso **"Verificar una nueva IP"**. No autorices esa IP
+  suelta: en el plan Hobby la IP de salida de Railway puede cambiar. En Brevo → *Settings* → **Seguridad**
+  → **IP autorizadas** (o el enlace "Haz clic aquí" del aviso morado de *Claves API y MCP*) pulsa
+  **"Desactivar para claves API"** y deja **Activado** el de claves SMTP (PetConnect no usa SMTP). Es
+  aceptable porque la única clave está sellada en Railway y restringida a enviar correos.
 
 **Leer los registros** (desde cualquier carpeta, con la sesión de `railway login`):
 
@@ -196,6 +217,6 @@ ni la clave:
 
 | Código | Qué significa | Qué revisar |
 |---|---|---|
-| 401 | Brevo no acepta la clave | Que `BREVO_API_KEY` sea la clave nueva y activa, y la lista de IP autorizadas |
+| 401 | Brevo no acepta la clave | La lista de IP autorizadas (lo más común) y que `BREVO_API_KEY` sea la clave nueva y activa |
 | 400 | Brevo no acepta el mensaje | Que `BREVO_SENDER` sea exactamente el remitente validado en Brevo |
 | Sin esa línea, y el correo no llega | Falta una variable o `EMAIL_MODE` está mal escrito | Que estén `EMAIL_MODE=brevo`, `BREVO_API_KEY` y `BREVO_SENDER` |
