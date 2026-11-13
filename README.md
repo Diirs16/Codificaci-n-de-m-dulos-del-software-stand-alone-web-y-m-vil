@@ -1,7 +1,7 @@
 # PetConnect
 
 Plataforma para mascotas (adopción, tienda de productos y directorio de proveedores de servicios) hecha como
-proyecto formativo del SENA (ficha 220501096). Tiene **cuatro formas de usarse** que comparten la misma base de
+proyecto formativo del SENA (ficha 3235905). Tiene **cuatro formas de usarse** que comparten la misma base de
 datos y la misma API REST:
 
 | Módulo | Carpeta | Para qué |
