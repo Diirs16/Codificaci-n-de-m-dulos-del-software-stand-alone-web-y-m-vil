@@ -1473,6 +1473,26 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   último commit con `git show HEAD:` en una carpeta temporal): con las dos viejas o solo `EJECUCION.md` vieja fallan 2
   (rutas en los `.md` y comandos sin la variable); con solo DESPLIEGUE vieja falla 1 (línea 139); pasan a propósito las
   2 de búsqueda y patrón, que no dependen del repo; con las dos nuevas, 0.
+- **Estado de A-37: resuelto el 13/11/2026 (ítem 6.10 de PRIORIDADES; el renombre se hizo en el 5.5, el 11/11/2026;
+  en el 6.10 solo se comprobó y se agregó una prueba; no toca código, dependencias, CI ni BD; no cierra NC).** El
+  dueño renombró el repositorio a `Diirs16/PETCONNECT-PROYECTO` en el 5.5 (Railway rechazaba el nombre largo como
+  nombre de servicio) y el `origin` local ya apunta ahí (`git remote -v`, 13/11/2026). Búsqueda en todo lo que sigue
+  git, saltando este registro y PRIORIDADES: `git grep` (texto) sin ninguna mención al nombre viejo ni a su URL (las
+  palabras “Codificación de módulos” de `VERIFICACION.md` son el título de la evidencia GA7, no el repositorio);
+  dentro de los Word y Excel (abiertos como ZIP, solo lectura) la URL vieja aparece como **texto sin enlace** en los
+  dos Word de GA8: `GA8-220501096-AA1-EV02-PetConnect.docx` (2 veces, una en el “Anexo F”) y
+  `GA8-220501096-AA2-EV02-PetConnect.docx` (1, “Anexo E”). Decisión del dueño: opción A (dejar los Word como están:
+  son evidencias ya entregadas y GitHub redirige la dirección vieja a la nueva mientras no se cree otro repositorio
+  con el nombre viejo en la cuenta; descartada B, corregirlos, que pedía `python-docx` como dependencia nueva o
+  hacerlo a mano en Word y cambiaba una entrega) con prueba de regresión. La redirección no se comprobó con una
+  petición a GitHub (el dueño no la pidió). Railway no se tocó: después del renombre ya había construido desde
+  GitHub. Regresión: `tests/test_nombre_repo.py` (2: ningún archivo de **texto** con seguimiento de `git ls-files`
+  tiene el nombre viejo, sin importar mayúsculas, saltando este registro, PRIORIDADES y los binarios —con un byte
+  nulo, como los Word—; la búsqueda probada con un repositorio git temporal que incluye un archivo sin seguimiento,
+  el registro y un binario falso; se omiten sin git o sin repositorio, como en Docker). El nombre viejo se arma por
+  partes dentro de la prueba para que ella misma no cuente. Suite 595 (540 + 55 omitidas). Contraprueba (la URL vieja
+  agregada a mano al `README.md` y luego restaurado desde una copia): falla 1 (`['README.md'] != []`); pasa a
+  propósito la del repositorio temporal, que no depende del repo; con el README restaurado, 0.
 - **Estado de A-38: resuelto el 12/11/2026 (ítem 6.8 de PRIORIDADES; solo `.gitignore` y una prueba; no toca código,
   dependencias, CI ni BD; no cierra NC).** Revisión: ningún `~$*` en el árbol actual (`git ls-files`) ni en el disco;
   en el historial, el temporal `Documentacion/GA9/~$9-220501096-AA3-EV02-PetConnect.docx` (162 bytes; Word guarda ahí
