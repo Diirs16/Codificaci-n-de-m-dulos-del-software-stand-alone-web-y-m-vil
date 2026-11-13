@@ -1489,10 +1489,17 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   GitHub. Regresión: `tests/test_nombre_repo.py` (2: ningún archivo de **texto** con seguimiento de `git ls-files`
   tiene el nombre viejo, sin importar mayúsculas, saltando este registro, PRIORIDADES y los binarios —con un byte
   nulo, como los Word—; la búsqueda probada con un repositorio git temporal que incluye un archivo sin seguimiento,
-  el registro y un binario falso; se omiten sin git o sin repositorio, como en Docker). El nombre viejo se arma por
-  partes dentro de la prueba para que ella misma no cuente. Suite 595 (540 + 55 omitidas). Contraprueba (la URL vieja
-  agregada a mano al `README.md` y luego restaurado desde una copia): falla 1 (`['README.md'] != []`); pasa a
-  propósito la del repositorio temporal, que no depende del repo; con el README restaurado, 0.
+  el registro y un binario falso; se omiten sin git o sin repositorio, como en Docker). Suite 595 (540 + 55
+  omitidas). Contraprueba (la URL vieja agregada a mano al `README.md` y luego restaurado desde una copia): falla 1
+  (`['README.md'] != []`); pasa a propósito la del repositorio temporal, que no depende del repo; con el README
+  restaurado, 0. **Tropiezo y corrección (13/11/2026):** con el push de las Fases 5 y 6 (`726743e..6f6aa8f`, 12
+  commits, con el sí del dueño) la CI 43451229171 falló solo en el backend: la prueba se encontraba **a sí misma**
+  (su explicación y la prueba del repositorio temporal escriben el nombre viejo completo). En local había pasado
+  porque la suite se corrió cuando el archivo aún no tenía seguimiento y `git ls-files` no lo listaba. Reproducido en
+  un clon limpio del repositorio (falla 1). Arreglo: la prueba salta su propio archivo (está en la lista del
+  registro) y la del repositorio temporal incluye ese archivo para vigilar la exclusión. En el clon limpio: la prueba
+  pasa, la contraprueba del README falla 1 y la suite queda en 595 (540 + 55 omitidas). Lección: las pruebas que leen
+  `git ls-files` se corren también en un clon limpio después del commit.
 - **Estado de A-38: resuelto el 12/11/2026 (ítem 6.8 de PRIORIDADES; solo `.gitignore` y una prueba; no toca código,
   dependencias, CI ni BD; no cierra NC).** Revisión: ningún `~$*` en el árbol actual (`git ls-files`) ni en el disco;
   en el historial, el temporal `Documentacion/GA9/~$9-220501096-AA3-EV02-PetConnect.docx` (162 bytes; Word guarda ahí

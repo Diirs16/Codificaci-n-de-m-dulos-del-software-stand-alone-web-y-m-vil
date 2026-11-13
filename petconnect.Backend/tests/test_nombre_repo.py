@@ -11,7 +11,7 @@ con el nombre viejo en la misma cuenta.
 Decision del dueno (opcion A): los dos Word de GA8 (evidencias ya entregadas)
 se dejan como estan; por eso solo se revisan los archivos de TEXTO con
 seguimiento de git. Se saltan AUDITORIA y PRIORIDADES (son el registro de lo
-que se encontro y no se cambian).
+que se encontro y no se cambian) y este mismo archivo.
 
 Lo que se vigila:
 - Ningun archivo de texto con seguimiento (git ls-files) tiene el nombre viejo.
@@ -33,13 +33,17 @@ import unittest
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAIZ_REPO = os.path.dirname(BACKEND)
 
-# Se arma por partes para que este mismo archivo no cuente como hallazgo.
-NOMBRE_VIEJO = "codificaci" + "-n-de-m-dulos"
+NOMBRE_VIEJO = "codificaci-n-de-m-dulos"
 
-# Registro de la auditoria: citan el nombre viejo a proposito.
+# Citan el nombre viejo a proposito: el registro de la auditoria y este mismo
+# archivo (su explicacion y la prueba con el repositorio temporal). Sin este
+# ultimo, la prueba se encontraba a si misma en cuanto el archivo entraba a
+# git (fallo de la CI del 13/11/2026; en local pasaba porque aun no tenia
+# seguimiento).
 ARCHIVOS_REGISTRO = {
     "Documentacion/Auditoria/AUDITORIA-PetConnect-2026-11-03.md",
     "Documentacion/Auditoria/PRIORIDADES-PetConnect-2026-11-03.md",
+    "petconnect.Backend/tests/test_nombre_repo.py",
 }
 
 
@@ -91,6 +95,8 @@ class BusquedaDelNombreViejoTest(unittest.TestCase):
                 f"| A-37 | `{nombre}` |\n",
             "Documentacion/Auditoria/PRIORIDADES-PetConnect-2026-11-03.md":
                 f"{nombre}\n",
+            "petconnect.Backend/tests/test_nombre_repo.py":
+                f'NOMBRE = "{nombre}"\n',
             "evidencia.docx": f"PK\0\0{nombre}",
             "limpio.md": "Repo: PETCONNECT-PROYECTO\n",
         }
