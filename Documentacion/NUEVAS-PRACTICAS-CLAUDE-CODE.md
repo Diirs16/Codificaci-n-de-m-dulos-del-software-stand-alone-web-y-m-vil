@@ -129,7 +129,7 @@ Los tres hooks están escritos en JavaScript (Node.js, que ya está instalado) p
 ### Cómo se implementó
 | Hook | Cuándo corre | Qué hace |
 |---|---|---|
-| `.claude/hooks/proteger-secretos.js` | **Antes** de leer, editar, escribir o correr un comando | Bloquea abrir/editar `.env` y llaves; bloquea `cat`/`Get-Content`/`copy` de esos archivos en la terminal; bloquea `git add -f` y `git add .env`; si Claude va a escribir algo como `password = "…"` en el código, **te pregunta** antes |
+| `.claude/hooks/proteger-secretos.js` | **Antes** de leer, editar, escribir, buscar con Grep o correr un comando | Bloquea abrir/editar/buscar dentro de `.env`, `.env.*`, `nombre.env` (como `docker/api.env`) y llaves (las plantillas `*.example` sí se leen); bloquea `cat`/`Get-Content`/`copy`, `python -c`, `node -e`, comodines como `.env*` y demás formas de leer esos archivos en la terminal; bloquea `git add -f` y `git add .env`; si Claude va a escribir algo como `password = "…"` en el código, **te pregunta** antes. Desde el 12/11/2026 (ítem 6.9, A-40) **no** bloquea una búsqueda que solo tiene `.env` en el patrón (`grep -n "\.env" .gitignore`). Prueba: `node --test .claude/hooks/proteger-secretos.test.js` |
 | `.claude/hooks/revisar-commit.js` | **Antes** de cualquier `git commit` | Revisa lo que está preparado (*staged*): si hay un `.env`, una llave privada, una variable de `.env` con valor real o una clave escrita en el código, **bloquea el commit** y explica cómo sacarla a `.env` |
 | `.claude/hooks/lint-front.js` | **Después** de editar un `.js`/`.jsx` de `PetConnect.Front/petconnect-app/src/` | Corre `oxlint` solo sobre ese archivo y le pasa los avisos a Claude para que los corrija en el momento |
 
@@ -375,6 +375,7 @@ No se modificó **ningún** archivo de código de la aplicación (Backend, Web n
 | Qué | Resultado |
 |---|---|
 | Hook `proteger-secretos.js`: 14 casos (leer/editar `.env`, `.env.local`, `.pem`; `cat`/`Get-Content` de `.env`; `git add -f`; clave quemada; y casos que deben pasar: `.env.example`, `api.py`, `ls`, archivos de prueba, entrada inválida) | 14/14 correctos |
+| Hook `proteger-secretos.js` tras el ítem 6.9 (12/11/2026): `proteger-secretos.test.js` con `node:test` (50 que deben bloquearse, 29 que deben pasar, 2 de claves escritas y 1 límite aceptado) | 82/82; con el hook anterior fallan 31 |
 | Hook `lint-front.js`: archivo con `debugger` y variable sin usar / archivo limpio / archivo del backend | Reporta, pasa, ignora (correcto) |
 | Hook `revisar-commit.js` en un repositorio de prueba con un `.env` y un `config.py` con clave | Bloqueó ambos; con solo un archivo limpio dejó pasar |
 | Hook activo en la sesión real (`cat no-existe/.env`) | Bloqueado por la regla de PetConnect |

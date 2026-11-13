@@ -1504,6 +1504,27 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
 - `proteger-secretos.js` bloqueó **3 comandos de esta auditoría** que solo *contenían el texto* `.env` dentro de una
   búsqueda (`grep`), sin leer el archivo.
 - **Arreglo:** que el patrón exija que `.env` sea una ruta argumento (no parte de una expresión regular entre comillas).
+- **Estado: resuelto el 12/11/2026 (ítem 6.9 de PRIORIDADES).** Medido antes de tocar (copia del hook en una carpeta
+  temporal, 51 casos): 7 falsos positivos (`grep`, `rg`, `git grep`, `findstr` y `Select-String` con `.env` en el
+  **patrón**) y 10 huecos que el hook viejo dejaba pasar: `docker/api.env` y `docker/bd.env` (contraseñas reales del
+  5.2) por Read, Edit y la terminal, comodines (`.env*`, `rg -g "*.env"`), `python -c`, `node -e`,
+  `[IO.File]::ReadAllText` y `curl -F archivo=@.env`. Una ruta a `.env.example` sola ya pasaba. Opción C del dueño
+  (descartadas A, quitar `\` y comillas de la regla, que dejaba pasar `type ".env"` y `carpeta\.env`, y B, solo los
+  falsos positivos). `proteger-secretos.js` ahora parte el comando en tramos y palabras (respetando comillas) y, en
+  los comandos de búsqueda, aparta **solo** el patrón (primer argumento, `-e`/`--regexp`, `-Pattern`, `/c:`); los
+  valores de `-f`, `-g`, `--include` o `/g:` se siguen revisando. Secretos: `.env`, `.env.*`, `nombre.env` y
+  `.pem/.key/.p12/.pfx/.jks/.keystore/.p8`, salvo lo que termina en `.example`, y los comodines que los alcanzan. Se
+  suman a los lectores `python`, `node`, `mv`, `curl`/`wget`, `base64`, `[IO.File]`, la redirección `<` y otros; y la
+  herramienta **Grep** entra al hook (`matcher` de `.claude/settings.json`; revisa `path` y `glob`). Límite aceptado:
+  un `.env` y un lector en el mismo comando (`Test-Path .env; Get-Content README.md`) siguen bloqueados para no dejar
+  pasar `$f='.env'; Get-Content $f`. Antes se subió a git la configuración de Claude Code tal como estaba (`3ace560`,
+  decisión del dueño) para que el arreglo se vea en el historial. Regresión: `.claude/hooks/proteger-secretos.test.js`
+  (82, `node:test`, sin dependencias; corre el hook como proceso aparte y no abre archivos). Contraprueba con el hook
+  viejo: fallan 31 (20 huecos y 11 falsos positivos) y pasan 51 a propósito (bloqueos que ya funcionaban, casos que
+  ya pasaban, claves escritas y el límite). 4 sabotajes detectados (sin `nombre.env` → 6; sin apartar el patrón →
+  11; `-g` de `rg` sin valor → 1; sin la herramienta Grep → 5). Suite del backend 593 (538 + 55 omitidas).
+  Fuera del ítem (no tocados): comandos que leen secretos sin nombrar el archivo (`docker compose config`,
+  `railway variables`, `dotenv list`), igual que A-41.
 
 #### A-41 · 🟡 Media · Los hooks no detectan lecturas indirectas de secretos [N] — ver incidente §5
 - Un script que **importa `api.py`** carga el `.env` real mediante `load_dotenv()`; ningún hook lo puede ver.
@@ -1518,6 +1539,9 @@ Archivos **sin commit**: `petconnect.Backend/Dockerfile`, `docker-compose.yml`, 
   archivo en un Python aparte con el espía y exige 0 llamadas. Suite 397 (347 + 50 omitidas); el espía sobre la suite
   completa: 0 llamadas (antes 1). Contraprueba con los archivos viejos: fallan 2 de 2. Ningún valor de configuración se
   leyó ni se imprimió. Los hooks siguen sin ver lecturas indirectas: la protección es la regla y esta prueba.
+- **Nota del 12/11/2026 (ítem 6.9):** confirmado que `08e61ec` y `tests/test_sin_env_real.py` siguen en verde. Pero la
+  regla **no estaba** escrita en ningún `CLAUDE.md` (ni en `NUEVAS-PRACTICAS-CLAUDE-CODE.md`), aunque arriba dice
+  que “ya existía”. Se agregó a la regla 4 del `CLAUDE.md` de la raíz (`3ace560`, primer commit de esos archivos).
 
 ---
 
