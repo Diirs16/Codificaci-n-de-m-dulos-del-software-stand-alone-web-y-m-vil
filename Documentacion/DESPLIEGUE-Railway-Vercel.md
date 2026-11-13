@@ -87,8 +87,10 @@ Celular ──HTTPS──┘
    | `JWT_SECRET` | clave **nueva** (sellada) | `.\.venv\Scripts\python -c "import secrets; print(secrets.token_hex(32))"` |
    | `FERNET_KEY` | clave **nueva** (sellada) | `.\.venv\Scripts\python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
    | `PROXY_CONFIABLE` | `x-real-ip` | El límite de 5 intentos cuenta por la IP real de cada persona |
-   | `APP_ENV` | `desarrollo` | Railway bloquea el correo SMTP: el código de verificación sale en los registros de Railway (solo el código, nunca el correo). **Solo para el preview** |
-   | `EMAIL_MODE` | `gmail` | Sin `GMAIL_USER` ni `GMAIL_APP_PASSWORD`: falla al instante, sin intentar conectarse |
+   | `APP_ENV` | `desarrollo` | **Temporal**: si el correo falla, el código sale en los registros de Railway (solo el código, nunca el correo). Se quita al terminar el ítem 6.12, cuando el correo con Brevo ya llega |
+   | `EMAIL_MODE` | `brevo` | Railway Hobby bloquea SMTP; Brevo envía por HTTPS (ver [Correo con Brevo](#correo-con-brevo-ítem-612)) |
+   | `BREVO_API_KEY` | clave **nueva** (sellada) | Se genera en Brevo y la pone el dueño **por el panel web** (nunca en el chat ni con `Read-Host`) |
+   | `BREVO_SENDER` | remitente validado en Brevo | El Gmail del proyecto, el mismo que aparece como verificado en Brevo → *Remitentes* |
    | `PORT` | `5000` | Gunicorn escucha en el 5000 (`gunicorn.conf.py`) |
    | `CORS_ORIGENES` | *(vacía por ahora)* | Se llena en la parte 3 con la dirección de Vercel |
 
@@ -150,3 +152,50 @@ solo por nombre.
 - Dirección de la API: `https://api-production-d8fdc68b.up.railway.app`
 - Ver los registros: `railway logs --service api` (o `--service db`)
 - Ver los despliegues: `railway deployment list --service api`
+
+### Correo con Brevo (ítem 6.12)
+
+**Por qué:** el plan Hobby de Railway bloquea el correo SMTP (Gmail, Mailtrap), pero no HTTPS. Brevo tiene
+una API por HTTPS (puerto 443), así que la API manda el código de verificación por ahí
+(`EMAIL_MODE=brevo`, función `_enviar_brevo` de `correo/servicio.py`). No usa dependencias nuevas.
+
+1. **Cuenta**: crear una cuenta gratuita en Brevo con el Gmail del proyecto.
+2. **Remitente**: en Brevo → *Remitentes*, agregar el Gmail del proyecto con el nombre `PetConnect` y
+   validarlo con el enlace que llega a esa bandeja. Ese mismo correo va en `BREVO_SENDER`.
+3. **Clave de API restringida**: Brevo → *SMTP y API* → *Claves de API* → *Generar una nueva clave*, con
+   permisos **restringidos** y solo *Emails transaccionales → Todos*. Si alguien la roba, solo puede enviar
+   correos, no leer contactos ni cambiar la cuenta. Brevo la muestra **una sola vez**.
+4. **Ponerla en Railway por el panel web**: servicio `api` → **Variables** → `BREVO_API_KEY` → ⋮ →
+   **Edit** → pegar → ✓ → **Deploy**. No uses `Read-Host` en PowerShell: dos veces la clave terminó
+   pegada dentro del texto del comando y quedó visible en capturas. No tomes capturas donde se vea la clave;
+   si se ve, bórrala en Brevo y genera otra.
+5. **Las variables que no son secretas** (`EMAIL_MODE=brevo` y `BREVO_SENDER`) también se ponen en el panel.
+6. **Probar**: pedir un código desde la web de Vercel y revisar la bandeja **y la carpeta de spam**.
+7. **Al terminar**: quitar `APP_ENV`. Sin esa variable, si el correo falla la API responde 503
+   ("No pudimos enviar el código…") y el código se descarta; no queda en ningún registro.
+
+**Avisos:**
+
+- **Spam**: Brevo no puede autenticar un remitente de Gmail (es un dominio gratuito), así que lo cambia por
+  una dirección `@brevosend.com`. Por eso el correo puede caer en spam. Con un dominio propio verificado
+  en Brevo esto se arregla.
+- **La clave vence**: Brevo desactiva una clave de API que pasa **90 días sin usarse**. Si la demo queda
+  quieta mucho tiempo, genera otra y cámbiala en el panel.
+- **Error 401 por "IP autorizadas"**: si en Brevo → *Configuración* → *Seguridad* está activa la lista de
+  IP autorizadas, rechaza a Railway (su IP cambia con cada despliegue). Desactiva esa lista para las claves
+  de API o el correo nunca saldrá.
+
+**Leer los registros** (desde cualquier carpeta, con la sesión de `railway login`):
+
+```powershell
+railway logs --service api
+```
+
+Busca la línea `Brevo rechazo el correo: HTTP ...`. El registro solo muestra el código HTTP, nunca el correo
+ni la clave:
+
+| Código | Qué significa | Qué revisar |
+|---|---|---|
+| 401 | Brevo no acepta la clave | Que `BREVO_API_KEY` sea la clave nueva y activa, y la lista de IP autorizadas |
+| 400 | Brevo no acepta el mensaje | Que `BREVO_SENDER` sea exactamente el remitente validado en Brevo |
+| Sin esa línea, y el correo no llega | Falta una variable o `EMAIL_MODE` está mal escrito | Que estén `EMAIL_MODE=brevo`, `BREVO_API_KEY` y `BREVO_SENDER` |
