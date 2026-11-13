@@ -220,3 +220,62 @@ ni la clave:
 | 401 | Brevo no acepta la clave | La lista de IP autorizadas (lo más común) y que `BREVO_API_KEY` sea la clave nueva y activa |
 | 400 | Brevo no acepta el mensaje | Que `BREVO_SENDER` sea exactamente el remitente validado en Brevo |
 | Sin esa línea, y el correo no llega | Falta una variable o `EMAIL_MODE` está mal escrito | Que estén `EMAIL_MODE=brevo`, `BREVO_API_KEY` y `BREVO_SENDER` |
+
+---
+
+## Vercel: solo preview y sin Git conectado
+
+**La regla:** la web se publica en Vercel **solo como preview** (privado, con Vercel Authentication), con
+`vercel deploy` **sin** `--prod`, y el proyecto `petconnect-web` **sin** el repositorio de GitHub conectado.
+Si Git queda conectado, cada push a `main` intenta publicar en **producción**, que es pública.
+
+**Todos los comandos `vercel` se corren desde `PetConnect.Front\petconnect-app`**, que es la carpeta que
+tiene la carpeta oculta `.vercel` (el enlace con el proyecto). En otra carpeta el CLI no sabe de qué
+proyecto hablas.
+
+### Trampas del `--yes`
+
+- **`vercel link --yes` conecta GitHub solo, sin preguntar.** Pasó dos veces el 11/11/2026: la primera se
+  desconectó en seguida (ítem 5.5), pero un segundo `link` la volvió a conectar (00:39 UTC del 12/11) y
+  nadie lo notó. Desde ahí, cada push a `main` mandó un correo *"Production deployment failed"* con
+  `sh: vite: command not found` / `vite build exited with 127`: el Root Directory del proyecto es la raíz
+  del repositorio, donde no hay `package.json` de la web. Fallaron 5 despliegues (`726743e`, `6f6aa8f`,
+  `1b89258`, `ec3c1d1`, `c636fe1`); ninguno publicó nada. Se arregló el 13/11/2026 con
+  `vercel git disconnect --yes` y se borraron esos 5 con `vercel rm` (con permiso del dueño).
+- **`vercel <lo que sea> --yes` fuera de la carpeta de la web** intenta **crear un proyecto nuevo** con el
+  nombre de la carpeta. El 13/11/2026, en la raíz `Evidecia`, Vercel lo rechazó solo porque el nombre
+  lleva mayúscula; con otro nombre habría quedado un segundo proyecto.
+- **No arreglarlo cambiando el Root Directory** a `PetConnect.Front/petconnect-app`: el build pasaría, pero
+  cada push a `main` saldría a producción (pública).
+
+### Comprobar que Git sigue desconectado
+
+`vercel git` solo tiene `connect` y `disconnect`; no hay un comando para *ver* el estado. Desde
+`PetConnect.Front\petconnect-app`:
+
+```powershell
+$p = vercel api /v9/projects/petconnect-web | Out-String | ConvertFrom-Json; if ($p.link) { "Conectado a: " + $p.link.org + "/" + $p.link.repo } else { "Git desconectado" }
+```
+
+Debe decir `Git desconectado`. Solo imprime el nombre del repositorio, no el resto de la ficha (ahí
+también pueden venir *deploy hooks*, enlaces que sirven para lanzar despliegues). Si dice "Conectado a",
+corre `vercel git disconnect --yes` desde esa misma carpeta.
+
+Hazlo **después de cada `vercel link`** y si llega un correo de Vercel tras un push.
+
+### Ver los despliegues
+
+```powershell
+vercel ls petconnect-web
+```
+
+Lo normal es **una sola fila**, con *Environment* = `Preview` y *Status* = `Ready`. Una fila `Production`
+significa que algo salió a producción: avisar antes de borrarla con `vercel rm <dirección>` (no se puede
+deshacer).
+
+### Un preview nuevo cambia la dirección
+
+Cada `vercel deploy` crea una dirección distinta (`petconnect-xxxxxxxxx-daniel-cc4c.vercel.app`). Si se
+publica otro preview hay que poner la dirección nueva en `CORS_ORIGENES` del servicio `api` en Railway y
+redesplegar; si no, la página carga pero la API rechaza sus pedidos. El enlace para compartir del
+preview también es de ese despliegue.
