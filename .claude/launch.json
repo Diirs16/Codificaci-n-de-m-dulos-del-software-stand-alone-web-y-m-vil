@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "PetConnect.Front/petconnect-app", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "movil-web-export",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "http.server", "8090", "--bind", "127.0.0.1", "--directory", "PetConnect.Mobile/dist"],
+      "port": 8090
+    },
+    {
+      "name": "movil-web-export-api",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "http.server", "8081", "--bind", "127.0.0.1", "--directory", "PetConnect.Mobile/dist"],
+      "port": 8081
+    }
+  ]
+}
